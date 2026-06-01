@@ -73,6 +73,15 @@ export interface ResolvedExitConfig {
   maxHoldMs: number;
   /** Max-hold ceiling in hours (for API/UI display). `0` = disabled. */
   maxHoldHours: number;
+  /**
+   * Let-winners-run opt-in (Profit-Optimization, feature #3). Derived from the
+   * account `aiPersonality` — `true` ONLY for "aggressive". When set, the live
+   * exit monitor may hold a position past its take-profit while upside momentum
+   * is still strong, letting the trailing-stop / trend-weakening / max-hold
+   * exits capture the gain instead of a hard TP cut. SL is untouched. Every
+   * other personality keeps the byte-for-byte hard-TP behaviour (`false`).
+   */
+  letWinnersRun: boolean;
 }
 
 // ── Env operator overrides (global escape hatch) ──────────────────────────────
@@ -112,6 +121,7 @@ interface AccountRow {
   takeProfitPercent:   number;
   trailingStopPercent: number | null;
   maxHoldHours:        number | null;
+  aiPersonality:       string | null;
 }
 interface PerExchangeRow {
   takeProfitPercent:   number | null;
@@ -163,7 +173,11 @@ function resolveFrom(
     maxHoldMs = Math.round(maxHoldHours * 3_600_000);
   }
 
-  return { stopLossPercent, takeProfitPercent, trailingStopPercent, maxHoldMs, maxHoldHours };
+  // Let-winners-run is opt-in via the aggressive personality only — every other
+  // personality (and a missing row) keeps the hard take-profit behaviour.
+  const letWinnersRun = account?.aiPersonality === "aggressive";
+
+  return { stopLossPercent, takeProfitPercent, trailingStopPercent, maxHoldMs, maxHoldHours, letWinnersRun };
 }
 
 // ── DB-backed resolution ──────────────────────────────────────────────────────
@@ -173,6 +187,7 @@ const ACCOUNT_COLS = {
   takeProfitPercent:   userSettingsTable.takeProfitPercent,
   trailingStopPercent: userSettingsTable.trailingStopPercent,
   maxHoldHours:        userSettingsTable.maxHoldHours,
+  aiPersonality:       userSettingsTable.aiPersonality,
 } as const;
 
 const PER_EXCHANGE_COLS = {
@@ -251,6 +266,7 @@ export async function buildExitConfigResolver(
       takeProfitPercent:   r.takeProfitPercent,
       trailingStopPercent: r.trailingStopPercent,
       maxHoldHours:        r.maxHoldHours,
+      aiPersonality:       r.aiPersonality,
     });
   }
 

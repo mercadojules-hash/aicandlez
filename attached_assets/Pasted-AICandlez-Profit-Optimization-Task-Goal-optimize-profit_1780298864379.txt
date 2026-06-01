@@ -1,0 +1,181 @@
+AICandlez Profit Optimization Task
+
+Goal: optimize profit per trade and total account growth while keeping core safety controls active.
+
+Do not waste time on another architecture report. Build and tune the system so it produces better real-money trading results.
+
+Current goal:
+
+* Increase average profit per trade
+* Improve attempt → fill conversion
+* Improve winner size
+* Reduce unnecessary held-back trades
+* Favor stronger alt/meme opportunities
+* Keep risk controlled with stop-loss, trailing stop, and liquidity protection
+
+Important:
+
+Do NOT remove core safety controls:
+
+* Stop loss
+* Liquidity protection
+* Duplicate-position protection
+* Exchange validation
+* Broker balance checks
+* Max position limits
+* Kill switch
+
+But DO identify and reduce unnecessary blockers that are preventing profitable trades from executing.
+
+Required changes:
+
+1. Profit Optimization Presets
+
+Add selectable trading modes:
+
+Conservative:
+
+* More selective
+* Smaller trade size
+* Faster exits
+
+Balanced:
+
+* Default mode
+* Moderate selectivity
+* Moderate TP/trailing
+
+Aggressive Growth:
+
+* More alt/meme exposure
+* Allows more valid trade attempts
+* Higher TP targets
+* Lets winners run longer
+* Still uses SL and trailing stop
+
+2. Alt/Meme Bias
+
+Add category allocation controls:
+
+* Majors %
+* Alts %
+* Memes %
+
+Recommended starting preset:
+
+Majors: 10%
+Alts: 50%
+Memes: 40%
+
+The AI should prioritize high-conviction alt/meme setups while avoiding over-concentration in one symbol.
+
+3. Dynamic Profit Targets
+
+Replace fixed take-profit behavior with smarter profit capture:
+
+* Keep 2% stop loss as default
+* Allow TP to be configurable per exchange
+* Add trailing stop to protect winning trades
+* Allow strong momentum trades to run beyond initial TP
+* Exit when trend weakens, trailing stop hits, or max-hold expires
+
+Suggested test settings:
+
+Coinbase:
+
+* SL: 2%
+* TP: 6%
+* Trailing: 2%
+* Max Hold: 1–2 hours
+
+Kraken:
+
+* SL: 2%
+* TP: 4–6%
+* Trailing: 2%
+* Max Hold: 1 hour
+
+4. Trade Size Progression
+
+Add per-exchange trade size controls:
+
+Testing mode:
+
+* $10 per trade
+
+Growth test:
+
+* $20 per trade
+
+Scale mode:
+
+* $100 per trade
+
+Allow separate sizing:
+
+Coinbase: configurable
+Kraken: configurable
+
+5. Fix Attempt-to-Fill Bottlenecks
+
+Use the customer-specific execution funnel to identify why trades are held back.
+
+For each held-back trade, classify the reason:
+
+* Risk gate
+* Liquidity protection
+* Duplicate position
+* Per-symbol cap
+* Exchange reject
+* Insufficient balance
+* Category allocation
+* Cooldown
+* Other
+
+Then reduce unnecessary blockers without disabling safety.
+
+Goal:
+
+If the AI finds valid opportunities, more of them should become real trades.
+
+6. Concurrency Recommendation
+
+Analyze current account balances and recommend safe concurrent positions for each mode:
+
+$10 trades:
+
+* Recommend 5–20 concurrent depending on balance
+
+$20 trades:
+
+* Recommend 5–15 concurrent depending on balance
+
+$100 trades:
+
+* Recommend only when account equity supports it safely
+
+Do not hardcode one number. Make it balance-aware.
+
+7. Reporting
+
+After implementation, show:
+
+* Average winning trade
+* Average losing trade
+* Win rate
+* Profit factor
+* Attempt-to-fill conversion
+* Most profitable coin categories
+* Best-performing exchanges
+* Best-performing symbols
+* Average hold time
+* Trades closed by TP
+* Trades closed by trailing stop
+* Trades closed by SL
+* Trades closed by max-hold
+
+Final objective:
+
+AICandlez should prioritize higher-profit alt/meme opportunities, allow winners to produce larger returns, reduce unnecessary held-back trades, and scale safely from $10 trades to $20 trades and later $100+ trades.
+
+Do not remove the protections that prevent account damage. Optimize the blockers that are unnecessarily preventing valid profitable trades from executing.

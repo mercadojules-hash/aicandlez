@@ -5,6 +5,13 @@ import { and, desc, eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth.js";
 import { resolveAiTradingGate } from "../lib/aiTradingGate.js";
 import { ALLOWED_TRADE_SIZES, DEFAULT_TRADE_SIZE_USD, isAllowedTradeSize } from "../lib/liquidityGuard.js";
+import {
+  TRADING_MODE_PRESETS,
+  TRADING_MODE_PRESET_IDS,
+  buildPresetPatch,
+  isTradingModePreset,
+  resolvePresetIdentity,
+} from "../lib/tradingModePresets.js";
 import type { Request } from "express";
 
 const router = Router();
@@ -391,6 +398,73 @@ router.put("/user/settings", requireAuth, async (req, res): Promise<void> => {
   } catch (err) {
     req.log.error({ err }, "PUT /user/settings failed");
     res.status(500).json({ error: "Failed to save settings" });
+  }
+});
+
+// ── Trading-mode presets (Profit-Optimization initiative, feature #1) ─────────
+//
+// A preset is a NAMED bundle of already-wired customer levers. Applying one
+// WRITES the underlying fields the execution engine already consumes (minConfidence,
+// categoryAllocation, account SL/TP/trailing/maxHold, preferredLiveOrderSizeUsd,
+// aiPersonality) and stamps `tradingModePreset` as an identity marker — so NO new
+// execution gate wiring is introduced and every safety gate stays enforced.
+// SL stays 2% in every preset; "aggressive" only loosens selectivity, biases
+// toward alts/memes, raises TP, and lets winners run longer.
+
+// GET catalog + the account's currently-resolved mode identity.
+router.get("/user/trading-mode", requireAuth, async (req, res): Promise<void> => {
+  const userId = (req as AuthReq).clerkUserId;
+  try {
+    const s = await getOrCreateSettings(userId);
+    const identity = resolvePresetIdentity({
+      aiPersonality:             s.aiPersonality,
+      minConfidence:             s.minConfidence,
+      categoryAllocation:        s.categoryAllocation ?? null,
+      stopLossPercent:           s.stopLossPercent,
+      takeProfitPercent:         s.takeProfitPercent,
+      trailingStopPercent:       s.trailingStopPercent ?? null,
+      maxHoldHours:              s.maxHoldHours ?? null,
+      preferredLiveOrderSizeUsd: s.preferredLiveOrderSizeUsd,
+    });
+    res.json({
+      presets:        TRADING_MODE_PRESET_IDS.map((id) => TRADING_MODE_PRESETS[id]),
+      // Stored marker (what the user last applied) and the live-resolved
+      // identity (may be "custom" if any composing field was hand-edited since).
+      storedPreset:   s.tradingModePreset ?? null,
+      resolvedPreset: identity,
+    });
+  } catch (err) {
+    req.log.error({ err, userId }, "GET /user/trading-mode failed");
+    res.status(500).json({ error: "Failed to load trading mode" });
+  }
+});
+
+// POST apply a named preset — single-tx bundle write.
+router.post("/user/trading-mode", requireAuth, async (req, res): Promise<void> => {
+  const userId = (req as AuthReq).clerkUserId;
+  const preset = (req.body ?? {}).preset;
+  if (!isTradingModePreset(preset)) {
+    res.status(400).json({
+      error: `preset must be one of: ${TRADING_MODE_PRESET_IDS.join(", ")}`,
+    });
+    return;
+  }
+  try {
+    await getOrCreateSettings(userId);
+    const patch = buildPresetPatch(preset);
+    const [updated] = await db
+      .update(userSettingsTable)
+      .set({ ...patch, updatedAt: new Date() })
+      .where(eq(userSettingsTable.userId, userId))
+      .returning();
+    req.log.info(
+      { tag: "TRADING_MODE_APPLIED", userId, preset },
+      "[TRADING_MODE_APPLIED] customer applied trading-mode preset",
+    );
+    res.json({ ok: true, preset, settings: updated });
+  } catch (err) {
+    req.log.error({ err, userId }, "POST /user/trading-mode failed");
+    res.status(500).json({ error: "Failed to apply trading mode" });
   }
 });
 

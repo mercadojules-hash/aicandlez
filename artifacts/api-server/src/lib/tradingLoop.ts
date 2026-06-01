@@ -2016,6 +2016,11 @@ async function runHardStopMonitor() {
     );
     const nowMs              = Date.now();
 
+    // Let-winners-run momentum freshness window (Profit-Optimization #3). A
+    // per-symbol breakdown older than this is treated as "no momentum signal",
+    // so we fail safe to the hard take-profit rather than extend on stale data.
+    const LET_RUN_MOMENTUM_FRESH_MS = 5 * 60_000;
+
     // Prune water marks for positions no longer open (prevents unbounded growth).
     const openPositionIds = new Set(positions.map((p) => p.positionId));
     for (const id of liveTrailWaterMarks.keys()) {
@@ -2043,6 +2048,9 @@ async function runHardStopMonitor() {
       let trailArmed = false;
       let highWater:  number | null = null;
       let lowWater:   number | null = null;
+      // True when an aggressive (opt-in) live winner is held past its TP because
+      // momentum is still strong. Observability only — surfaced in the eval log.
+      let letRunExtended = false;
 
       // Price-dependent exits (SL → TP → live trailing). Skipped on a missing /
       // stale price — never close on a zero/absent price; the next tick retries.
@@ -2051,7 +2059,37 @@ async function runHardStopMonitor() {
           if (isBuy ? price <= p.stopLoss : price >= p.stopLoss) reason = "STOP_LOSS";
         }
         if (reason === null && p.takeProfit !== null) {
-          if (isBuy ? price >= p.takeProfit : price <= p.takeProfit) reason = "TAKE_PROFIT";
+          const tpHit = isBuy ? price >= p.takeProfit : price <= p.takeProfit;
+          if (tpHit) {
+            // ── Let-winners-run (Profit-Optimization #3 — LIVE + opt-in only) ──
+            // Aggressive accounts hold past TP while upside momentum is still
+            // strong, letting the trailing-stop / trend-weakening / max-hold
+            // exits capture more of the move. The default (and ANY stale or
+            // missing momentum read) keeps today's hard take-profit cut. The
+            // 2% stop-loss above is untouched and still owns the downside.
+            if (isLive && exitCfg.letWinnersRun) {
+              const bd = engineStats.symbolBreakdowns[p.symbol];
+              const momentumFresh =
+                bd !== undefined && (nowMs - bd.lastUpdated) < LET_RUN_MOMENTUM_FRESH_MS;
+              const momentumStrong =
+                momentumFresh &&
+                bd.marketCondition === "trending" &&
+                (isBuy
+                  ? bd.agreedAction === "BUY"  && bd.trend1H !== "bearish"
+                  : bd.agreedAction === "SELL" && bd.trend1H !== "bullish");
+              if (momentumStrong) {
+                // Hold — extend the winner. Trailing (armed above entry) and the
+                // max-hold ceiling below still bound the downside.
+                letRunExtended = true;
+              } else {
+                // Momentum gone / unknown — take profit now. Trend-weakening
+                // exits route here and are stamped TAKE_PROFIT for reporting.
+                reason = "TAKE_PROFIT";
+              }
+            } else {
+              reason = "TAKE_PROFIT";
+            }
+          }
         }
 
         // Trailing stop is LIVE-only here. Paper trailing is owned by
@@ -2125,7 +2163,8 @@ async function runHardStopMonitor() {
             highWater,
             lowWater,
             ageHours:    ageHours !== null ? parseFloat(ageHours.toFixed(2)) : null,
-            decision:    reason ?? (price === undefined ? "HOLD_NO_PRICE" : "HOLD"),
+            letRun:      letRunExtended,
+            decision:    reason ?? (letRunExtended ? "HOLD_LET_RUN" : price === undefined ? "HOLD_NO_PRICE" : "HOLD"),
           },
           `[LIVE_POSITION_EVAL] ${p.symbol} ${p.side} @ ${price ?? "n/a"} (entry ${p.entryPrice}, SL ${p.stopLoss}, TP ${p.takeProfit}) → ${reason ?? "HOLD"}`,
         );

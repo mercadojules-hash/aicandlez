@@ -12,6 +12,18 @@ export const userSettingsTable = pgTable("user_settings", {
   aiPersonality:      varchar("ai_personality", { length: 50 }).notNull().default("balanced"),
   minConfidence:      real("min_confidence").notNull().default(60),
 
+  // ── Profit-optimization trading-mode preset (Profit-Opt initiative) ───────
+  // Identity-only marker for which named preset the account is currently on:
+  // "conservative" | "balanced" | "aggressive". NULLABLE on purpose — NULL
+  // means "custom/unset" so every existing row keeps its exact current field
+  // values and behavior (this column is never read by the execution engine).
+  // Applying a preset (POST /api/user/trading-mode) writes the underlying
+  // already-wired levers (minConfidence, categoryAllocation, account
+  // SL/TP/trailing/maxHold, preferredLiveOrderSizeUsd, aiPersonality) AND
+  // stamps this marker. Manually diverging any of those fields makes the
+  // resolved identity "custom" again (see resolvePresetIdentity).
+  tradingModePreset:  varchar("trading_mode_preset", { length: 50 }),
+
   riskLevel:          varchar("risk_level", { length: 50 }).notNull().default("moderate"),
   positionSizeUSD:    real("position_size_usd").notNull().default(20),
   maxTradesPerDay:    integer("max_trades_per_day").notNull().default(5),

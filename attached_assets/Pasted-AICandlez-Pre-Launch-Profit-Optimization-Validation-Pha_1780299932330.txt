@@ -1,0 +1,99 @@
+AICandlez Pre-Launch Profit Optimization & Validation Phase
+
+Do not prepare for public release yet.
+
+Before adding users, we need to prove that the live algorithm is profitable, stable, and safe on the two internal test accounts:
+
+* [info@mixtapepsd.com](mailto:info@mixtapepsd.com)
+* [teedelgado@gmail.com](mailto:teedelgado@gmail.com)
+
+Primary goal:
+
+Make AICandlez as profitable as possible using real production data, while keeping strict risk controls.
+
+Required work:
+
+1. Optimize the trading setup for both accounts:
+
+   * Trade size
+   * Max concurrent positions
+   * Stop loss
+   * Take profit
+   * Trailing stop
+   * Max hold time
+   * Alt/meme allocation
+   * Risk gate strictness
+   * Liquidity guard behavior
+
+2. Use actual production trade history to evaluate:
+
+   * Win rate
+   * Average winner
+   * Average loser
+   * Profit factor
+   * Net realized PnL
+   * Max drawdown
+   * Average hold time
+   * Best symbols
+   * Worst symbols
+   * Best exchange
+   * Worst exchange
+   * Best category: majors / alts / memes
+
+3. Create recommended profiles:
+
+Testing Mode:
+
+* $10 trades
+* Lower concurrency
+* Safety focused
+
+Growth Mode:
+
+* $20-$50 trades
+* Moderate concurrency
+* Higher alt/meme bias
+
+Scale Mode:
+
+* $100+ trades
+* Only enabled after profitability is proven
+
+4. Do not remove core protections:
+
+   * Stop loss
+   * Liquidity protection
+   * Broker balance checks
+   * Duplicate protection
+   * Kill switch
+   * Exchange validation
+
+5. Reduce unnecessary blockers only if data proves they are preventing profitable trades.
+
+6. Before public launch, provide a readiness report showing:
+
+   * Minimum 24-48 hours live testing
+   * Positive net realized PnL
+   * Stable trade history
+   * No ghost trades
+   * No missing positions
+   * No exchange sync failures
+   * Accurate account balances
+   * Accurate Live Trades and Trade History
+   * Customer dashboard stable after refresh
+   * Both accounts tested separately
+
+Do not optimize for maximum trades.
+
+Optimize for maximum profitable, repeatable, risk-controlled trades.
+
+Final deliverable:
+
+A recommended launch-ready configuration for:
+
+* $10 trades
+* $20 trades
+* $50 trades
+* $100 trades
+
+for both Coinbase and Kraken, with exact settings and reasoning based on production data.

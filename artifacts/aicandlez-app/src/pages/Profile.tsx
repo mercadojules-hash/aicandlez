@@ -1101,6 +1101,138 @@ async function exitApi<T>(method: string, path: string, body?: unknown): Promise
   return json as T;
 }
 
+// ── Trading-mode presets (Profit-Optimization, feature #1) ────────────────────
+// Selectable Conservative / Balanced / Aggressive Growth modes. Applying a mode
+// writes the underlying already-wired levers (confidence floor, majors/alts/memes
+// allocation, account SL/TP/trailing/max-hold, per-trade size, AI personality) in
+// one call, so the engine picks the change up on its next loop tick. Stop-loss
+// stays 2% in every mode — modes only change selectivity, category bias, profit
+// targets, and how long winners run, never the hard safety gates.
+interface TradingModePresetDef {
+  id:                        "conservative" | "balanced" | "aggressive";
+  label:                     string;
+  summary:                   string;
+  aiPersonality:             string;
+  minConfidence:             number;
+  categoryAllocation:        { majors: number; alts: number; memes: number };
+  stopLossPercent:           number;
+  takeProfitPercent:         number;
+  trailingStopPercent:       number;
+  maxHoldHours:              number;
+  preferredLiveOrderSizeUsd: number;
+}
+interface TradingModeResponse {
+  presets:        TradingModePresetDef[];
+  storedPreset:   string | null;
+  resolvedPreset: "conservative" | "balanced" | "aggressive" | "custom";
+}
+
+function TradingModeSection() {
+  const qc = useQueryClient();
+  const { data, isLoading } = useQuery<TradingModeResponse>({
+    queryKey: ["user-trading-mode"],
+    queryFn:  () => exitApi<TradingModeResponse>("GET", "/user/trading-mode"),
+  });
+
+  const apply = useMutation({
+    mutationFn: (preset: string) =>
+      exitApi<{ ok: boolean; preset: string }>("POST", "/user/trading-mode", { preset }),
+    onSuccess: () => {
+      // The preset write touches multiple cached surfaces — refresh them all so
+      // the confidence slider, exit controls, and mode card all reflect it.
+      qc.invalidateQueries({ queryKey: ["user-trading-mode"] });
+      qc.invalidateQueries({ queryKey: ["user-exit-config"] });
+      qc.invalidateQueries({ queryKey: ["/user/settings"] });
+    },
+  });
+
+  const resolved = data?.resolvedPreset ?? null;
+  const pendingId = apply.isPending ? (apply.variables as string | undefined) : undefined;
+
+  return (
+    <div style={{ marginBottom:18 }}>
+      <SectionHead label="Trading Mode" accent="rgba(102,255,102,0.65)"/>
+      <div style={{ background:CARD, border:`1px solid ${E}`, borderRadius:16, padding:"14px 16px" }}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:10, marginBottom:12 }}>
+          <div style={{ fontSize:9, fontFamily:SANS, color:GR, lineHeight:1.55, flex:1 }}>
+            Pick a profit profile. Each mode tunes selectivity, category bias, profit
+            targets and how long winners run. Stop-loss stays 2% in every mode.
+          </div>
+          <span style={{
+            fontSize:8, fontFamily:SANS, fontWeight:700, letterSpacing:"0.08em",
+            color: resolved === "custom" ? GOLD : C, flexShrink:0,
+            padding:"3px 8px", borderRadius:6,
+            background: resolved === "custom" ? "rgba(255,210,0,0.08)" : "rgba(102,255,102,0.08)",
+            border: `1px solid ${resolved === "custom" ? "rgba(255,210,0,0.22)" : "rgba(102,255,102,0.22)"}`,
+          }}>
+            {resolved === "custom" ? "CUSTOM" : resolved ? resolved.toUpperCase() : "—"}
+          </span>
+        </div>
+
+        {isLoading ? (
+          <div style={{ fontSize:11, fontFamily:SANS, color:DIM, padding:"8px 0" }}>Loading…</div>
+        ) : (
+          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+            {(data?.presets ?? []).map((p) => {
+              const selected = resolved === p.id;
+              const busy = pendingId === p.id;
+              const accent = p.id === "aggressive" ? GOLD : p.id === "conservative" ? "rgba(0,200,255,0.85)" : C;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  disabled={apply.isPending}
+                  onClick={() => { if (!selected) apply.mutate(p.id); }}
+                  style={{
+                    textAlign:"left", cursor: selected ? "default" : "pointer",
+                    background: selected ? "rgba(102,255,102,0.05)" : "rgba(255,255,255,0.02)",
+                    border:`1px solid ${selected ? "rgba(102,255,102,0.35)" : E}`,
+                    borderRadius:12, padding:"12px 14px", width:"100%",
+                    opacity: apply.isPending && !busy ? 0.5 : 1,
+                    transition:"all 200ms",
+                  }}>
+                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:8 }}>
+                    <span style={{ fontSize:13, fontFamily:SANS, fontWeight:600, color:W }}>{p.label}</span>
+                    <span style={{ fontSize:8, fontFamily:SANS, fontWeight:700, letterSpacing:"0.06em",
+                      color: selected ? C : accent }}>
+                      {busy ? "APPLYING…" : selected ? "ACTIVE" : "SELECT"}
+                    </span>
+                  </div>
+                  <div style={{ fontSize:9, fontFamily:SANS, color:GR, lineHeight:1.5, marginTop:4 }}>
+                    {p.summary}
+                  </div>
+                  <div style={{ display:"flex", flexWrap:"wrap", gap:"4px 10px", marginTop:8 }}>
+                    <ModeStat label="Conf" value={`${p.minConfidence}%`}/>
+                    <ModeStat label="M/A/M" value={`${p.categoryAllocation.majors}/${p.categoryAllocation.alts}/${p.categoryAllocation.memes}`}/>
+                    <ModeStat label="TP" value={`${p.takeProfitPercent}%`}/>
+                    <ModeStat label="SL" value={`${p.stopLossPercent}%`}/>
+                    <ModeStat label="Trail" value={`${p.trailingStopPercent}%`}/>
+                    <ModeStat label="Hold" value={`${p.maxHoldHours}h`}/>
+                    <ModeStat label="Size" value={`$${p.preferredLiveOrderSizeUsd}`}/>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {apply.isError && (
+          <div style={{ fontSize:9, fontFamily:SANS, color:"rgba(255,90,90,0.85)", marginTop:8 }}>
+            Could not apply mode. Try again.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ModeStat({ label, value }: { label:string; value:string }) {
+  return (
+    <span style={{ fontSize:8.5, fontFamily:MONO, color:DIM, whiteSpace:"nowrap" }}>
+      {label} <span style={{ color:GR, fontWeight:700 }}>{value}</span>
+    </span>
+  );
+}
+
 function ExitControlsSection() {
   const qc = useQueryClient();
   const { data, isLoading } = useQuery<ExitConfigResponse>({
@@ -2046,6 +2178,9 @@ export default function Profile() {
             ⚡ All settings persist across sessions. Paper mode is never a restriction on AI scanning.
           </div>
         </div>
+
+        {/* ── Trading Mode (profit-optimization presets) ───────────────────── */}
+        <TradingModeSection/>
 
         {/* ── Exit Controls (per-account / per-exchange live-exit overrides) ── */}
         <ExitControlsSection/>
