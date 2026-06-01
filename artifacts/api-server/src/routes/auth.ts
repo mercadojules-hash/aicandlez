@@ -4,7 +4,7 @@ import { db, usersTable, userTradeLimitsTable, DEFAULT_TRADE_LIMIT_CAP } from "@
 import { eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth.js";
 import { auditLogger } from "../services/telemetry/AuditLogger.js";
-import { isSuperAdminEmail } from "../lib/adminAllowlist.js";
+import { isSuperAdminEmail, isOperatorAdminEmail } from "../lib/adminAllowlist.js";
 
 const router: IRouter = Router();
 
@@ -34,8 +34,16 @@ router.get("/auth/me", requireAuth, async (req, res): Promise<void> => {
     }
   }
 
-  const shouldBeSuperAdmin = isSuperAdminEmail(email);
-  const targetRole = shouldBeSuperAdmin ? "super-admin" : undefined;
+  // Allowlist-driven role: super-admin wins; otherwise operator allowlist →
+  // `admin` (operator surface, no super-admin powers). Never downgrades a
+  // super-admin who also happens to be on the operator list.
+  const shouldBeSuperAdmin    = isSuperAdminEmail(email);
+  const shouldBeOperatorAdmin = !shouldBeSuperAdmin && isOperatorAdminEmail(email);
+  const targetRole: "super-admin" | "admin" | undefined = shouldBeSuperAdmin
+    ? "super-admin"
+    : shouldBeOperatorAdmin
+      ? "admin"
+      : undefined;
 
   const [existing] = await db
     .select()
@@ -43,9 +51,12 @@ router.get("/auth/me", requireAuth, async (req, res): Promise<void> => {
     .where(eq(usersTable.clerkUserId, clerkUserId));
 
   if (existing) {
-    // Re-assert super-admin role on every login (defends against accidental
-    // role downgrades in the DB).
-    if (targetRole && existing.role !== targetRole) {
+    // Re-assert allowlisted role on every login (defends against accidental
+    // role downgrades in the DB). Guard: an operator-allowlist match must NEVER
+    // downgrade an account already stored as super-admin.
+    const isDowngradeFromSuperAdmin =
+      existing.role === "super-admin" && targetRole !== "super-admin";
+    if (targetRole && existing.role !== targetRole && !isDowngradeFromSuperAdmin) {
       const [updated] = await db
         .update(usersTable)
         .set({ role: targetRole, updatedAt: new Date() })

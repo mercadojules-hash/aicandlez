@@ -1,13 +1,13 @@
 import crypto from "crypto";
 import { db } from "@workspace/db";
 import { signalsTable, logsTable, settingsTable, tradesTable, userNotificationsTable } from "@workspace/db";
-import { eq, and, gte, gt, inArray, count } from "drizzle-orm";
+import { eq, and, gte, gt, lt, inArray, count, isNotNull } from "drizzle-orm";
 import { settingsStore } from "./settingsStore.js";
 import { getCandles, SUPPORTED_SYMBOLS, type Candle } from "./marketData.js";
 import { runAIDecision, type AIDecisionResult } from "./aiReasoning.js";
 import { computeRSI, computeEMA, computeMACD } from "./indicators.js";
 import { placeOrder, getAccountSummary, hydrateOpenPositions, closePosition, type SimPosition } from "./simulationEngine.js";
-import { placeLiveAutoOrder } from "./exchangeEngine.js";
+import { placeLiveAutoOrder, closeOperatorPositionLive, confirmOperatorOrderFill } from "./exchangeEngine.js";
 import {
   listLiveExecutionUsers,
   isDryRunEnabled,
@@ -556,6 +556,77 @@ async function markTradeRowClosed(
   if (updated.length === 0) {
     logger.warn({ positionId }, "[EXIT_ENGINE_V2] no open trades row to close for position (already closed or unmapped)");
   }
+}
+
+// ── Manual operator override (AI-managed) ────────────────────────────────────
+// A manual operator order placed via POST /api/exchange/order/execute fills a
+// REAL position on the operator-env exchange but, unlike the AI path, registers
+// nothing in any managed book. This records a managed `trades` row (mode
+// "manual", `exchange` set, real fillPrice/fillQty captured) so the manual trade
+// is governed by the same fixed SL/TP the AI applies — see
+// `runManualOperatorLiveStops` for the real-exchange exit. Mode "manual" is kept
+// OUT of `V2_TRADE_MODES`, so the row never collides with the paper global-book
+// passes (`runGlobalHardStops` / `runGlobalCapSelfHeal`) or the
+// `maxActivePositions` cap — manual + AI trades coexist on independent budgets.
+export async function registerManualOperatorTrade(args: {
+  symbol:           string;
+  side:             "BUY" | "SELL";
+  fillPrice:        number;
+  fillQty:          number;
+  sizeUSD:          number;
+  exchange:         string;
+  exchangeOrderId?: string;
+}): Promise<{ positionId: string; stopLoss: number | null; takeProfit: number | null }> {
+  const settings = await fetchSettings();
+  const { symbol, side, fillPrice, fillQty, sizeUSD, exchange, exchangeOrderId } = args;
+  const isBuy = side === "BUY";
+
+  const slPct = settings.stopLossPercent;
+  const tpPct = settings.takeProfitPercent;
+  const stopLoss = slPct > 0
+    ? (isBuy ? fillPrice * (1 - slPct / 100) : fillPrice * (1 + slPct / 100))
+    : null;
+  const takeProfit = tpPct > 0
+    ? (isBuy ? fillPrice * (1 + tpPct / 100) : fillPrice * (1 - tpPct / 100))
+    : null;
+
+  const positionId = genId();
+  await db.insert(tradesTable).values({
+    id:              positionId,
+    symbol,
+    side,
+    amount:          parseFloat(sizeUSD.toFixed(2)),
+    price:           parseFloat(fillPrice.toFixed(2)),
+    status:          "open",
+    mode:            "manual",
+    signalId:        null,
+    stopLoss:        stopLoss   !== null ? parseFloat(stopLoss.toFixed(2))   : null,
+    takeProfit:      takeProfit !== null ? parseFloat(takeProfit.toFixed(2)) : null,
+    reason:          "Manual operator override — AI-managed SL/TP",
+    exchange,
+    exchangeOrderId: exchangeOrderId ?? null,
+    fillPrice:       parseFloat(fillPrice.toFixed(2)),
+    fillQty:         parseFloat(fillQty.toFixed(8)),
+  });
+
+  logger.info({
+    tag: "MANUAL_OVERRIDE_REGISTERED", symbol, side, exchange,
+    positionId, fillPrice, fillQty, sizeUSD, stopLoss, takeProfit,
+  }, `[MANUAL_OVERRIDE_REGISTERED] ${side} ${symbol} @ $${fillPrice.toFixed(2)} qty=${fillQty} — SL ${stopLoss?.toFixed(2) ?? "—"} / TP ${takeProfit?.toFixed(2) ?? "—"} (AI-managed)`);
+
+  try {
+    await db.insert(logsTable).values({
+      id:      genId(),
+      type:    "trade",
+      level:   "success",
+      message: `[MANUAL] ${side} ${symbol} @ $${fillPrice.toFixed(2)} — $${sizeUSD.toFixed(0)} — SL ${stopLoss?.toFixed(2) ?? "—"} / TP ${takeProfit?.toFixed(2) ?? "—"} — operator override (AI-managed)`,
+      details: { symbol, side, fillPrice, fillQty, sizeUSD, stopLoss, takeProfit, exchange, mode: "manual" },
+    });
+  } catch (err) {
+    logger.warn({ err: err instanceof Error ? err.message : String(err) }, "registerManualOperatorTrade: log insert failed");
+  }
+
+  return { positionId, stopLoss, takeProfit };
 }
 
 // ── Settings ───────────────────────────────────────────────────────────────────
@@ -2379,6 +2450,386 @@ async function runGlobalCapSelfHeal() {
   }
 }
 
+// ── Manual operator AI-managed exit monitor ──────────────────────────────────
+// Enforces fixed SL/TP (and the live max-hold ceiling) on manual operator
+// override trades (mode "manual", `exchange` set) by issuing a REAL market close
+// on the operator-env exchange. This is the ONLY exit path that sends a real
+// broker order for the operator/global book — `runGlobalHardStops` /
+// `runGlobalCapSelfHeal` only ever close the paper mirror. Scoped strictly to
+// mode='manual' rows so AI-operator (exchange NULL) and customer per-user
+// (`sim_positions`) paths are untouched. Always-on (HARD_STOP_ENFORCEMENT only,
+// NOT V2-gated) because these are real-money positions. On any close failure the
+// row is left open for retry — a real position is never marked closed without a
+// confirmed broker fill.
+// A close attempt holds the 'closing' reservation only for the duration of one
+// placeOrder + ~5s confirmation poll. Any row that has been 'closing' longer
+// than this lease was stranded by a crash between claim and finalize/release,
+// and is safe to reclaim. Kept far larger than a real close takes so a healthy
+// in-flight close in ANOTHER process is never stolen (multi-instance safe).
+const MANUAL_CLOSING_LEASE_MS = 120_000;
+// A submitted-but-unconfirmed close whose order state stays UNKNOWN this long
+// (broker unqueryable / order not found / still non-terminal) is escalated to
+// an operator alert. The reservation is HELD throughout — it is never
+// auto-retried, because the original close may still be live at the venue and a
+// second close would oversell. Resolution is by re-confirmation or by hand.
+const MANUAL_CLOSING_STUCK_ALERT_MS = 10 * 60_000;
+
+/**
+ * Apply a broker-confirmed manual close to a reserved ('closing') row. Shared
+ * by the live close path and the lease re-confirmation path so both classify
+ * full vs partial fills identically and never diverge.
+ *
+ * - confirmed fill ≥ requested → finalize row 'closing'→'closed' with realized
+ *   PnL (returns "closed"), emits the position_closed telemetry event.
+ * - confirmed fill < requested (real partial) → reduce tracked qty to the
+ *   residual and release 'closing'→'open' so the next tick closes the remainder
+ *   (returns "partial"); never marks the row closed (would orphan the residual).
+ * - zero confirmed fill → "noop" (caller decides whether to release for retry).
+ *
+ * All writes are scoped to status='closing' so they can never collide with the
+ * global hard-stop path (status='open'); a 0-row match returns "noop".
+ */
+async function settleManualClose(opts: {
+  rowId:              string;
+  symbol:             string;
+  side:               string;
+  entryPrice:         number;
+  trackedQty:         number;
+  confirmedFilledQty: number;
+  exitPrice:          number;
+  reason:             "STOP_LOSS" | "TAKE_PROFIT" | "MAX_HOLD";
+  exchange:           string | null;
+  correlationId:      string;
+  source:             "live" | "reclaim";
+}): Promise<"closed" | "partial" | "noop"> {
+  const isBuy     = opts.side !== "SELL";
+  const closedQty = opts.confirmedFilledQty > 0 ? opts.confirmedFilledQty : 0;
+  if (closedQty <= 0) return "noop";
+
+  const fullyFilled = closedQty >= opts.trackedQty * 0.999;
+  if (!fullyFilled) {
+    const residual = Math.max(opts.trackedQty - closedQty, 0);
+    if (residual > opts.trackedQty * 0.001) {
+      const upd = await db.update(tradesTable)
+        .set({
+          status:         "open",
+          closedAt:       null,
+          brokerResponse: null,
+          fillQty:        parseFloat(residual.toFixed(8)),
+          amount:         parseFloat((residual * opts.entryPrice).toFixed(2)),
+        })
+        .where(and(eq(tradesTable.id, opts.rowId), eq(tradesTable.status, "closing")))
+        .returning({ id: tradesTable.id });
+      if (upd.length === 0) return "noop";
+      logger.warn({ tag: "MANUAL_EXIT_PARTIAL", correlationId: opts.correlationId, source: opts.source, positionId: opts.rowId, symbol: opts.symbol, triggerReason: opts.reason, requestedQty: opts.trackedQty, closedQty, residual },
+        `[MANUAL_EXIT_PARTIAL] partial close ${opts.symbol} — ${closedQty}/${opts.trackedQty} filled, residual ${residual} kept managed for next tick`);
+      return "partial";
+    }
+    // Residual is dust — treat as effectively flat and finalize below.
+  }
+
+  const exitPrice = opts.exitPrice > 0 ? opts.exitPrice : opts.entryPrice;
+  const fillQty   = closedQty > 0 ? closedQty : opts.trackedQty;
+  const pnl    = isBuy ? (exitPrice - opts.entryPrice) * fillQty : (opts.entryPrice - exitPrice) * fillQty;
+  const pnlPct = opts.entryPrice > 0
+    ? (isBuy ? (exitPrice - opts.entryPrice) / opts.entryPrice : (opts.entryPrice - exitPrice) / opts.entryPrice) * 100
+    : 0;
+  const finalized = await db.update(tradesTable)
+    .set({
+      status:         "closed",
+      exitPrice:      parseFloat(exitPrice.toFixed(2)),
+      pnl:            parseFloat(pnl.toFixed(2)),
+      pnlPercent:     parseFloat(pnlPct.toFixed(2)),
+      closedAt:       new Date(),
+      reason:         opts.reason,
+      brokerResponse: null,
+    })
+    .where(and(eq(tradesTable.id, opts.rowId), eq(tradesTable.status, "closing")))
+    .returning({ id: tradesTable.id });
+  if (finalized.length === 0) return "noop";
+  engineStats.hardStopHits++;
+
+  logger.info({
+    tag: "MANUAL_EXIT_TRIGGERED", correlationId: opts.correlationId, source: opts.source, positionId: opts.rowId, symbol: opts.symbol, side: opts.side,
+    reason: opts.reason, entryPrice: opts.entryPrice, exitPrice, qtyBase: fillQty, realizedPnL: pnl, realizedPnLPct: pnlPct, exchange: opts.exchange,
+  }, `[MANUAL_EXIT_TRIGGERED] ${opts.reason} ${opts.symbol} ${opts.side} exit $${exitPrice.toFixed(2)} (entry $${opts.entryPrice.toFixed(2)}) pnl ${pnl.toFixed(2)}`);
+
+  executionStreamBus.emitEvent({
+    type:     "position_closed",
+    severity: opts.reason === "TAKE_PROFIT" || (opts.reason === "MAX_HOLD" && pnl >= 0) ? "success" : "warn",
+    symbol:   opts.symbol,
+    side:     isBuy ? "BUY" : "SELL",
+    price:    exitPrice,
+    mode:     "live",
+    exchange: opts.exchange ?? undefined,
+    reason:   opts.reason,
+    message:  `${opts.reason} close — MANUAL ${opts.symbol} @ $${exitPrice.toFixed(2)} (pnl ${pnl.toFixed(2)})`,
+    details:  { positionId: opts.rowId, entryPrice: opts.entryPrice, realizedPnL: pnl, realizedPnLPct: pnlPct, source: opts.source },
+  });
+  return "closed";
+}
+
+async function runManualOperatorLiveStops() {
+  if (!isHardStopEnforcementEnabled()) return;
+  try {
+    // Crash recovery (lease-based, multi-process safe): a crash between claiming
+    // a row (status='closing') and finalizing/releasing it would strand the
+    // position forever — the selector below only reads status='open'. The claim
+    // stamps `closedAt` with the claim time; reclaim only rows whose lease has
+    // expired so a healthy close in flight elsewhere is never disturbed.
+    try {
+      const leaseCutoff = new Date(Date.now() - MANUAL_CLOSING_LEASE_MS);
+      const stale = await db
+        .select({
+          id:             tradesTable.id,
+          symbol:         tradesTable.symbol,
+          side:           tradesTable.side,
+          price:          tradesTable.price,
+          fillQty:        tradesTable.fillQty,
+          amount:         tradesTable.amount,
+          exchange:       tradesTable.exchange,
+          brokerResponse: tradesTable.brokerResponse,
+          closedAt:       tradesTable.closedAt,
+        })
+        .from(tradesTable)
+        .where(and(
+          eq(tradesTable.mode, "manual"),
+          eq(tradesTable.status, "closing"),
+          isNotNull(tradesTable.exchange),
+          lt(tradesTable.closedAt, leaseCutoff),
+        ));
+      const reclaimCorrelationId = genCorrelationId();
+      for (const r of stale) {
+        const br = (r.brokerResponse ?? null) as { closeOrderId?: string; closeReason?: string; closeSubmittedAt?: string } | null;
+        const closeOrderId = br?.closeOrderId;
+        const trackedQty = (r.fillQty != null && r.fillQty > 0)
+          ? r.fillQty
+          : (r.price > 0 ? r.amount / r.price : 0);
+
+        // A close order was submitted but never confirmed. Re-confirm it
+        // against the REAL exchange BEFORE deciding — re-submitting a close
+        // that already filled would double-close (oversell) the position.
+        if (closeOrderId && r.exchange) {
+          const chk = await confirmOperatorOrderFill({ exchange: r.exchange, orderId: closeOrderId, symbol: r.symbol });
+          if (chk.found && chk.terminal && chk.filledQty > 0) {
+            const reason = (br?.closeReason === "STOP_LOSS" || br?.closeReason === "TAKE_PROFIT" || br?.closeReason === "MAX_HOLD")
+              ? br.closeReason : "MAX_HOLD";
+            await settleManualClose({
+              rowId:              r.id,
+              symbol:             r.symbol,
+              side:               r.side,
+              entryPrice:         r.price,
+              trackedQty,
+              confirmedFilledQty: chk.filledQty,
+              exitPrice:          chk.avgFillPrice,
+              reason,
+              exchange:           r.exchange,
+              correlationId:      reclaimCorrelationId,
+              source:             "reclaim",
+            });
+            logger.warn({ tag: "MANUAL_CLOSING_RECONFIRMED", positionId: r.id, symbol: r.symbol, closeOrderId, status: chk.status, filledQty: chk.filledQty },
+              `[MANUAL_CLOSING_RECONFIRMED] lease-expired close ${r.symbol} confirmed filled on re-check — finalized`);
+            continue;
+          }
+          if (chk.found && chk.terminal && chk.filledQty <= 0) {
+            // Broker confirms the close never filled (cancelled/rejected) —
+            // safe to release for a fresh retry.
+            await db.update(tradesTable).set({ status: "open", closedAt: null, brokerResponse: null })
+              .where(and(eq(tradesTable.id, r.id), eq(tradesTable.status, "closing")));
+            logger.warn({ tag: "MANUAL_CLOSING_RECLAIMED", positionId: r.id, symbol: r.symbol, closeOrderId, status: chk.status },
+              `[MANUAL_CLOSING_RECLAIMED] lease-expired close ${r.symbol} confirmed unfilled — released for retry`);
+            continue;
+          }
+          // Order state is UNKNOWN (not found / non-terminal / API error). The
+          // close may still be live at the venue, so releasing for a fresh
+          // close would risk a double-close (oversell). HOLD the reservation
+          // ('closing') and KEEP closeOrderId so the next tick re-confirms —
+          // never auto-retry an unconfirmed-but-possibly-live close. Escalate
+          // to an operator alert once the position has been stuck beyond the
+          // alert threshold so it can be resolved by hand.
+          const submittedAtMs = br?.closeSubmittedAt ? Date.parse(br.closeSubmittedAt) : NaN;
+          const stuckMs = Number.isFinite(submittedAtMs) ? Date.now() - submittedAtMs : Infinity;
+          if (stuckMs >= MANUAL_CLOSING_STUCK_ALERT_MS) {
+            logger.error({ tag: "MANUAL_CLOSING_STUCK", positionId: r.id, symbol: r.symbol, closeOrderId, status: chk.status, stuckMs, exchange: r.exchange },
+              `[MANUAL_CLOSING_STUCK] manual close ${r.symbol} unresolved for ${Math.round(stuckMs / 1000)}s (order ${closeOrderId}) — reservation HELD, needs operator intervention`);
+          } else {
+            logger.warn({ tag: "MANUAL_CLOSING_HELD", positionId: r.id, symbol: r.symbol, closeOrderId, status: chk.status },
+              `[MANUAL_CLOSING_HELD] lease-expired close ${r.symbol} still unresolved — reservation HELD for re-confirmation (no retry)`);
+          }
+          continue;
+        }
+
+        // No close order id recorded. We CANNOT prove whether a real broker
+        // order was placed: the best-effort id-persist may have failed AFTER a
+        // genuine submit, or the process may have crashed around submit time.
+        // Auto-releasing would risk a second close against a possibly-live order
+        // (oversell / double-close). FAIL-CLOSED: hold the reservation and
+        // escalate for operator reconciliation rather than blindly retrying.
+        const claimedAtMs = r.closedAt instanceof Date
+          ? r.closedAt.getTime()
+          : (r.closedAt ? Date.parse(r.closedAt as unknown as string) : NaN);
+        const strandedMs = Number.isFinite(claimedAtMs) ? Date.now() - claimedAtMs : Infinity;
+        logger.error({ tag: "MANUAL_CLOSING_STUCK", positionId: r.id, symbol: r.symbol, closeOrderId: null, strandedMs, exchange: r.exchange },
+          `[MANUAL_CLOSING_STUCK] lease-expired manual close ${r.symbol} stranded with NO recorded order id for ${Number.isFinite(strandedMs) ? Math.round(strandedMs / 1000) + "s" : "unknown"} — cannot prove a close was not already submitted; reservation HELD (no auto-retry), needs operator reconciliation`);
+      }
+    } catch (err) {
+      logger.warn({ err: err instanceof Error ? err.message : String(err) }, "runManualOperatorLiveStops: lease reclaim failed");
+    }
+
+    const openRows = await db
+      .select({
+        id:         tradesTable.id,
+        symbol:     tradesTable.symbol,
+        side:       tradesTable.side,
+        price:      tradesTable.price,
+        amount:     tradesTable.amount,
+        stopLoss:   tradesTable.stopLoss,
+        takeProfit: tradesTable.takeProfit,
+        exchange:   tradesTable.exchange,
+        fillQty:    tradesTable.fillQty,
+        timestamp:  tradesTable.timestamp,
+      })
+      .from(tradesTable)
+      .where(and(
+        eq(tradesTable.mode, "manual"),
+        eq(tradesTable.status, "open"),
+        isNotNull(tradesTable.exchange),
+      ));
+    if (openRows.length === 0) return;
+
+    const symbols    = [...new Set(openRows.map((r) => r.symbol))];
+    const priceBySym = new Map<string, number>();
+    await Promise.all(symbols.map(async (sym) => {
+      try { const t = await getTicker(sym); if (t.price > 0) priceBySym.set(sym, t.price); }
+      catch { /* skip this symbol this tick */ }
+    }));
+
+    const correlationId = genCorrelationId();
+    const maxHoldMs     = getLivePositionMaxHoldMs();
+    const nowMs         = Date.now();
+
+    for (const row of openRows) {
+      const isBuy = row.side !== "SELL";
+      const price = priceBySym.get(row.symbol);
+
+      let reason: "STOP_LOSS" | "TAKE_PROFIT" | "MAX_HOLD" | null = null;
+      if (price !== undefined) {
+        if (row.stopLoss != null && (isBuy ? price <= row.stopLoss : price >= row.stopLoss)) {
+          reason = "STOP_LOSS";
+        }
+        if (reason === null && row.takeProfit != null && (isBuy ? price >= row.takeProfit : price <= row.takeProfit)) {
+          reason = "TAKE_PROFIT";
+        }
+      }
+      // Price-independent max-hold ceiling so a stuck position can always close.
+      if (reason === null && maxHoldMs > 0) {
+        const openedAtMs = row.timestamp instanceof Date
+          ? row.timestamp.getTime()
+          : new Date(row.timestamp as unknown as string).getTime();
+        if (Number.isFinite(openedAtMs) && nowMs - openedAtMs >= maxHoldMs) reason = "MAX_HOLD";
+      }
+      if (reason === null) continue;
+
+      const qtyBase = (row.fillQty != null && row.fillQty > 0)
+        ? row.fillQty
+        : (row.price > 0 ? row.amount / row.price : 0);
+      if (!(qtyBase > 0)) {
+        logger.warn({ tag: "MANUAL_EXIT_SKIPPED", correlationId, positionId: row.id, symbol: row.symbol, reason: "no_qty" },
+          "[MANUAL_EXIT_SKIPPED] cannot size close — leaving row open");
+        continue;
+      }
+
+      // Reserve the row BEFORE sending a real broker order: atomically flip
+      // status open→closing. The openRows query only selects status='open', so
+      // once claimed no overlapping tick can re-select it and submit a duplicate
+      // close. If the claim matches 0 rows, another path already owns it — skip.
+      // Stamp `closedAt` as the lease timestamp so the lease-based reclaim above
+      // can detect a crash-stranded 'closing' row. Cleared on release; replaced
+      // with the real close time on finalize.
+      const claimed = await db
+        .update(tradesTable)
+        .set({ status: "closing", closedAt: new Date() })
+        .where(and(eq(tradesTable.id, row.id), eq(tradesTable.status, "open")))
+        .returning({ id: tradesTable.id });
+      if (claimed.length === 0) continue;
+
+      try {
+        const closeRes = await closeOperatorPositionLive({
+          symbol:   row.symbol,
+          openSide: isBuy ? "BUY" : "SELL",
+          qtyBase,
+          exchange: row.exchange!,
+          reason,
+        });
+
+        // If ANY broker order was placed (confirmed fill OR submitted-but-
+        // unconfirmed), record its id on the reserved row FIRST — best-effort
+        // and NEVER throwing. This is the crash-safe anchor: if a later step
+        // (settle, or an unexpected throw) fails, the lease reclaim re-confirms
+        // via this id instead of blindly re-closing a possibly-live order.
+        const placedOrderId = closeRes.closeOrderId || closeRes.exchangeOrderId;
+        if (placedOrderId) {
+          await db.update(tradesTable)
+            .set({ brokerResponse: { closeOrderId: placedOrderId, closeReason: reason, closeSubmittedAt: new Date().toISOString() } })
+            .where(and(eq(tradesTable.id, row.id), eq(tradesTable.status, "closing")))
+            .catch((e) => logger.warn({ tag: "MANUAL_EXIT_PERSIST_FAILED", correlationId, positionId: row.id, symbol: row.symbol, closeOrderId: placedOrderId, error: e instanceof Error ? e.message : String(e) },
+              "[MANUAL_EXIT_PERSIST_FAILED] could not persist close order id — proceeding with in-hand result"));
+        }
+
+        if (!closeRes.success) {
+          if (closeRes.submitted && placedOrderId) {
+            // A broker close order WAS placed but its fill could not be
+            // confirmed in time. Do NOT release for an immediate retry — that
+            // would double-close a possibly-filled order. Keep the row reserved
+            // ('closing'); the lease reclaim re-confirms via the persisted id.
+            logger.warn({ tag: "MANUAL_EXIT_UNCONFIRMED", correlationId, positionId: row.id, symbol: row.symbol, triggerReason: reason, closeOrderId: placedOrderId, error: closeRes.error },
+              "[MANUAL_EXIT_UNCONFIRMED] close submitted but unconfirmed — reservation held for re-confirmation");
+            continue;
+          }
+          // No order placed (pre-submit reject) or a broker-confirmed zero fill
+          // — safe to release the reservation so a later tick retries. Never
+          // mark a real position closed without a confirmed broker fill. Clear
+          // any stale brokerResponse so the reclaim never sees a dangling id.
+          await db.update(tradesTable).set({ status: "open", closedAt: null, brokerResponse: null })
+            .where(and(eq(tradesTable.id, row.id), eq(tradesTable.status, "closing")));
+          logger.warn({ tag: "MANUAL_EXIT_SKIPPED", correlationId, positionId: row.id, symbol: row.symbol, triggerReason: reason, error: closeRes.error },
+            "[MANUAL_EXIT_SKIPPED] real close unconfirmed/unfilled — reservation released for retry");
+          continue;
+        }
+
+        // Broker-confirmed fill. settleManualClose finalizes (full) or reduces
+        // to residual + releases (partial), scoped to the 'closing' reservation.
+        const exitPrice = closeRes.fillPrice && closeRes.fillPrice > 0 ? closeRes.fillPrice : (price ?? row.price);
+        await settleManualClose({
+          rowId:              row.id,
+          symbol:             row.symbol,
+          side:               row.side,
+          entryPrice:         row.price,
+          trackedQty:         qtyBase,
+          confirmedFilledQty: closeRes.quantity && closeRes.quantity > 0 ? closeRes.quantity : 0,
+          exitPrice,
+          reason,
+          exchange:           row.exchange,
+          correlationId,
+          source:             "live",
+        });
+      } catch (err) {
+        // FAIL-CLOSED: an exception after the row was reserved may have occurred
+        // AFTER a real broker order was submitted (closeOperatorPositionLive is
+        // built to never throw post-submit, but settle/DB writes still can).
+        // Reopening here could double-close, so KEEP the reservation ('closing').
+        // Recovery is by the lease reclaim: if a close order id was persisted
+        // above it re-confirms that order; if no order was ever placed the
+        // reclaim's no-id branch safely releases the row.
+        logger.error({ tag: "MANUAL_EXIT_ERROR", correlationId, positionId: row.id, symbol: row.symbol, triggerReason: reason, error: err instanceof Error ? err.message : String(err) },
+          "[MANUAL_EXIT_ERROR] manual exit threw after reservation — reservation HELD (fail-closed), lease reclaim will resolve");
+      }
+    }
+  } catch (err) {
+    logger.error({ err: err instanceof Error ? err.message : String(err) }, "runManualOperatorLiveStops: unexpected failure");
+  }
+}
+
 // ── Trailing stop tick ─────────────────────────────────────────────────────────
 
 async function runTrailingStops() {
@@ -2976,6 +3427,7 @@ async function tick() {
   // the global `trades`-table book (the max-active-positions cap source) so those
   // rows actually close on SL/TP instead of only on a trailing trigger.
   await runHardStopMonitor();
+  await runManualOperatorLiveStops();
   await runGlobalHardStops();
   await runGlobalCapSelfHeal();
   await runTrailingStops();

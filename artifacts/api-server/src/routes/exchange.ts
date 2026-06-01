@@ -16,6 +16,7 @@ import {
   type OrderType,
   type ExchangeMode,
 } from "../lib/exchangeEngine.js";
+import { registerManualOperatorTrade } from "../lib/tradingLoop.js";
 import { requireAuth, requireRole } from "../middlewares/requireAuth.js";
 
 // Operator endpoints — admin/super-admin only. These control the shared
@@ -240,6 +241,31 @@ router.post("/exchange/order/execute", ...requireOperator, async (req, res) => {
   }
   try {
     const order = await executeOrder(symbol, side, orderType, amountUSD, limitPrice);
+
+    // Manual operator override → AI-managed: when this operator order filled
+    // LIVE, register a managed `trades` row so the engine enforces fixed SL/TP
+    // (and the live max-hold ceiling) on the real position via
+    // `runManualOperatorLiveStops`. Registration MUST NOT fail the response —
+    // the broker fill already happened; a tracking-row failure is logged only.
+    if (order.mode === "live" && order.status === "filled" && order.volumeBase > 0 && order.exchange) {
+      try {
+        await registerManualOperatorTrade({
+          symbol,
+          side:            side === "buy" ? "BUY" : "SELL",
+          fillPrice:       order.fillPrice,
+          fillQty:         order.volumeBase,
+          sizeUSD:         order.valueUSD,
+          exchange:        order.exchange,
+          exchangeOrderId: order.exchangeOrderId,
+        });
+      } catch (regErr: unknown) {
+        req.log.error(
+          { err: regErr instanceof Error ? regErr.message : String(regErr), symbol, side },
+          "manual override registration failed (order already filled live)",
+        );
+      }
+    }
+
     res.json(order);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Execution failed";

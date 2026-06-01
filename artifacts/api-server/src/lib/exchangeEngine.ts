@@ -32,6 +32,12 @@ export interface ExchangeOrder {
   mode:             ExchangeMode;
   timestamp:        number;
   exchangeOrderId?: string;          // broker-assigned order ID
+  // Authoritative venue this order was actually routed to, captured
+  // synchronously at submit time. Consumers (e.g. the manual-override
+  // managed-trade registration) MUST read this rather than the mutable
+  // `_selectedExchange` global, which a concurrent /exchange/select could
+  // flip during the placeOrder await window. Only set on the LIVE path.
+  exchange?:        string;
   riskChecks:       RiskGate[];
   rejectionReason?: string;
 }
@@ -803,7 +809,11 @@ export async function executeOrder(
   // operator's process-env credentials. Before this registry existed, this
   // branch was hardcoded to `new AlpacaAdapter()` — meaning a Kraken
   // selection on the operator console would silently route to Alpaca.
-  const liveAdapter = getLiveAdapter(_selectedExchange);
+  // Capture the routed venue synchronously, BEFORE the await, so a concurrent
+  // /exchange/select cannot retroactively mis-stamp which exchange this order
+  // landed on. This is the authoritative venue downstream consumers must use.
+  const routedExchange = _selectedExchange;
+  const liveAdapter = getLiveAdapter(routedExchange);
   const result = await liveAdapter.placeOrder({
     symbol,
     side:      side as "buy" | "sell",
@@ -813,6 +823,7 @@ export async function executeOrder(
     ...(orderType === "limit" && limitPrice ? { limitPrice } : {}),
   });
 
+  order.exchange        = routedExchange;
   order.exchangeOrderId = result.exchangeOrderId;
   order.status          = result.status === "filled" ? "filled" : "open";
   if (orderType === "market") order.status = "filled";
@@ -875,6 +886,221 @@ export function getLiveAdapter(exchange: string): BaseExchangeAdapter {
 }
 
 export const LIVE_BRIDGE_EXCHANGES = ["Kraken", "Coinbase", "Alpaca", "Binance", "CryptoDotCom"] as const;
+
+// Currently selected live exchange (operator routing SoT). Exposed so the
+// manual-operator override path can stamp the exchange a fill landed on onto
+// its managed `trades` row (used later by the AI-managed exit monitor).
+export function getSelectedExchange(): string {
+  return _selectedExchange;
+}
+
+export interface OperatorCloseResult {
+  success:          boolean;
+  error?:           string;
+  exchange?:        string;
+  exchangeOrderId?: string;
+  fillPrice?:       number;
+  /** Base-asset quantity actually filled by this close (may be < requested). */
+  quantity?:        number;
+  /**
+   * True when the confirmed fill covered (essentially) the full requested
+   * close quantity. When false but `success` is true, only a PARTIAL close
+   * landed — the caller MUST keep the residual position managed (never mark
+   * the DB row closed), or a real position is orphaned at the broker.
+   */
+  fullyFilled?:     boolean;
+  /**
+   * True when a broker order WAS placed but its fill could not be confirmed
+   * within the poll window (`success` is false). The caller MUST NOT release
+   * the position for an immediate re-close (that would double-close a possibly
+   * filled order) — keep it reserved and re-confirm `closeOrderId` later.
+   * Distinct from a pre-submit rejection (`submitted` falsy → safe to retry).
+   */
+  submitted?:       boolean;
+  /** Broker order id of the close, for later re-confirmation when unconfirmed. */
+  closeOrderId?:    string;
+}
+
+/**
+ * Operator-path LIVE position close (process-env credentials). Issues a market
+ * order OPPOSITE to the open side for the held base quantity. Used by the
+ * AI-managed manual-override exit monitor (`runManualOperatorLiveStops`) to
+ * enforce fixed SL/TP/max-hold on manual operator trades against the REAL
+ * exchange — the global paper-mirror passes never send a real broker order.
+ *
+ * Intentionally NOT gated on mode/kill-switch/pause: a protective close of an
+ * existing real position must always be allowed to flow (mirrors the BUY-only
+ * DISARM gate philosophy where SELLs/closes are never blocked).
+ */
+export async function closeOperatorPositionLive(args: {
+  symbol:   string;
+  openSide: "BUY" | "SELL"; // side the position was OPENED with
+  qtyBase:  number;         // base-asset quantity to close
+  exchange: string;         // exchange the position was opened on
+  reason?:  string;
+}): Promise<OperatorCloseResult> {
+  const { symbol, openSide, qtyBase, exchange } = args;
+  if (!(qtyBase > 0)) return { success: false, error: "qtyBase must be positive", exchange };
+
+  let adapter: BaseExchangeAdapter;
+  try {
+    adapter = getLiveAdapter(exchange);
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err), exchange };
+  }
+
+  const closeSide: OrderSide = openSide === "BUY" ? "sell" : "buy";
+  const clientId = `manualclose-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const t0 = Date.now();
+  await recordExecTrace(`manual_close_submitted_${exchange.toLowerCase()}`, "info", {
+    symbol, openSide, closeSide, qtyBase, exchange, clientId, reason: args.reason,
+  });
+
+  let order: Awaited<ReturnType<BaseExchangeAdapter["placeOrder"]>>;
+  try {
+    order = await adapter.placeOrder({ symbol, side: closeSide, type: "market", qty: qtyBase, clientId });
+  } catch (err) {
+    const brokerErr = err instanceof Error ? err.message : String(err);
+    await recordExecTrace("manual_close_rejected", "error", {
+      symbol, openSide, closeSide, qtyBase, exchange, clientId,
+      error: brokerErr, latencyMs: Date.now() - t0,
+    });
+    return { success: false, error: brokerErr, exchange };
+  }
+
+  // ── Confirm the close actually FILLED before reporting success ───────────────
+  // Market-order acks can be OPTIMISTIC: some adapters (notably Kraken) return
+  // status="filled"/filledQty=req.qty on the INITIAL ack before the venue has
+  // actually executed. Trusting that ack would let the caller mark a real
+  // position closed in the DB while it is still open (or only partially closed)
+  // on the exchange. So NEVER trust the ack's fill — always verify against a
+  // real getOrder() read until a terminal broker state is observed. If no
+  // terminal read is obtained within the window, report submitted-but-
+  // unconfirmed so the caller keeps the position reserved (no double-close) and
+  // re-confirms `closeOrderId` later.
+  const isTerminal = (s: string) => s === "filled" || s === "cancelled" || s === "rejected";
+  const pollId = order.exchangeOrderId || order.id;
+  let confirmed: typeof order | null = null;
+  if (pollId) {
+    const deadline = Date.now() + 6000;
+    while (Date.now() < deadline) {
+      try {
+        const o = await adapter.getOrder(pollId, symbol);
+        if (o) {
+          confirmed = o;
+          if (isTerminal(o.status)) break;
+        }
+      } catch { /* transient poll error — keep trying until deadline */ }
+      await new Promise((r) => setTimeout(r, 500));
+    }
+  }
+
+  if (!confirmed || !isTerminal(confirmed.status)) {
+    // Order placed but no broker-confirmed terminal state. Do NOT trust the
+    // optimistic ack and do NOT let the caller immediately retry (would
+    // double-close a possibly-filled order). Surface submitted + closeOrderId
+    // so the caller holds the reservation and re-confirms later.
+    await recordExecTrace("manual_close_unconfirmed", "error", {
+      symbol, openSide, closeSide, qtyBase, exchange, clientId,
+      status: confirmed?.status ?? order.status, filledQty: confirmed?.filledQty ?? 0,
+      submitted: true, closeOrderId: pollId, latencyMs: Date.now() - t0,
+    }).catch(() => { /* never throw after submit — order may be live */ });
+    return {
+      success: false,
+      submitted: true,
+      closeOrderId: pollId || undefined,
+      error: `manual close submitted but not broker-confirmed within poll window (status=${confirmed?.status ?? order.status})`,
+      exchange,
+    };
+  }
+
+  // Broker-confirmed terminal. Treat ANY positive fill as a real close (even a
+  // cancelled-after-partial) — real base asset left the account and must be
+  // accounted; the caller distinguishes full vs partial via `fullyFilled`. A
+  // genuine confirmed zero fill (rejected / cancelled-unfilled) is safe to
+  // retry in full.
+  const filledQty = confirmed.filledQty > 0 ? confirmed.filledQty : 0;
+  if (!(filledQty > 0)) {
+    await recordExecTrace("manual_close_unconfirmed", "error", {
+      symbol, openSide, closeSide, qtyBase, exchange, clientId,
+      status: confirmed.status, filledQty: confirmed.filledQty, latencyMs: Date.now() - t0,
+    }).catch(() => { /* never throw after submit */ });
+    return {
+      success: false,
+      error: `manual close confirmed unfilled (status=${confirmed.status}, filledQty=${confirmed.filledQty})`,
+      exchange,
+    };
+  }
+  const fullyFilled = filledQty >= qtyBase * 0.999;
+
+  const latencyMs = Date.now() - t0;
+  let fill = confirmed.avgFillPrice > 0 ? confirmed.avgFillPrice : 0;
+  if (!(fill > 0)) {
+    try { const t = await getTicker(symbol); fill = t.price; } catch { /* leave 0; caller falls back */ }
+  }
+  const exchangeOrderId = confirmed.exchangeOrderId || confirmed.id;
+
+  // Telemetry only — must never throw after a broker-confirmed fill, or the
+  // caller's outer catch could reopen an already-closed position (double-close).
+  try {
+    executionStreamBus.emitEvent({
+      type:     "order_filled",
+      severity: "success",
+      symbol,
+      side:     closeSide === "buy" ? "BUY" : "SELL",
+      sizeUSD:  parseFloat((filledQty * fill).toFixed(2)),
+      price:    fill,
+      mode:     "live",
+      exchange,
+      message:  `MANUAL CLOSE FILLED ${symbol} ${closeSide} qty=${filledQty} @ $${fill.toFixed(2)} on ${exchange} (id=${exchangeOrderId})`,
+      details:  { exchangeOrderId, filledQty, fillPrice: fill, latencyMs, reason: args.reason },
+    });
+  } catch { /* telemetry bus must never break a confirmed close */ }
+  await recordExecTrace("manual_close_accepted", "info", {
+    symbol, openSide, closeSide, qtyBase, filledQty, fill, exchange, exchangeOrderId, latencyMs,
+  }).catch(() => { /* never throw after confirmed fill */ });
+
+  return { success: true, fullyFilled, exchange, exchangeOrderId, fillPrice: fill, quantity: filledQty };
+}
+
+/**
+ * Re-confirm a previously-submitted operator close order against the REAL
+ * exchange. Used by the manual-exit lease reclaim to decide whether a
+ * 'closing' row whose close was submitted-but-unconfirmed actually filled
+ * (→ finalize) or never landed (→ release for retry) — never blindly
+ * re-submitting a close that may already have executed.
+ *
+ * Best-effort and fail-closed: any error / unresolvable adapter returns
+ * `found=false, terminal=false`, which the caller treats as "still unknown,
+ * keep waiting" rather than a confirmed no-fill.
+ */
+export async function confirmOperatorOrderFill(args: {
+  exchange: string;
+  orderId:  string;
+  symbol:   string;
+}): Promise<{ found: boolean; terminal: boolean; status: string; filledQty: number; avgFillPrice: number }> {
+  const { exchange, orderId, symbol } = args;
+  const isTerminal = (s: string) => s === "filled" || s === "cancelled" || s === "rejected";
+  let adapter: BaseExchangeAdapter;
+  try {
+    adapter = getLiveAdapter(exchange);
+  } catch {
+    return { found: false, terminal: false, status: "unknown", filledQty: 0, avgFillPrice: 0 };
+  }
+  try {
+    const o = await adapter.getOrder(orderId, symbol);
+    if (!o) return { found: false, terminal: false, status: "unknown", filledQty: 0, avgFillPrice: 0 };
+    return {
+      found:        true,
+      terminal:     isTerminal(o.status),
+      status:       o.status,
+      filledQty:    o.filledQty > 0 ? o.filledQty : 0,
+      avgFillPrice: o.avgFillPrice > 0 ? o.avgFillPrice : 0,
+    };
+  } catch {
+    return { found: false, terminal: false, status: "unknown", filledQty: 0, avgFillPrice: 0 };
+  }
+}
 
 // ── Auto-trade live bridge ────────────────────────────────────────────────────
 //
