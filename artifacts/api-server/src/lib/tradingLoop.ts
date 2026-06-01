@@ -127,6 +127,13 @@ function getLivePositionMaxHoldMs(): number {
 // current price (conservative — trailing simply re-arms after the next run-up).
 const liveTrailWaterMarks = new Map<string, { high: number; low: number }>();
 
+// Consecutive LIVE stop-loss breach counter per position (Production Optimization
+// P1 — confirmation logic). A live stop fires only after LIVE_STOP_CONFIRM_TICKS
+// consecutive breaching ticks; this map holds the running count and is reset to 0
+// whenever a position stops breaching. Pruned each tick alongside
+// `liveTrailWaterMarks`. Process-local: on restart confirmation simply re-counts.
+const liveStopBreachStreak = new Map<string, number>();
+
 // ── Per-symbol concurrency cap (diversification entry gate) ──────────────────────
 // Caps how many concurrent open global-engine positions a single symbol may hold.
 // ENTRY-ONLY: enforced when evaluating NEW entries in `autoExecute`; it never
@@ -209,6 +216,64 @@ export const BASELINE_MIN_CONFIDENCE = EXPERIMENT_CONF_FLOOR;
 // user-facing rejection copy derive from this constant so the enforced
 // threshold and the message can never drift.
 export const VOLUME_GATE_FRACTION = 0.35;
+
+// ── LIVE stop-loss stabilization (Production Optimization P1) ─────────────────────
+// Production validation found ~30% of live trades scratch-closed via STOP_LOSS
+// within seconds of entry: the bid/ask spread alone, evaluated on the very next
+// tick against a stop computed from the entry-side fill, tripped the stop before
+// the trade could work. These knobs filter that spread/timing noise WITHOUT
+// weakening real protection — a genuinely adverse move still stops out within a
+// couple of ticks, and a catastrophic move bypasses every filter immediately. The
+// 2% stop-loss LEVEL is unchanged; only the live TRIGGER is stabilized. LIVE
+// positions only — paper SL is byte-for-byte untouched. All env-tunable, no redeploy.
+//
+// SAFETY: every knob is parsed fail-SAFE. A malformed/out-of-range env value
+// (e.g. "abc", "", negative) MUST NOT silently disable live stop-loss exits —
+// it falls back to the hard-coded safe default and logs a single warning at boot.
+// Bounds are deliberately conservative so no env value can push the effective
+// trigger so far that a genuine 2% breach can never confirm.
+const liveStopEnvWarnings: string[] = [];
+function parseLiveStopKnob(
+  name: string,
+  raw: string | undefined,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
+  if (raw === undefined || raw.trim() === "") return fallback;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < min || n > max) {
+    liveStopEnvWarnings.push(
+      `${name}="${raw}" is invalid (expected ${min}..${max}); using safe default ${fallback}`,
+    );
+    return fallback;
+  }
+  return n;
+}
+// 1. Grace: suppress the NORMAL stop for the first N ms after entry (spread settle).
+//    Capped at 10 min so a fat-finger value can't park a position un-stopped for hours.
+export const LIVE_STOP_STABILIZATION_MS = parseLiveStopKnob(
+  "LIVE_STOP_STABILIZATION_MS", process.env.LIVE_STOP_STABILIZATION_MS, 90000, 0, 600000);
+// 2. Spread buffer: the stop must be breached by more than this % of entry price
+//    before it counts, so the spread by itself can never trigger an exit. Capped at
+//    1% so the buffer can never swallow the whole 2% stop distance.
+export const LIVE_STOP_SPREAD_BUFFER_PCT = parseLiveStopKnob(
+  "LIVE_STOP_SPREAD_BUFFER_PCT", process.env.LIVE_STOP_SPREAD_BUFFER_PCT, 0.15, 0, 1);
+// 3. Confirmation: require this many CONSECUTIVE breaching ticks before exiting.
+//    Floored at 1 (always at least one confirming tick) and capped at 10.
+export const LIVE_STOP_CONFIRM_TICKS = parseLiveStopKnob(
+  "LIVE_STOP_CONFIRM_TICKS", process.env.LIVE_STOP_CONFIRM_TICKS, 2, 1, 10);
+// 4. Catastrophic override: a breach beyond (mult-1)× the stop distance past the
+//    stop fires immediately, bypassing grace + confirmation (real-crash protection).
+//    Floored at 1 (mult ≤ 1 would never trigger) and capped at 10.
+export const LIVE_STOP_CATASTROPHIC_MULT = parseLiveStopKnob(
+  "LIVE_STOP_CATASTROPHIC_MULT", process.env.LIVE_STOP_CATASTROPHIC_MULT, 2.5, 1, 10);
+if (liveStopEnvWarnings.length > 0) {
+  logger.warn(
+    { tag: "LIVE_STOP_ENV_INVALID", warnings: liveStopEnvWarnings },
+    "[LIVE_STOP_ENV_INVALID] one or more LIVE_STOP_* env knobs were invalid; safe defaults applied",
+  );
+}
 
 export interface SymbolBreakdown {
   symbol:          string;
@@ -2026,6 +2091,9 @@ async function runHardStopMonitor() {
     for (const id of liveTrailWaterMarks.keys()) {
       if (!openPositionIds.has(id)) liveTrailWaterMarks.delete(id);
     }
+    for (const id of liveStopBreachStreak.keys()) {
+      if (!openPositionIds.has(id)) liveStopBreachStreak.delete(id);
+    }
 
     await Promise.all(positions.map(async (p) => {
       const isBuy  = p.side === "BUY";
@@ -2056,7 +2124,43 @@ async function runHardStopMonitor() {
       // stale price — never close on a zero/absent price; the next tick retries.
       if (price !== undefined) {
         if (p.stopLoss !== null) {
-          if (isBuy ? price <= p.stopLoss : price >= p.stopLoss) reason = "STOP_LOSS";
+          const rawBreach = isBuy ? price <= p.stopLoss : price >= p.stopLoss;
+          if (!isLive) {
+            // Paper: unchanged — no spread/slippage to filter.
+            if (rawBreach) reason = "STOP_LOSS";
+          } else if (rawBreach) {
+            // LIVE stop-loss stabilization (Production Optimization P1). The SL
+            // LEVEL stays 2% — only the TRIGGER is filtered for spread/first-tick
+            // noise. A catastrophic move bypasses grace + confirmation.
+            const slDist = Math.abs(p.entryPrice - p.stopLoss);
+            const buffer = p.entryPrice * (LIVE_STOP_SPREAD_BUFFER_PCT / 100);
+            const bufferedBreach = isBuy
+              ? price <= p.stopLoss - buffer
+              : price >= p.stopLoss + buffer;
+            const catastrophic = slDist > 0 && (isBuy
+              ? price <= p.stopLoss - slDist * (LIVE_STOP_CATASTROPHIC_MULT - 1)
+              : price >= p.stopLoss + slDist * (LIVE_STOP_CATASTROPHIC_MULT - 1));
+            const withinGrace = ageMs !== null && ageMs < LIVE_STOP_STABILIZATION_MS;
+            if (catastrophic) {
+              // Real-crash protection — fire now regardless of grace/confirmation.
+              reason = "STOP_LOSS";
+              liveStopBreachStreak.delete(p.positionId);
+            } else if (withinGrace) {
+              // Stabilization window — suppress the normal stop; reset the streak.
+              liveStopBreachStreak.delete(p.positionId);
+            } else if (bufferedBreach) {
+              // Genuine breach beyond the spread buffer — require N consecutive.
+              const streak = (liveStopBreachStreak.get(p.positionId) ?? 0) + 1;
+              liveStopBreachStreak.set(p.positionId, streak);
+              if (streak >= LIVE_STOP_CONFIRM_TICKS) reason = "STOP_LOSS";
+            } else {
+              // Breach within the spread buffer = noise — reset the streak.
+              liveStopBreachStreak.delete(p.positionId);
+            }
+          } else {
+            // No breach this tick — reset the confirmation streak.
+            liveStopBreachStreak.delete(p.positionId);
+          }
         }
         if (reason === null && p.takeProfit !== null) {
           const tpHit = isBuy ? price >= p.takeProfit : price <= p.takeProfit;

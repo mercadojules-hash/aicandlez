@@ -28,9 +28,10 @@ import { eq, and, inArray } from "drizzle-orm";
  */
 
 export const EXIT_DEFAULTS = {
-  stopLossPercent:   2,
-  takeProfitPercent: 4,
-  maxHoldHours:      24,
+  stopLossPercent:     2,
+  takeProfitPercent:   4,
+  trailingStopPercent: 1.5,
+  maxHoldHours:        24,
 } as const;
 
 // Safe clamp ranges, centralized so every write path (customer + admin) reuses
@@ -155,7 +156,7 @@ function resolveFrom(
     trailingStopPercent =
       perExchange?.trailingStopPercent ??
       account?.trailingStopPercent ??
-      null;
+      EXIT_DEFAULTS.trailingStopPercent;
   }
 
   // Max-hold: env override wins; else per-exchange hours; else account hours;

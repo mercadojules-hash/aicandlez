@@ -1,0 +1,210 @@
+AICandlez Production Optimization Package – APPROVED FOR IMPLEMENTATION
+
+The #221 Production Profitability Validation Report has been reviewed.
+
+We are now moving from analysis into implementation.
+
+The goal is to maximize profitability while maintaining capital protection and preparing the platform for public launch.
+
+IMPORTANT:
+
+Implement only the approved optimization package below.
+
+Do NOT redesign the platform.
+Do NOT rebuild existing systems.
+Do NOT create new reporting tasks.
+Do NOT generate another research phase.
+
+Focus only on the highest-impact profitability improvements identified from production data.
+
+=====================================================
+PRIORITY 1 – FIX INSTANT STOP-OUTS
+==================================
+
+This is the highest-leverage issue identified.
+
+Production validation confirmed approximately 30% of trades are closing via STOP_LOSS within seconds of entry due to spread/timing behavior rather than actual trade failure.
+
+Implement:
+
+1. Stabilization grace period after entry.
+
+   * Suggested: 60–120 seconds.
+   * Stop-loss should not immediately evaluate against spread noise.
+
+2. Spread-aware stop evaluation.
+
+   * Prevent bid/ask spread alone from triggering exits.
+
+3. Optional confirmation logic.
+
+   * Require two consecutive stop-loss breaches before exit.
+
+Requirements:
+
+* Keep stop loss at 2%.
+* Do not weaken risk management.
+* Prevent false stop-outs while preserving real protection.
+
+This is the highest-priority deployment item.
+
+=====================================================
+PRIORITY 2 – SYMBOL OPTIMIZATION
+================================
+
+Implement symbol adjustments based on actual production results.
+
+PROMOTE:
+
+* TONUSD
+* HBARUSD
+
+Increase selection bias and opportunity preference.
+
+TEMPORARILY DISABLE:
+
+* STXUSD
+* INJUSD
+
+Reduce exposure immediately.
+
+REDUCE WEIGHT:
+
+* XLMUSD
+* AVAXUSD
+
+Monitor performance after deployment.
+
+No other symbol changes at this time.
+
+=====================================================
+PRIORITY 3 – CATEGORY ALLOCATION
+================================
+
+Update allocation strategy to:
+
+Majors = 85%
+Alts = 10%
+Memes = 5% maximum exploratory allocation
+
+Reason:
+
+Production results support heavier exposure toward majors and validated winners.
+
+Keep meme allocation small until enough live data exists.
+
+=====================================================
+PRIORITY 4 – EXIT OPTIMIZATION
+==============================
+
+Maintain:
+
+Stop Loss = 2%
+Take Profit = 4%
+
+Enable:
+
+Trailing Stop = 1.5%
+
+Keep:
+
+Max Hold = 24 hours
+
+Do not raise TP to 5–6% yet.
+
+Do not loosen stop loss.
+
+Do not alter exit ratios beyond the above configuration.
+
+=====================================================
+PRIORITY 5 – CONFIDENCE LOGIC
+=============================
+
+DO NOT raise confidence thresholds.
+
+Production validation showed:
+
+40–50 confidence range is currently the most profitable range.
+
+Therefore:
+
+* Keep confidence floor at 40.
+* Do not increase to 60–65.
+* Do not reduce trade frequency by tightening confidence filters.
+
+Instead:
+
+Create a future task to investigate why confidence scoring is not correlating with profitability.
+
+No confidence-threshold changes in this deployment.
+
+=====================================================
+PRIORITY 6 – VALIDATION CAPITAL SCALING
+=======================================
+
+After deployment:
+
+[info@mixtapepsd.com](mailto:info@mixtapepsd.com)
+
+* Trade size: $50
+* Concurrent positions: 6
+
+[teedelgado@gmail.com](mailto:teedelgado@gmail.com)
+
+* Trade size: $50
+* Concurrent positions: 4
+
+Goal:
+
+Generate statistically meaningful production validation data.
+
+$10 trade size is now considered plumbing/testing mode only and is no longer the primary profitability validation size.
+
+=====================================================
+DEPLOYMENT REQUIREMENTS
+=======================
+
+1. Implement all approved changes.
+2. Preserve existing safety protections.
+3. Preserve audit logging.
+4. Preserve customer isolation.
+5. Preserve exchange-specific controls.
+6. Do not modify user balances.
+7. Do not modify historical trade records.
+8. Do not alter reconciliation data.
+
+=====================================================
+POST-DEPLOYMENT
+===============
+
+After deployment:
+
+Run live validation.
+
+Target:
+
+* Minimum 200–300 additional live trades.
+* Collect new profit factor.
+* Collect new win rate.
+* Collect new realized P&L.
+* Compare against baseline metrics from #221.
+
+Only after sufficient trade volume is collected should we revisit:
+
+* TP increases
+* Additional symbol additions
+* Confidence model recalibration
+* Larger position sizing
+
+Focus on execution quality first.
+
+Priority order:
+
+P1 Instant Stop-Out Fix
+P2 Symbol Optimization
+P3 Allocation Optimization
+P4 Trailing Stop Activation
+P5 Confidence Investigation (future)
+P6 Capital Scaling Validation
+
+Implement and deploy.

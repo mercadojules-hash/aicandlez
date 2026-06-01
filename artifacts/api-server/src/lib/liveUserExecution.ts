@@ -33,7 +33,8 @@ import {
   coerceTradeSizeToPreset,
   evaluateLiquidityGuard,
 } from "./liquidityGuard.js";
-import { categoryForSymbol, type SymbolCategory } from "./symbolCategories.js";
+import { categoryForSymbol, DEFAULT_CATEGORY_ALLOCATION, type SymbolCategory } from "./symbolCategories.js";
+import { isLiveSymbolDisabled, liveSymbolSizeMultiplier } from "./symbolPolicy.js";
 import { simAccountsTable } from "@workspace/db";
 import { loadParallelConfig, effectivePerExchangeMax } from "./multiExchangeParallel.js";
 
@@ -109,7 +110,7 @@ export interface LiveUserOrderResult {
   dryRun?:         boolean;
   /** True when the order was routed through the exchange's public sandbox. */
   sandbox?:        boolean;
-  errorCode?:      "no_connection" | "not_trade_authorized" | "decrypt_failed" | "unsupported" | "unsupported_symbol" | "symbol_not_in_universe" | "no_sandbox" | "price_unavailable" | "exchange_reject" | "trade_limit_exhausted" | "user_status_blocked" | "customer_live_execution_disabled" | "user_ai_disabled" | "concurrent_live_cap_reached" | "risk_max_per_trade" | "risk_max_simultaneous" | "risk_max_allocation" | "risk_reserve_cash_breach" | "risk_no_equity" | "ai_disclaimer_not_accepted" | "low_confidence_signal" | "volume_safety_gate" | "liquidity_protected" | "plan_max_positions_reached" | "allocation_limit";
+  errorCode?:      "no_connection" | "not_trade_authorized" | "decrypt_failed" | "unsupported" | "unsupported_symbol" | "symbol_not_in_universe" | "symbol_disabled" | "no_sandbox" | "price_unavailable" | "exchange_reject" | "trade_limit_exhausted" | "user_status_blocked" | "customer_live_execution_disabled" | "user_ai_disabled" | "concurrent_live_cap_reached" | "risk_max_per_trade" | "risk_max_simultaneous" | "risk_max_allocation" | "risk_reserve_cash_breach" | "risk_no_equity" | "ai_disclaimer_not_accepted" | "low_confidence_signal" | "volume_safety_gate" | "liquidity_protected" | "plan_max_positions_reached" | "allocation_limit";
   error?:          string;
 }
 
@@ -762,6 +763,64 @@ export async function placeLiveAutoOrderForUser(
     }
   }
 
+  // 0SYM. Per-symbol live-trading policy (Production Optimization P2). Operator
+  // bypass. Symbols on the disable list (default STXUSD/INJUSD — production net
+  // losers) never open NEW customer live positions; existing positions, their
+  // exit monitors, paper trading, and history are all untouched. Env-tunable via
+  // DISABLED_LIVE_SYMBOLS without a redeploy. This gate does NOT touch confidence,
+  // MTF, volume, risk, or sizing — it only restricts WHICH symbols may enter the
+  // remaining gates.
+  {
+    const operatorSym = await isOperatorRole(userId);
+    if (!operatorSym && isLiveSymbolDisabled(symbol)) {
+      const reason =
+        `${symbol.trim().toUpperCase()} is temporarily disabled for live trading ` +
+        `(production performance review). No new live positions are being opened in it.`;
+      await emitFailureNotification(userId, symbol, side, reason);
+      executionStreamBus.emitEvent({
+        type:     "order_rejected",
+        severity: "warn",
+        symbol, side, sizeUSD, mode: "live",
+        gate:     "symbol_disabled",
+        reason:   "symbol_disabled",
+        message:  `Live order REJECTED ${symbol} ${side}: ${reason}`,
+        details:  { userId },
+      });
+      try {
+        await db.insert(logsTable).values({
+          id:      crypto.randomUUID(),
+          type:    "trade",
+          level:   "warn",
+          message: `[symbol_disabled] ${reason}`,
+          details: { userId, symbol, side, sizeUSD, errorCode: "symbol_disabled" },
+        });
+      } catch (err) {
+        logger.warn({ err, userId }, "liveUserExecution: 0SYM log insert failed");
+      }
+      return { success: false, userId, errorCode: "symbol_disabled", error: reason };
+    }
+  }
+
+  // Per-symbol size weighting (Production Optimization P2). Scale exposure on
+  // individual symbols (default: halve XLMUSD/AVAXUSD — weak performers). Applied
+  // BEFORE the volume / liquidity / risk gates below, so every ceiling still
+  // binds — this can only shrink (or scale within bounds) the requested size,
+  // never bypass a cap. Operator path keeps full size.
+  {
+    const operatorWeight = await isOperatorRole(userId);
+    if (!operatorWeight) {
+      const mult = liveSymbolSizeMultiplier(symbol);
+      if (mult !== 1) {
+        const before = sizeUSD;
+        sizeUSD = Math.max(0, sizeUSD * mult);
+        logger.info(
+          { userId, symbol, mult, before, after: sizeUSD },
+          "[symbol_size_weight] applied per-symbol live size multiplier",
+        );
+      }
+    }
+  }
+
   // 0VOL. MANDATORY volume-confirmation safety gate.
   //
   // Volume Filter is a baseline platform safety control for all customer
@@ -1178,7 +1237,9 @@ export async function placeLiveAutoOrderForUser(
           .from(userSettingsTable)
           .where(eq(userSettingsTable.userId, userId))
           .limit(1);
-        const allocation = allocRow?.allocation ?? null;
+        // P3: fall back to the majors-heavy platform default when the account
+        // has set no explicit allocation (previously a NULL skipped the gate).
+        const allocation = allocRow?.allocation ?? DEFAULT_CATEGORY_ALLOCATION;
         if (allocation) {
           const cat = categoryForSymbol(symbol);
           const rawWeight = Number(allocation[cat]);

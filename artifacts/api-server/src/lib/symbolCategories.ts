@@ -42,3 +42,18 @@ export function categoryForSymbol(symbol: string): SymbolCategory {
 }
 
 export const CATEGORY_KEYS: readonly SymbolCategory[] = ["majors", "alts", "memes"] as const;
+
+/**
+ * Platform default category allocation (Production Optimization P3). Applied by
+ * the customer live execution 0ALLOC gate when an account has no explicit
+ * `category_allocation`. Majors-heavy: production validation showed majors carry
+ * the book, so alts/memes get small exploratory shares. It is a SOFT cap (each
+ * enabled category keeps ≥1 slot); customers can still override per-account, and
+ * the operator path bypasses 0ALLOC entirely, so this only shapes customer live
+ * selection. Revert P3 by restoring the gate's null-skip behaviour.
+ */
+export const DEFAULT_CATEGORY_ALLOCATION: Record<SymbolCategory, number> = {
+  majors: 85,
+  alts:   10,
+  memes:  5,
+};
