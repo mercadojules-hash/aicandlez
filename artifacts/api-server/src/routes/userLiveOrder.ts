@@ -19,6 +19,7 @@ import { requireAuth } from "../middlewares/requireAuth.js";
 import { isCustomerLiveExecutionEnabled } from "../lib/liveUserExecution.js";
 import { executeCustomerOrder } from "../lib/executionGateway.js";
 import { registerLiveUserFill } from "../lib/userSimRegistry.js";
+import { resolveExitConfig } from "../lib/exitConfig.js";
 import { TIER_MAX_SIZE_USD, type TierPlan } from "../lib/tierLimits.js";
 import { getSupportedExchanges, UnsupportedSymbolError } from "../lib/marketData.js";
 import { emit as emitTelemetry, genCorrelationId, rememberCorrelation } from "../lib/executionTelemetry.js";
@@ -396,8 +397,13 @@ router.post(
         const entry = result.fillPrice ?? 0;
         const qty   = result.quantity  ?? (entry > 0 ? sizeUSD / entry : 0);
         if (entry > 0 && qty > 0) {
-          const SL_PCT = 2;
-          const TP_PCT = 4.5;
+          // Resolve SL/TP from the SAME per-account/per-exchange resolver the AI
+          // live open-path uses (tradingLoop), so a manual live order inherits a
+          // customer's configured exits per exchange instead of a hardcoded
+          // 2 / 4.5. Precedence: per-exchange → account → env default → hardcoded.
+          const exitCfg = await resolveExitConfig(userId, result.exchange ?? null);
+          const SL_PCT = exitCfg.stopLossPercent;
+          const TP_PCT = exitCfg.takeProfitPercent;
           const sl = parsed.side === "BUY"
             ? entry * (1 - SL_PCT / 100)
             : entry * (1 + SL_PCT / 100);
