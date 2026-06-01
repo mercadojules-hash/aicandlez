@@ -1,0 +1,68 @@
+Before we continue running the optimization package, I need a production-data verification using the two live test accounts ([info@mixtapepsd.com](mailto:info@mixtapepsd.com) and [teedelgado@gmail.com](mailto:teedelgado@gmail.com)).
+
+I am concerned that profitability may be declining despite increased execution activity.
+
+Do not make any changes yet.
+
+Please provide the following using actual production trade data from both accounts:
+
+1. Current LIVE exit settings being enforced
+
+   * Take Profit %
+   * Stop Loss %
+   * Trailing Stop %
+   * Max Hold
+   * Any account-specific overrides
+   * Any exchange-specific overrides
+
+2. Exit breakdown for the last 24 hours (or since the optimization deployment if less than 24 hours)
+
+   * Number of Take Profit exits
+   * Number of Stop Loss exits
+   * Number of Trailing Stop exits
+   * Number of Max Hold exits
+   * Number of Manual/Other exits
+
+3. Trade quality metrics
+
+   * Win rate %
+   * Average winning trade %
+   * Average losing trade %
+   * Profit factor
+   * Expectancy per trade
+   * Net realized P&L
+
+4. Risk/reward analysis
+   Based on the actual live settings currently being enforced, calculate:
+
+   * Break-even win rate
+   * Current win rate
+   * Whether the current configuration has a positive or negative mathematical expectancy
+
+5. Most important question:
+   Are we currently exiting winning trades too early?
+
+I specifically want to know whether:
+
+* The 1.5% trailing stop is cutting winners before they can reach the 4% take-profit target.
+* The trailing stop is responsible for most profitable exits.
+* A larger trailing stop (2.5%–3%) would likely improve realized profit based on the actual production trade history.
+
+6. Optimization assessment
+   Compare:
+
+   * Before optimization package
+   * After optimization package
+
+Show:
+
+* Trade frequency
+* Win rate
+* Average winner
+* Average loser
+* Realized P&L
+* Profit factor
+
+Do not recommend changes yet.
+
+First prove whether profitability improved, stayed the same, or worsened after the optimization package using actual production trade data.
