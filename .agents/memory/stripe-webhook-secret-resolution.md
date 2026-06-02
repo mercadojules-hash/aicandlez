@@ -93,6 +93,23 @@ value. Compare that fingerprint to sha256 of the Render env secret.
 in Stripe + its `stripe._managed_webhooks` row, leaving only the manual endpoint
 whose whsec_ is in env. Destructive → confirm before executing.
 
+## TOTAL vs INTERMITTENT failure triage (read-only, prod DB)
+First query the prod `stripe` schema row counts (RENDER_PROD_DATABASE_URL via
+pg + createRequire). If `stripe.events`=0 AND every data table (invoices,
+customers, subscriptions, payment_intents…) =0 while `_migrations`>0 and
+`accounts`=1, the sync engine is installed but **NOT ONE webhook has ever passed
+`constructEventAsync`** → this is TOTAL signature failure (single wrong/mismatched
+env secret OR endpoint test-vs-live mode mismatch), NOT the intermittent
+duplicate-endpoint "half failures" pattern (which leaves SOME rows synced).
+`_managed_webhooks`=0 in prod = Option B manual ownership (auto-registrar gated to
+non-prod) so verification reads env STRIPE_WEBHOOK_SECRET. A junk-`Stripe-Signature`
+POST to the live URL returning the app's JSON 400 `{"error":"Webhook processing
+error"}` confirms the route is the real verifier. The literal exception+stack
+(StripeSignatureVerificationError "No signatures found matching…") and the DIAG2
+`hmacMatchesAnyV1`/`lengthMatch` discriminator live ONLY in Render stdout (pino),
+NOT fetch_deployment_logs (which targets the Replit deploy, not Render) and NOT the
+DB `logs` table.
+
 ## ALWAYS cross-check live Stripe, not just the DB row (it lags)
 The `stripe._managed_webhooks` DB row can be STALE vs live Stripe: the recreate
 loop deletes+recreates the managed endpoint with a NEW id AND can change the URL
