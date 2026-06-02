@@ -39,3 +39,28 @@ problem is **neither TP-too-low nor trailing-too-tight**.
 than the engine), so trust MFE + raw-move ground truth, not simulated PF/net-$.
 Also `sim_trades` has no stored peak — MFE must be rebuilt from candles, and
 trades inside their 24h hold window are censored (can only mark-to-market).
+
+## Counterfactual: TP4→10 on a high-volume live day (149 closed trades)
+**Verdict: raising TP does NOT help; TP=4 maximizes realized P&L.** Re-confirmed
+on a much bigger sample than the original 8-trade day.
+- **The 2% trailing stop is the binding constraint, NOT the TP ceiling.** 67% of
+  winners *eventually* printed ≥10% MFE somewhere in 24h, but with trailing held
+  at 2% only ~1 in ~48 winners actually reaches +10% — the trailing stop catches
+  the first >2% pullback long before the later global peak. Raising TP just
+  converts hard +4% banks into trailing give-backs (~peak−2%), avg cohort raw
+  return drops from +4% to ~1.9%.
+- **Two methods agree directionally** that higher TP loses money vs TP=4:
+  full-path sim (Δ≈−$1.7 at TP10) and a reality-anchored decomposition
+  (hold all non-TP trades at actual P&L, re-sim only actual-TP-hitters forward
+  from their +4% point) (Δ≈−$0.6). Decomposition is the trustworthy one — it
+  sidesteps the SL model.
+- **SL-stabilization modeling trap:** a naive 1m-candle full-path sim fires SL on
+  any bar wick to −2% and massively over-counts stop-outs (52 vs actual 24),
+  because production P1 stop stabilization (90s grace + 2-tick confirm + spread
+  buffer, tick-level) suppresses brief wicks. NEVER trust the absolute net-$ of a
+  candle full-path sim; the constant-SL block cancels in TP-vs-TP *deltas*, and
+  the decomposition avoids SL entirely by anchoring forward from the real exit.
+- Mechanics for any future candle recon here: prod DB = RENDER_PROD_DATABASE_URL;
+  candles via Coinbase Exchange public (`/products/{SYM}-USD/candles?granularity=60`,
+  300/page) with Kraken OHLC fallback (only returns last ~720 1m candles → trades
+  opened >12h before now lose entry-side coverage).
