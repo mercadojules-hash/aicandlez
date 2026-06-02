@@ -2280,3 +2280,85 @@ export async function placeLiveCloseOrderForUser(
     return { success: false, userId, exchange: row.exchange, errorCode: "exchange_reject", error: msg };
   }
 }
+
+// ── Broker base-asset balance probe (zombie-position reconciliation) ──────────
+// Used by the hard-stop monitor to VERIFY, before any local reconciliation, that
+// the broker truly cannot satisfy a recorded LIVE position quantity. This is the
+// safety gate that distinguishes a permanent orphan (the underlying asset is gone
+// from the exchange, so the close can never succeed) from a transient broker
+// rejection (nonce error, momentary balance lock, min-size hiccup) where the
+// asset is still present and we MUST keep retrying. NEVER reconcile a position
+// without an `ok:true` result here — fail-closed so a probe failure can never be
+// mistaken for "balance gone".
+export interface BrokerBaseBalanceResult {
+  ok:           boolean;
+  baseAsset:    string;
+  freeBalance:  number | null;
+  totalBalance: number | null;
+  errorCode?:   "no_connection" | "decrypt_failed" | "unsupported" | "getaccount_failed";
+  error?:       string;
+}
+
+// Strip the USD-quote suffix from a trading symbol to recover the base asset key
+// used by `StandardAccount.balances` (adapters normalise asset keys to standard
+// tickers, e.g. Kraken XBT → BTC). Longest quote suffix first so "…USDT"/"…USDC"
+// win over "…USD".
+function deriveBaseAsset(symbol: string): string {
+  const s = symbol.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  for (const quote of ["USDT", "USDC", "USD"]) {
+    if (s.endsWith(quote) && s.length > quote.length) return s.slice(0, -quote.length);
+  }
+  return s;
+}
+
+export async function getUserBrokerBaseBalance(
+  userId: string,
+  exchange: string,
+  symbol: string,
+): Promise<BrokerBaseBalanceResult> {
+  const baseAsset = deriveBaseAsset(symbol);
+  const base: BrokerBaseBalanceResult = {
+    ok: false, baseAsset, freeBalance: null, totalBalance: null,
+  };
+
+  // Resolve the connection for the venue that holds the position (mirrors the
+  // close path: by userId + exchange + status="active", NOT isDefault).
+  const [row] = await db
+    .select()
+    .from(userExchangeConnectionsTable)
+    .where(
+      and(
+        eq(userExchangeConnectionsTable.userId,   userId),
+        eq(userExchangeConnectionsTable.exchange, exchange),
+        eq(userExchangeConnectionsTable.status,   "active"),
+      ),
+    )
+    .limit(1);
+  if (!row) {
+    return { ...base, errorCode: "no_connection", error: `No active ${exchange} connection` };
+  }
+
+  const creds = vault.decryptBlob(userId, row.encryptedBlob);
+  if (!creds) {
+    return { ...base, errorCode: "decrypt_failed", error: "Could not decrypt stored credentials" };
+  }
+
+  let adapter: BaseExchangeAdapter;
+  try {
+    // Balance probe always against production (testnet:false) — zombies are real
+    // positions on the live venue; sandbox holdings are irrelevant here.
+    adapter = makeAdapter(row.exchange, creds, { testnet: false, demoMode: row.demoMode });
+  } catch (err) {
+    return { ...base, errorCode: "unsupported", error: err instanceof Error ? err.message : String(err) };
+  }
+
+  try {
+    const account = await adapter.getAccount();
+    const bal = account.balances[baseAsset];
+    const free  = bal && Number.isFinite(bal.free)  ? bal.free  : 0;
+    const total = bal && Number.isFinite(bal.total) ? bal.total : 0;
+    return { ok: true, baseAsset, freeBalance: free, totalBalance: total };
+  } catch (err) {
+    return { ...base, errorCode: "getaccount_failed", error: err instanceof Error ? err.message : String(err) };
+  }
+}

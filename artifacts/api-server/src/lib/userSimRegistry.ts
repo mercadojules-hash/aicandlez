@@ -4,6 +4,7 @@ import {
   simPositionsTable,
   simTradesTable,
   userSettingsTable,
+  userNotificationsTable,
 } from "@workspace/db";
 import { eq, desc, sql, and, or, isNotNull, gte } from "drizzle-orm";
 import { getTicker, SUPPORTED_SYMBOLS } from "./marketData.js";
@@ -828,6 +829,7 @@ export async function listOpenPositionsForRiskMonitor(): Promise<
     positionId: string;
     symbol:     string;
     side:       string;
+    quantity:   number;
     entryPrice: number;
     stopLoss:   number | null;
     takeProfit: number | null;
@@ -842,6 +844,7 @@ export async function listOpenPositionsForRiskMonitor(): Promise<
         positionId: simPositionsTable.id,
         symbol:     simPositionsTable.symbol,
         side:       simPositionsTable.side,
+        quantity:   simPositionsTable.quantity,
         entryPrice: simPositionsTable.entryPrice,
         stopLoss:   simPositionsTable.stopLoss,
         takeProfit: simPositionsTable.takeProfit,
@@ -1052,11 +1055,143 @@ export async function registerLiveUserFill(params: {
 // per-user registry state (and all close paths) live in this one process.
 const inFlightCloses = new Set<string>();
 
+// ── Zombie LIVE-position reconciliation ──────────────────────────────────────
+// A LIVE position past max-hold whose broker close is repeatedly rejected BECAUSE
+// the underlying asset is no longer at the exchange (verified balance < recorded
+// qty) is a permanent orphan: every monitor tick re-submits a close the broker
+// can never honor. `reconcileZombiePosition` retires it LOCALLY, without a broker
+// order. Accounting (locked): LIVE opens never deducted cash, so a position's
+// only ledger footprint is its `sizeUSD` inside `equityProxy`. Removing the row
+// drops exposure + the open-position count correctly. We do NOT credit cash and
+// do NOT touch totalRealized/totalTrades — the asset is gone at the broker (its
+// real P&L already lives in the broker balance, the SoT for live equity), so a
+// fabricated recovered-capital credit would overstate equity. The audit
+// sim_trades row is tagged so it is EXCLUDED from the realized recompute.
+export const ZOMBIE_RECONCILE_TAG = "ZOMBIE_INSUFFICIENT_FUNDS";
+
+export async function reconcileZombiePosition(args: {
+  userId: string;
+  positionId: string;
+  brokerError: string;
+  actualBalance: number | null;
+  recordedQuantity: number;
+  closeReason?: string;
+}): Promise<{ reconciled: boolean; error?: string }> {
+  const { userId, positionId, brokerError, actualBalance, recordedQuantity } = args;
+  const closeReason = args.closeReason ?? "RECONCILED_INSUFFICIENT_FUNDS";
+
+  // Atomic: delete the orphan position (the `.returning()` row is the idempotency
+  // gate — if a concurrent close already removed it we no-op) and write the
+  // tagged audit trade row in the same transaction.
+  let result:
+    | { applied: false }
+    | { applied: true; deleted: typeof simPositionsTable.$inferSelect };
+  try {
+    result = await db.transaction(async (tx) => {
+      // Scope the delete by (id, userId) so a mismatched caller arg can never
+      // retire another user's row — and the audit trade we write below always
+      // belongs to the same user we deleted from.
+      const [deleted] = await tx
+        .delete(simPositionsTable)
+        .where(and(eq(simPositionsTable.id, positionId), eq(simPositionsTable.userId, userId)))
+        .returning();
+      if (!deleted) return { applied: false as const };
+
+      const now = Date.now();
+      await tx.insert(simTradesTable).values({
+        id:             `recon-${positionId}-${now}`,
+        userId,
+        symbol:         deleted.symbol,
+        side:           deleted.side,
+        quantity:       deleted.quantity,
+        entryPrice:     deleted.entryPrice,
+        // No broker fill — flat exit at entry so realized P&L is exactly 0. The
+        // row is tagged + excluded from the realized ledger regardless.
+        exitPrice:      deleted.entryPrice,
+        entryTime:      deleted.entryTime,
+        exitTime:       now,
+        sizeUSD:        deleted.sizeUSD,
+        realizedPnL:    0,
+        realizedPnLPct: 0,
+        durationMs:     Math.max(0, now - deleted.entryTime),
+        confidence:     deleted.confidence ?? null,
+        closeReason,
+        exchange:        deleted.exchange ?? null,
+        exchangeOrderId: deleted.exchangeOrderId ?? null,
+        sandbox:         deleted.sandbox ?? false,
+        reconciliationTag: ZOMBIE_RECONCILE_TAG,
+      });
+      return { applied: true as const, deleted };
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.error({ userId, positionId, err: msg }, "[ZOMBIE_RECONCILE] transaction failed");
+    return { reconciled: false, error: msg };
+  }
+
+  if (!result.applied) {
+    return { reconciled: false, error: `Position ${positionId} already gone` };
+  }
+  const posRow = result.deleted;
+
+  // Converge the in-memory registry: drop the orphan from the cached book so the
+  // open-position count + equityProxy match the DB. Totals are intentionally
+  // untouched (see header).
+  const state = registry.get(userId);
+  if (state) {
+    const cidx = state.positions.findIndex((p) => p.id === positionId);
+    if (cidx !== -1) state.positions.splice(cidx, 1);
+  }
+
+  // Full audit trail: symbol, exchange, recorded qty, actual balance, broker
+  // error, reconciliation reason.
+  const auditData = {
+    kind:              "zombie_position_reconciled",
+    positionId,
+    symbol:            posRow.symbol,
+    exchange:          posRow.exchange ?? null,
+    side:              posRow.side,
+    recordedQuantity,
+    actualBalance,
+    sizeUSD:           posRow.sizeUSD,
+    brokerError,
+    closeReason,
+    reconciliationTag: ZOMBIE_RECONCILE_TAG,
+  };
+
+  try {
+    await db.insert(userNotificationsTable).values({
+      userId,
+      type:    "live_position_reconciled",
+      title:   `Closed orphaned ${posRow.symbol} position`,
+      message: `A live ${posRow.symbol} position on ${posRow.exchange ?? "your exchange"} was retired after the exchange balance could no longer cover it (broker error: ${brokerError}).`,
+      data:    auditData,
+    });
+  } catch (err) {
+    logger.warn(
+      { userId, positionId, err: err instanceof Error ? err.message : String(err) },
+      "[ZOMBIE_RECONCILE] notification insert failed (non-fatal)",
+    );
+  }
+
+  logger.warn(
+    {
+      tag:           "ZOMBIE_RECONCILED",
+      sourceOfTruth: "userSimRegistry.reconcileZombiePosition",
+      userId,
+      ...auditData,
+    },
+    "[ZOMBIE_RECONCILED] orphaned live position retired locally (broker balance < recorded qty)",
+  );
+
+  return { reconciled: true };
+}
+
 export async function closeUserPosition(
   userId: string,
   positionId: string,
   closeReason: string = "MANUAL",
-): Promise<{ success: boolean; trade?: UserSimTrade; error?: string }> {
+): Promise<{ success: boolean; trade?: UserSimTrade; error?: string; errorCode?: string }> {
   const state = await getOrLoad(userId);
   const idx   = state.positions.findIndex((p) => p.id === positionId);
   if (idx === -1) {
@@ -1143,8 +1278,9 @@ export async function closeUserPosition(
         "UserSimRegistry: live close order rejected — position remains open",
       );
       return {
-        success: false,
-        error:   `Live close order rejected on ${pos.exchange}: ${closeRes.error ?? "unknown"}`,
+        success:   false,
+        error:     `Live close order rejected on ${pos.exchange}: ${closeRes.error ?? "unknown"}`,
+        errorCode: closeRes.errorCode,
       };
     }
     exchangeCloseOrderId = closeRes.exchangeCloseOrderId;

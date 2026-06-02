@@ -34,3 +34,23 @@ latest tick. A secondary INTERMITTENT Kraken `EAPI:Invalid nonce` (exchange API 
 appears but is not the blocker. "Insufficient balance" on a close = tracked `sim_positions.quantity`
 exceeds the actual sellable broker balance (asset already moved/sold or quantity drifted) — the
 position is untracked-divergent, not just rejected.
+
+**Resolution — local reconciliation safety valve (now wired):** the monitor escalates a
+past-max-hold LIVE position whose broker close fails N consecutive ticks to a broker-balance
+probe, and retires it LOCALLY (no broker order) only when the live TOTAL base-asset balance is
+verified below the recorded quantity. Hard rules that must never be relaxed:
+- **Fail-CLOSED on an unverified balance.** If the probe can't return `ok:true`, keep retrying —
+  never reconcile without a confirmed balance (a probe failure must not look like "asset gone").
+- **Verify before closing — never blind-close on one rejection.** Three independent confirms:
+  age≥maxHold, a consecutive failed-close streak (floor 2, default 3), AND verified
+  balance < qty*(1−tol). A balance that CAN cover the qty = transient (min-size / nonce) → keep
+  the row, reset the streak.
+- **Use TOTAL (free+locked), not free.** An asset locked in an open order still exists at the
+  venue → not an orphan. Reconciling on free-only would wrongly retire real holdings.
+- **Accounting:** reconcile = DELETE `sim_positions` + INSERT a `reconciliationTag`-tagged
+  `sim_trades` row (realizedPnL 0, closeReason `RECONCILED_INSUFFICIENT_FUNDS`). LIVE opens never
+  deducted cash, so do NOT credit cash and do NOT touch total_realized/total_trades — the asset is
+  already gone at the broker (the SoT for live equity); fabricating a recovered-capital credit
+  overstates equity. The tag excludes the row from the realized recompute.
+**Why:** the original close path is gated on a real fill so realized PnL matches the broker; the
+valve only bypasses that fill when the asset provably no longer exists to fill against.

@@ -11,6 +11,7 @@ import { placeLiveAutoOrder, closeOperatorPositionLive, confirmOperatorOrderFill
 import {
   listLiveExecutionUsers,
   isDryRunEnabled,
+  getUserBrokerBaseBalance,
   type LiveUserOrderResult,
 } from "./liveUserExecution.js";
 import { executeCustomerOrder } from "./executionGateway.js";
@@ -22,6 +23,7 @@ import {
   listOpenPaperPositionsBySymbol,
   listOpenPositionsForRiskMonitor,
   closeUserPosition,
+  reconcileZombiePosition,
 } from "./userSimRegistry.js";
 import { getTicker } from "./marketData.js";
 import { emit as emitTelemetry, genCorrelationId, rememberCorrelation } from "./executionTelemetry.js";
@@ -133,6 +135,42 @@ const liveTrailWaterMarks = new Map<string, { high: number; low: number }>();
 // whenever a position stops breaching. Pruned each tick alongside
 // `liveTrailWaterMarks`. Process-local: on restart confirmation simply re-counts.
 const liveStopBreachStreak = new Map<string, number>();
+
+// ── Zombie LIVE-position reconciliation (orphaned max-hold closes) ────────────
+// Consecutive FAILED live-close counter per position. A LIVE position past
+// max-hold whose broker close is rejected this many ticks IN A ROW is escalated
+// to a broker-balance check; only if the venue can no longer cover the recorded
+// quantity is the position reconciled (retired) locally. Pruned each tick
+// alongside the other per-position maps. Process-local: on restart the count
+// simply re-accumulates — conservative, since reconciliation only fires after
+// re-confirming both the repeated failures AND the missing broker balance.
+const failedLiveCloseStreak = new Map<string, number>();
+
+// Consecutive failed live closes before a max-hold orphan is balance-checked.
+// Fail-safe parse → default 3. Hard floor of 2: the safety invariant forbids
+// ever local-closing on a single rejection, so a misconfigured `1` (or any
+// invalid value) falls back to the default rather than weakening the guard.
+const DEFAULT_RECONCILE_FAILED_CLOSE_STREAK = 3;
+const MIN_RECONCILE_FAILED_CLOSE_STREAK = 2;
+function getReconcileFailedCloseStreak(): number {
+  const raw = process.env.LIVE_RECONCILE_FAILED_CLOSE_STREAK;
+  if (raw === undefined || raw === "") return DEFAULT_RECONCILE_FAILED_CLOSE_STREAK;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= MIN_RECONCILE_FAILED_CLOSE_STREAK
+    ? Math.floor(n)
+    : DEFAULT_RECONCILE_FAILED_CLOSE_STREAK;
+}
+
+// Tolerance band on the balance-vs-recorded-qty comparison so broker dust
+// rounding doesn't keep a truly-gone position alive forever. Fail-safe parse →
+// default 0.02 (2%), clamped to [0, 0.5).
+const DEFAULT_RECONCILE_BALANCE_TOLERANCE = 0.02;
+function getReconcileBalanceTolerance(): number {
+  const raw = process.env.LIVE_RECONCILE_BALANCE_TOLERANCE;
+  if (raw === undefined || raw === "") return DEFAULT_RECONCILE_BALANCE_TOLERANCE;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 && n < 0.5 ? n : DEFAULT_RECONCILE_BALANCE_TOLERANCE;
+}
 
 // ── Per-symbol concurrency cap (diversification entry gate) ──────────────────────
 // Caps how many concurrent open global-engine positions a single symbol may hold.
@@ -2131,6 +2169,9 @@ async function runHardStopMonitor() {
     for (const id of liveStopBreachStreak.keys()) {
       if (!openPositionIds.has(id)) liveStopBreachStreak.delete(id);
     }
+    for (const id of failedLiveCloseStreak.keys()) {
+      if (!openPositionIds.has(id)) failedLiveCloseStreak.delete(id);
+    }
 
     await Promise.all(positions.map(async (p) => {
       const isBuy  = p.side === "BUY";
@@ -2345,6 +2386,7 @@ async function runHardStopMonitor() {
           if (reason === "TRAILING_STOP") engineStats.trailingStopHits++;
           else                            engineStats.hardStopHits++;
           if (p.exchange) liveTrailWaterMarks.delete(p.positionId);
+          failedLiveCloseStreak.delete(p.positionId);
           const pnlPct = closeResult.trade?.realizedPnLPct;
           // Trigger-vs-execution diagnostics. `triggerPrice` is the price the
           // monitor observed when it decided to exit; `executionPrice` is the
@@ -2432,6 +2474,75 @@ async function runHardStopMonitor() {
             },
             "[HARD_STOP_SKIPPED] hard-stop close not applied",
           );
+
+          // ── Zombie reconciliation (orphaned LIVE position past max-hold) ──────
+          // A broker close that keeps failing on a LIVE position past its
+          // max-hold ceiling may be a permanent orphan (the underlying asset is
+          // gone from the exchange, so the close can never succeed). Escalate
+          // ONLY after repeated consecutive failures AND a verified broker
+          // balance below the recorded quantity. Anything short of that keeps
+          // retrying — never close blind on a single rejection.
+          const pastMaxHold =
+            isLive && exitCfg.maxHoldMs > 0 && ageMs !== null && ageMs >= exitCfg.maxHoldMs;
+          if (pastMaxHold && p.exchange) {
+            const streak = (failedLiveCloseStreak.get(p.positionId) ?? 0) + 1;
+            failedLiveCloseStreak.set(p.positionId, streak);
+            if (streak >= getReconcileFailedCloseStreak()) {
+              const probe = await getUserBrokerBaseBalance(p.userId, p.exchange, p.symbol);
+              if (probe.ok) {
+                // Use TOTAL (free + locked): if the asset exists ANYWHERE on the
+                // venue — including locked in an open order — it is NOT an orphan
+                // and we must keep trying. Reconcile only when even total cannot
+                // cover the recorded quantity (minus the dust tolerance).
+                const available = probe.totalBalance ?? 0;
+                const required  = p.quantity * (1 - getReconcileBalanceTolerance());
+                if (available < required) {
+                  const recon = await reconcileZombiePosition({
+                    userId:           p.userId,
+                    positionId:       p.positionId,
+                    brokerError:      closeResult.error ?? "broker close repeatedly rejected",
+                    actualBalance:    available,
+                    recordedQuantity: p.quantity,
+                  });
+                  if (recon.reconciled) failedLiveCloseStreak.delete(p.positionId);
+                } else {
+                  // Asset still present at the broker → transient/min-size issue,
+                  // not an orphan. Reset the streak so a future genuine
+                  // disappearance must re-accumulate its own confirmations.
+                  failedLiveCloseStreak.delete(p.positionId);
+                  logger.info(
+                    {
+                      tag:        "ZOMBIE_RECONCILE_SKIPPED",
+                      userId:     p.userId,
+                      positionId: p.positionId,
+                      symbol:     p.symbol,
+                      exchange:   p.exchange,
+                      baseAsset:  probe.baseAsset,
+                      available,
+                      required,
+                    },
+                    "[ZOMBIE_RECONCILE_SKIPPED] broker balance still covers recorded qty — keeping position",
+                  );
+                }
+              } else {
+                // Balance probe failed → fail-CLOSED: never reconcile without a
+                // verified balance. Keep the streak so once the probe recovers
+                // and confirms the asset is gone, reconciliation fires then.
+                logger.warn(
+                  {
+                    tag:        "ZOMBIE_RECONCILE_DEFERRED",
+                    userId:     p.userId,
+                    positionId: p.positionId,
+                    symbol:     p.symbol,
+                    exchange:   p.exchange,
+                    errorCode:  probe.errorCode,
+                    err:        probe.error,
+                  },
+                  "[ZOMBIE_RECONCILE_DEFERRED] could not verify broker balance — not reconciling (fail-closed)",
+                );
+              }
+            }
+          }
         }
       } catch (err) {
         logger.warn(
