@@ -157,19 +157,35 @@ export interface WebhookSecretInfo {
   length:   number;   // length AFTER trimming (the value actually used)
   prefixOk: boolean;  // true if it starts with the Stripe webhook prefix "whsec_"
   hadSurroundingWhitespace?: boolean; // raw env/DB value had leading/trailing whitespace
+  rawLength?:         number;  // length BEFORE trimming
+  trimChangesLength?: boolean; // true if .trim() shortened the value (catchable whitespace)
+  first6?:            string;  // first 6 chars only (the public "whsec_" prefix) — never the body
+  last4?:             string;  // last 4 chars only — reveals a stray tail char, not the secret
+}
+
+function describeSecretValue(
+  source: "env" | "db",
+  raw:    string,
+  trimmed: string,
+): WebhookSecretInfo {
+  return {
+    source,
+    loaded:                    true,
+    length:                    trimmed.length,
+    prefixOk:                  trimmed.startsWith("whsec_"),
+    hadSurroundingWhitespace:  raw !== trimmed,
+    rawLength:                 raw.length,
+    trimChangesLength:         raw.length !== trimmed.length,
+    first6:                    trimmed.slice(0, 6),
+    last4:                     trimmed.slice(-4),
+  };
 }
 
 export async function describeWebhookSecret(): Promise<WebhookSecretInfo> {
   const rawEnvSecret = process.env["STRIPE_WEBHOOK_SECRET"];
   const envSecret    = rawEnvSecret?.trim();
-  if (envSecret) {
-    return {
-      source:                    "env",
-      loaded:                    true,
-      length:                    envSecret.length,
-      prefixOk:                  envSecret.startsWith("whsec_"),
-      hadSurroundingWhitespace:  rawEnvSecret !== envSecret,
-    };
+  if (rawEnvSecret && envSecret) {
+    return describeSecretValue("env", rawEnvSecret, envSecret);
   }
 
   // env empty/unset → getStripeSync falls back to the DB-managed table.

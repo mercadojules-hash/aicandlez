@@ -178,11 +178,17 @@ app.post(
         {
           endpointPath:           req.originalUrl,
           signatureHeaderPresent: Boolean(signature),
+          stripeSignatureHeader:  Array.isArray(signature) ? signature[0] : (signature ?? null),
           webhookSecretLoaded:    wh.loaded,
           webhookSecretSource:    wh.source,
-          webhookSecretLength:    wh.length,
+          webhookSecretLength:    wh.length,          // length AFTER trim (value actually used)
+          webhookSecretRawLength: wh.rawLength ?? -1,  // length BEFORE trim
+          webhookSecretTrimChangesLength: wh.trimChangesLength ?? false,
           webhookSecretPrefixOk:  wh.prefixOk,
           webhookSecretHadWhitespace: wh.hadSurroundingWhitespace ?? false,
+          webhookSecretFirst6:    wh.first6 ?? "",     // public "whsec_" prefix only
+          webhookSecretLast4:     wh.last4 ?? "",      // last 4 chars only — never the full secret
+          bodyTypeof:             typeof req.body,
           bodyIsBuffer:           Buffer.isBuffer(req.body),
           bodyLength:             Buffer.isBuffer(req.body) ? (req.body as Buffer).length : -1,
         },
