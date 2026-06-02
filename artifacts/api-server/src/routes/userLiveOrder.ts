@@ -428,6 +428,25 @@ router.post(
             sandbox:                parsed.useSandbox,
           });
           mirroredPositionId = pos?.id ?? orderId;
+          // Surface the resolved exit settings actually applied to this manual
+          // live entry (req: logs show resolved exit config on new live opens).
+          req.log.info(
+            {
+              tag:        "LIVE_EXIT_CONFIG_RESOLVED",
+              userId,
+              exchange:   result.exchange ?? null,
+              symbol:     parsed.symbol,
+              side:       parsed.side,
+              positionId: mirroredPositionId,
+              exitConfig: {
+                stopLossPercent:     exitCfg.stopLossPercent,
+                takeProfitPercent:   exitCfg.takeProfitPercent,
+                trailingStopPercent: exitCfg.trailingStopPercent,
+                maxHoldHours:        exitCfg.maxHoldHours,
+              },
+            },
+            `[LIVE_EXIT_CONFIG_RESOLVED] ${userId} ${parsed.symbol} ${parsed.side} exits TP${exitCfg.takeProfitPercent}%/SL${exitCfg.stopLossPercent}%/trail${exitCfg.trailingStopPercent ?? "mirror"}/hold${exitCfg.maxHoldHours}h`,
+          );
         }
       } catch (mirrorErr) {
         persistenceResult = "failed";

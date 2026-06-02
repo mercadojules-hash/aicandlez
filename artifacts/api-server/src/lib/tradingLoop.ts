@@ -1513,11 +1513,19 @@ async function autoExecute(
               positionId:     mirroredPositionId,
               stopLoss:       parseFloat(userSL.toFixed(2)),
               takeProfit:     parseFloat(userTP.toFixed(2)),
+              // Resolved exit settings actually applied to this live entry
+              // (req: logs surface the resolved exit config on new live opens).
+              exitConfig: {
+                stopLossPercent:     exitCfg.stopLossPercent,
+                takeProfitPercent:   exitCfg.takeProfitPercent,
+                trailingStopPercent: exitCfg.trailingStopPercent,
+                maxHoldHours:        exitCfg.maxHoldHours,
+              },
               signalId,
               globalLiveMode: isLiveExec,
               store:          "sim_positions",
             },
-            `[CUSTOMER_POSITION_CREATED] ${r.userId} ${symbol} ${side} @ ${userEntry} on ${r.exchange ?? "unknown"} (pos=${mirroredPositionId})`,
+            `[CUSTOMER_POSITION_CREATED] ${r.userId} ${symbol} ${side} @ ${userEntry} on ${r.exchange ?? "unknown"} (pos=${mirroredPositionId}) exits TP${exitCfg.takeProfitPercent}%/SL${exitCfg.stopLossPercent}%/trail${exitCfg.trailingStopPercent ?? "mirror"}/hold${exitCfg.maxHoldHours}h`,
           );
           // CONF EXPERIMENT: per-customer LIVE fill in the measurement band [50,64].
           if (inConfExperimentBand(confidence)) {

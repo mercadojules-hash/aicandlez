@@ -86,3 +86,21 @@ on a much bigger sample than the original 8-trade day.
   of the six = widest tested (TP10/Tr5), but improvement had NOT plateaued at the
   grid edge, so the true optimum is unbracketed. Magnitude unprovable from one
   noisy day → validate via paper/live A/B, do NOT blind-deploy off the backtest.
+
+## EXIT_DEFAULTS is SHADOWED by NOT-NULL account TP/SL (rollout trap)
+- `user_settings.take_profit_percent` & `stop_loss_percent` are **NOT NULL**
+  (schema default 4 / 2); `trailing_stop_percent` & `max_hold_hours` are
+  **NULLABLE**. `resolveExitConfig` precedence = perExchange ?? account ?? env ??
+  EXIT_DEFAULTS. **Consequence:** bumping `EXIT_DEFAULTS.takeProfitPercent` only
+  reaches userId=null (operator/global) and rows with NO settings row — every
+  existing customer's stored TP=4 shadows it. Trailing & max-hold DO inherit
+  EXIT_DEFAULTS (nullable → fall through). SL likewise shadowed but we keep it 2.
+- **All live trading is customer-path** (non-null userId; operator-null live ≈ 0;
+  verified: 24 open live positions all customer, 6 user_settings rows all 4/null/
+  2/null, no per-exchange overrides). So a platform TP change that must hit live
+  trades REQUIRES a `user_settings` data migration (UPDATE take_profit_percent),
+  not just the code default.
+- **Deploy-order trap:** applying a wide-TP data change while trailing is still
+  the OLD tight default = the bad TP-wide/trail-tight interim (clips winners).
+  Setting BOTH tp AND trail explicitly on the account rows makes the rollout
+  deploy-order-independent (account values win on old AND new code).

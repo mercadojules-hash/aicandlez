@@ -19,12 +19,13 @@ import { eq, and, inArray } from "drizzle-orm";
  *      unset. Per-account / per-exchange edits MUST win over it, otherwise the
  *      per-account controls would be silently ineffective in any environment
  *      where the operator env knob is set. (SL/TP have no env knob.)
- *   4. Hardcoded default — SL 2 %, TP 4 %, trailing 2 %, max-hold 24h.
- *      P4 first set the default trailing to a fixed 1.5 %; a post-deploy
- *      counterfactual then widened it to 2 % (1.5 % clipped winners early).
- *      Previously it fell through to null (= "mirror the position's own stored
- *      stop-loss band"). SL/TP/max-hold defaults are unchanged. An account that
- *      never touches the controls now trails at 2 %.
+ *   4. Hardcoded default — SL 2 %, TP 10 %, trailing 5 %, max-hold 24h.
+ *      Evolution: P4 set a fixed 1.5 % default trailing; a counterfactual
+ *      widened it to 2 %; an approved joint TP+trailing change then moved TP
+ *      4 → 10 % and trailing 2 → 5 % together (the 2 % trailing was the binding
+ *      constraint clipping winners before a higher TP could be reached). SL and
+ *      max-hold are unchanged. An account that never touches the controls now
+ *      takes profit at 10 % and trails at 5 %.
  *
  * `trailingStopPercent === null` is still honored by the live monitor (mirror
  * each position's own stored stop-loss band) if a row explicitly carries it, but
@@ -35,13 +36,14 @@ import { eq, and, inArray } from "drizzle-orm";
 
 export const EXIT_DEFAULTS = {
   stopLossPercent:     2,
-  takeProfitPercent:   4,
-  // P4 introduced a fixed 1.5 % default; a post-deploy counterfactual on live
-  // trades showed 1.5 % clipped winners a touch early (most favourable moves
-  // peaked 2-3 %), so the default trailing distance was widened to 2 %. SL/TP/
-  // max-hold are unchanged. 3 % was evaluated and rejected — too wide for the
-  // observed sub-3 % peaks (it gives the whole move back).
-  trailingStopPercent: 2,
+  // Approved production change: TP widened 4 % → 10 % and trailing 2 % → 5 %
+  // together. A joint TP+trailing grid on a full live-trade day showed the 2 %
+  // trailing (not the TP ceiling) was the binding constraint — it clipped
+  // winners before they could reach a higher TP. Widening TP alone loses; TP
+  // and trailing must move together. SL stays 2 % and max-hold stays 24h. To
+  // revert, restore takeProfitPercent: 4 / trailingStopPercent: 2.
+  takeProfitPercent:   10,
+  trailingStopPercent: 5,
   maxHoldHours:        24,
 } as const;
 
