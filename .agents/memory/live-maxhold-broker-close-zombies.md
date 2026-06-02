@@ -22,7 +22,15 @@ close, NOT a broken max-hold trigger or a null entry_time. Diagnose the close-re
 reason first. Two common classes:
 - **Dust** (`quantity` ~1e-08, ~$0 notional, e.g. XLMUSD): below broker min order size →
   rejected every tick → permanent zombie. Inflates open-position count.
-- **Real exposure** ($10–$20): rejection reason (min-notional / insufficient sellable
-  balance / connection) lives in Render stdout (`HARD_STOP_SKIPPED`, "live close order
-  rejected") — these are pino-only, NOT in the DB `logs` table, so prod-DB queries won't
-  show them. Need Render logs to get the exact broker error.
+- **Real exposure** ($10–$20): the broker rejection text IS persisted — `closeUserPosition`'s
+  failure path calls `emitFailureNotification` → `user_notifications` (type=`live_trade_failed`,
+  message=`Exchange rejected close order: <broker msg>`, `data->>'symbol'` carries the symbol).
+  Query that table for the exact reason; you do NOT need Render stdout. (The DB `logs` table
+  still has nothing; pino HARD_STOP_SKIPPED is Render-only — but notifications cover it.)
+
+**Observed in prod:** every stuck REAL row failed for the SAME root reason — **insufficient
+balance** (Kraken `EOrder:Insufficient funds`, Coinbase `INSUFFICIENT_FUND`), persisting to the
+latest tick. A secondary INTERMITTENT Kraken `EAPI:Invalid nonce` (exchange API error) also
+appears but is not the blocker. "Insufficient balance" on a close = tracked `sim_positions.quantity`
+exceeds the actual sellable broker balance (asset already moved/sold or quantity drifted) — the
+position is untracked-divergent, not just rejected.
