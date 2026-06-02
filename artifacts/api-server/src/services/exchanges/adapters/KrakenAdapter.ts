@@ -27,6 +27,26 @@ const REVERSE_MAP: Record<string, string> = Object.fromEntries(
   Object.entries(SYMBOL_MAP).map(([k, v]) => [v, k])
 );
 
+// ── Process-global monotonic nonce ───────────────────────────────────────────
+// Kraken requires each private-request nonce for an API key to be STRICTLY
+// greater than the previous nonce it has seen for that key. `Date.now()` (ms)
+// collides whenever two private calls fire in the same millisecond — and this
+// server fires several concurrently (60s analysis tick + ~10s fast stop monitor
+// + on-demand balance fetches), producing `EAPI:Invalid nonce`. A single
+// module-level (process-global) counter shared across ALL KrakenAdapter
+// instances guarantees a strictly-increasing sequence for every key used in
+// this process (a globally-increasing counter is monotonic for each key's
+// subsequence too). Microsecond-scaled so it stays aligned with wall-clock and
+// has ample headroom: Date.now()*1000 ≈ 1.7e15 ≪ Number.MAX_SAFE_INTEGER 9e15.
+// Cross-process collisions are eliminated separately by the operator-engine
+// single-owner gate (see lib/operatorEngineOwner.ts).
+let _lastKrakenNonce = 0;
+function nextKrakenNonce(): string {
+  const micros = Date.now() * 1000;
+  _lastKrakenNonce = micros > _lastKrakenNonce ? micros : _lastKrakenNonce + 1;
+  return _lastKrakenNonce.toString();
+}
+
 const ASSET_MAP: Record<string, string> = {
   ZUSD: "USD", XXBT: "BTC", XETH: "ETH", SOL: "SOL",
   XXRP: "XRP", XDOGE: "DOGE", AVAX: "AVAX", LINK: "LINK", ADA: "ADA",
@@ -268,7 +288,7 @@ export class KrakenAdapter extends BaseExchangeAdapter {
 
   private krakenPrivate<T>(endpoint: string, params: Record<string, string> = {}): Promise<T> {
     const key   = this.config.apiKey!;
-    const nonce = Date.now().toString();
+    const nonce = nextKrakenNonce();
     const path  = `/0/private/${endpoint}`;
     const body  = new URLSearchParams({ nonce, ...params }).toString();
     const sign  = this.krakenSign(path, body, nonce);

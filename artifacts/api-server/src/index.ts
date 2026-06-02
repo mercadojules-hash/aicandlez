@@ -13,6 +13,7 @@ import { createWsServer } from "./lib/wsServer.js";
 import { startAlpacaTokenRefresher } from "./services/exchanges/AlpacaTokenRefresher.js";
 import { startBackfillScheduler } from "./lib/backfillScheduler.js";
 import { logOperatorEmailBootStatus, startOperatorEmailHealthMonitor } from "./lib/notifications.js";
+import { logOperatorEngineOwnerBootStatus } from "./lib/operatorEngineOwner.js";
 
 // ── Environment validation ─────────────────────────────────────────────────────
 validateEnv();
@@ -145,6 +146,7 @@ server.listen(finalPort, "0.0.0.0", async () => {
     logger.info("Kraken API credentials loaded");
   }
   logOperatorEmailBootStatus();
+  logOperatorEngineOwnerBootStatus();
   startOperatorEmailHealthMonitor();
   startTradingLoop();
   startAlpacaTokenRefresher();

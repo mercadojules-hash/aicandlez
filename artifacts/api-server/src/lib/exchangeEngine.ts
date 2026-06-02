@@ -8,6 +8,7 @@ import { CryptoDotComAdapter, CRYPTOCOM_CONFIG } from "../services/exchanges/ada
 import type { BaseExchangeAdapter } from "../services/exchanges/BaseExchangeAdapter.js";
 import { executionStreamBus } from "./executionStreamBus.js";
 import { logger } from "./logger.js";
+import { assertOperatorEngineOwner, isOperatorEngineOwner } from "./operatorEngineOwner.js";
 import { db, logsTable } from "@workspace/db";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -192,6 +193,8 @@ function isLiveCapable(): boolean {
 // ── Live balances ─────────────────────────────────────────────────────────────
 
 export async function fetchLiveBalances(): Promise<Balances> {
+  // Operator env-key balance polling — owner-process only (see operatorEngineOwner).
+  assertOperatorEngineOwner("fetchLiveBalances");
   const t0 = Date.now();
   logger.info({ tag: "BALANCE_FETCH", event: "start", exchange: _selectedExchange }, "[BALANCE_FETCH] start");
   if (_selectedExchange === "Kraken") {
@@ -360,6 +363,8 @@ function getBalancesSlot(exchange: string): BalancesPerExchange {
 }
 
 export async function fetchLiveBalancesWithMeta(): Promise<LiveBalancesWithMeta> {
+  // Operator env-key balance polling — owner-process only (see operatorEngineOwner).
+  assertOperatorEngineOwner("fetchLiveBalancesWithMeta");
   // Capture the exchange selection at call-entry. The slot is keyed by this
   // value, so even if `_selectedExchange` mutates mid-await we still resolve
   // against the slot that owns the upstream call we joined.
@@ -762,6 +767,8 @@ export async function executeOrder(
   amountUSD: number,
   limitPrice?: number,
 ): Promise<ExchangeOrder> {
+  // Operator env-key manual order — owner-process only (see operatorEngineOwner).
+  assertOperatorEngineOwner("executeOrder");
   const nativePair = ALPACA_PAIRS[symbol];
   if (!nativePair) throw new Error(`Unsupported symbol: ${symbol}`);
 
@@ -940,6 +947,10 @@ export async function closeOperatorPositionLive(args: {
   reason?:  string;
 }): Promise<OperatorCloseResult> {
   const { symbol, openSide, qtyBase, exchange } = args;
+  // Operator env-key close — owner-process only (see operatorEngineOwner).
+  if (!isOperatorEngineOwner()) {
+    return { success: false, error: "operator_engine_not_owner", exchange };
+  }
   if (!(qtyBase > 0)) return { success: false, error: "qtyBase must be positive", exchange };
 
   let adapter: BaseExchangeAdapter;
@@ -1080,6 +1091,10 @@ export async function confirmOperatorOrderFill(args: {
   symbol:   string;
 }): Promise<{ found: boolean; terminal: boolean; status: string; filledQty: number; avgFillPrice: number }> {
   const { exchange, orderId, symbol } = args;
+  // Operator env-key order lookup — owner-process only (see operatorEngineOwner).
+  if (!isOperatorEngineOwner()) {
+    return { found: false, terminal: false, status: "unknown", filledQty: 0, avgFillPrice: 0 };
+  }
   const isTerminal = (s: string) => s === "filled" || s === "cancelled" || s === "rejected";
   let adapter: BaseExchangeAdapter;
   try {
@@ -1194,6 +1209,12 @@ export async function placeLiveAutoOrder(req: {
     return { success: false, error, rejectionGate: gate };
   };
 
+  // Operator env-key live order — owner-process only (see operatorEngineOwner).
+  // A non-owner (e.g. the Replit dev workspace) must never drive the shared
+  // Kraken key or its nonce stream collides with the prod owner.
+  if (!isOperatorEngineOwner()) {
+    return reject("not_owner", "Operator engine is not owned by this process");
+  }
   if (_mode !== "live")  return reject("live_mode_off", "Exchange engine not in live mode");
   if (_killSwitch)       return reject("kill_switch",   "Exchange kill switch is active");
   if (_paused)           return reject("paused",        "Exchange is paused");
