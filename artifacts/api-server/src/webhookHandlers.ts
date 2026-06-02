@@ -246,11 +246,97 @@ export class WebhookHandlers {
       );
     }
 
+    // ── TEMP DIAGNOSTIC (remove after webhook processing debug) ─────────────
+    // Phase-split tracing that definitively separates a SIGNATURE-VERIFICATION
+    // failure from an EVENT-PROCESSING (DB write / sync) failure, and surfaces
+    // event identifiers + the full stack on each path. Behavior is UNCHANGED:
+    // every error is re-thrown so the route still returns its 400. This adds an
+    // extra constructEvent (purely computational, safe) only for observability.
+    let tracedEvent: Stripe.Event | null = null;
+    try {
+      const traceStripe = await getUncachableStripeClient();
+      const traceSecret = process.env.STRIPE_WEBHOOK_SECRET;
+      if (!traceSecret) {
+        logger.warn(
+          { phase: "VERIFY_SKIPPED_NO_ENV_SECRET" },
+          "[STRIPE_WEBHOOK_TRACE] no env STRIPE_WEBHOOK_SECRET — cannot trace-verify",
+        );
+      } else {
+        tracedEvent = await traceStripe.webhooks.constructEventAsync(
+          payload,
+          signature,
+          traceSecret,
+        );
+        const obj = tracedEvent.data?.object as unknown as Record<string, unknown> | undefined;
+        logger.info(
+          {
+            phase:          "VERIFY_OK",
+            eventId:        tracedEvent.id,
+            eventType:      tracedEvent.type,
+            livemode:       tracedEvent.livemode,
+            objectId:       obj?.["id"],
+            customerId:     obj?.["customer"],
+            subscriptionId: obj?.["subscription"],
+          },
+          "[STRIPE_WEBHOOK_TRACE] signature verified — proceeding to processing",
+        );
+      }
+    } catch (verifyErr) {
+      const e = verifyErr as Error & { type?: string; code?: string };
+      logger.error(
+        {
+          phase:      "VERIFY_FAILED",
+          errName:    e?.name,
+          errType:    e?.type,
+          errCode:    e?.code,
+          errMessage: e?.message,
+          stack:      e?.stack,
+        },
+        "[STRIPE_WEBHOOK_TRACE] FIRST FAILING STEP = signature verification",
+      );
+      throw verifyErr;
+    }
+
     // Phase C: handle credit_topup / outstanding_payment first. Internal
     // failures are caught and never NACK the webhook.
     await maybeHandleCreditEvent(payload, signature);
 
     const sync = await getStripeSync();
-    await sync.processWebhook(payload, signature);
+    try {
+      await sync.processWebhook(payload, signature);
+    } catch (processErr) {
+      const e = processErr as Error & { type?: string; code?: string; constraint?: string };
+      // sync.processWebhook re-verifies the signature with ITS OWN resolved
+      // secret. If that throws a signature error, the real first-failing step is
+      // still verification (secret mismatch on the sync path) — classify it as
+      // such so PROCESS_FAILED never masks a verification failure.
+      const isSignatureError =
+        e?.name === "StripeSignatureVerificationError" ||
+        e?.type === "StripeSignatureVerificationError";
+      const obj = tracedEvent?.data?.object as unknown as Record<string, unknown> | undefined;
+      logger.error(
+        {
+          phase:          isSignatureError ? "PROCESS_FAILED_SIGNATURE" : "PROCESS_FAILED",
+          failingStep:    isSignatureError
+            ? "signature verification (inside sync.processWebhook — secret mismatch)"
+            : "event processing (DB write / sync, post-verification)",
+          eventId:        tracedEvent?.id,
+          eventType:      tracedEvent?.type,
+          objectId:       obj?.["id"],
+          customerId:     obj?.["customer"],
+          subscriptionId: obj?.["subscription"],
+          errName:        e?.name,
+          errType:        e?.type,
+          errCode:        e?.code,        // pg SQLSTATE if it is a DB error
+          errConstraint:  e?.constraint,  // pg constraint name if any
+          errMessage:     e?.message,
+          stack:          e?.stack,
+        },
+        isSignatureError
+          ? "[STRIPE_WEBHOOK_TRACE] FIRST FAILING STEP = signature verification (sync-path secret)"
+          : "[STRIPE_WEBHOOK_TRACE] FIRST FAILING STEP = event processing (post-verification)",
+      );
+      throw processErr;
+    }
   }
 }

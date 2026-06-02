@@ -253,11 +253,64 @@ app.post(
       logger.warn({ err: diagErr }, "[STRIPE_WEBHOOK_DIAG2] self-test failed");
     }
 
+    // ── TEMP DIAGNOSTIC (remove after webhook processing debug) ─────────────
+    // Best-effort, UNVERIFIED parse of the raw body purely to label the log
+    // line with the event identifiers — even when the throw is signature
+    // verification (where no verified event object exists). Never used for
+    // business logic; failures here are ignored.
+    let bodyEventType: string | undefined;
+    let bodyObjectId: unknown;
+    let bodyCustomerId: unknown;
+    let bodySubscriptionId: unknown;
+    // Body is attacker-controlled until signature verification — treat parsed
+    // values as untrusted labels only and bound their length to avoid log abuse.
+    const truncLabel = (v: unknown): unknown =>
+      typeof v === "string" && v.length > 256 ? v.slice(0, 256) + "…[truncated]" : v;
+    try {
+      const parsed = JSON.parse((req.body as Buffer).toString("utf8")) as {
+        type?: string;
+        data?: { object?: Record<string, unknown> };
+      };
+      const obj = parsed.data?.object;
+      bodyEventType      = typeof parsed.type === "string" ? parsed.type.slice(0, 128) : undefined;
+      bodyObjectId       = truncLabel(obj?.["id"]);
+      bodyCustomerId     = truncLabel(obj?.["customer"]);
+      bodySubscriptionId = truncLabel(obj?.["subscription"]);
+    } catch { /* unparseable raw body — leave fields undefined */ }
+
+    logger.info(
+      {
+        phase:          "PRE_PROCESS",
+        eventType:      bodyEventType,
+        objectId:       bodyObjectId,
+        customerId:     bodyCustomerId,
+        subscriptionId: bodySubscriptionId,
+      },
+      "[STRIPE_WEBHOOK_TRACE] about to process delivery",
+    );
+
     try {
       await WebhookHandlers.processWebhook(req.body as Buffer, sig);
       res.status(200).json({ received: true });
     } catch (err) {
-      logger.error({ err }, "Stripe webhook processing failed");
+      const e = err as Error & { type?: string; code?: string; constraint?: string };
+      logger.error(
+        {
+          err,                              // pino serializes name/message/stack
+          phase:          "ROUTE_CATCH",
+          eventType:      bodyEventType,
+          objectId:       bodyObjectId,
+          customerId:     bodyCustomerId,
+          subscriptionId: bodySubscriptionId,
+          errName:        e?.name,
+          errType:        e?.type,          // Stripe error type (e.g. StripeSignatureVerificationError)
+          errCode:        e?.code,          // pg SQLSTATE when it is a DB error
+          errConstraint:  e?.constraint,    // pg constraint name if any
+          errMessage:     e?.message,
+          stack:          e?.stack,
+        },
+        "Stripe webhook processing failed",
+      );
       res.status(400).json({ error: "Webhook processing error" });
     }
   },

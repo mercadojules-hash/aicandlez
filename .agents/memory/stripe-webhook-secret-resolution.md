@@ -128,3 +128,21 @@ secret hashed on the host that actually runs (Render), never locally (local
 STRIPE_WEBHOOK_SECRET is often unset). To probe the prod route from a shell, POST
 a junk `Stripe-Signature` — a real verifier returns the app's JSON 400, a static
 SPA host returns index.html/200 (distinguishes routing from verification).
+
+## In-code phase-split TRACE instrumentation (temporary, removable)
+The webhook path carries TEMP diagnostics keyed `[STRIPE_WEBHOOK_TRACE]` (app.ts
+route + webhookHandlers.processWebhook). They log `phase` (`PRE_PROCESS` →
+`VERIFY_OK`/`VERIFY_FAILED` → `PROCESS_FAILED`/`PROCESS_FAILED_SIGNATURE` →
+`ROUTE_CATCH`) plus eventType + object/customer/subscription ids + full stack.
+**Authoritative verify-vs-process discriminator = the typed error class, not the
+phase position:** a `StripeSignatureVerificationError` is ALWAYS a verification
+failure even when it surfaces inside `sync.processWebhook` (which re-resolves its
+own secret) — that branch is relabeled `PROCESS_FAILED_SIGNATURE`. A pg error
+(SQLSTATE in `errCode`, `errConstraint`) inside `PROCESS_FAILED` = genuine
+post-verification DB/sync failure. **The existing route catch already logs the
+full stack via pino's default `err` serializer** — so on a caught throw the stack
+is ALREADY in Render stdout under "Stripe webhook processing failed"; read Render
+logs before adding more instrumentation. A bare 400 cannot distinguish secret
+failure from processing failure (a junk-sig probe reproduces the identical 400);
+only the typed error / phase label does. Diagnostics are diagnosis-only (every
+error re-thrown, route still 400); remove after root cause is captured.
