@@ -292,11 +292,13 @@ with a catastrophic-move override fast-path (`runHardStopMonitor` in
 `LIVE_STOP_CATASTROPHIC_MULT` (default 2.5×), `LIVE_STOP_IMMEDIATE_FRACTION`
 (immediate-fire band, must sit inside the catastrophic band). Paper SL untouched.
 
-**Exit config** (`lib/exitConfig.ts`): SL 2% / TP 4% / max-hold 24h; trailing
-default **2%** (`EXIT_DEFAULTS.trailingStopPercent`). Precedence: per-exchange →
-account → env `LIVE_TRAILING_STOP_PERCENT` → hardcoded default; `0` = disabled.
-Env is a gap-filler only and must NOT override an explicit per-account/exchange
-edit.
+**Exit config** (`lib/exitConfig.ts`): SL **2%** / max-hold **24h**, with an
+**active live test** of TP **10%** / trailing **5%** (`EXIT_DEFAULTS` =
+`takeProfitPercent:10`, `trailingStopPercent:5`; revert target TP4/trail2 noted
+in-file). Precedence (TP-side + trailing knobs): per-exchange → account → env
+(`LIVE_TRAILING_STOP_PERCENT`) → hardcoded default; `0` = disabled. Env is a
+gap-filler only and must NOT override an explicit per-account/exchange edit. See
+"Active live experiments & known issues" for scope + revert policy.
 
 **Trading-mode presets** (`lib/tradingModePresets.ts`): conservative/balanced/
 aggressive bundles that WRITE already-wired fields (minConfidence,
@@ -306,6 +308,34 @@ blockers" is opt-in only. `POST/GET /api/user/trading-mode`. Customer UI in
 `Profile.tsx` (`!isAdmin`-gated). Read-only intelligence endpoints (all
 requireAuth, per-user): `GET /api/user/{concurrency-recommendation,
 execution-blockers,profit-report}` — advisory, never change caps.
+
+---
+
+## Active live experiments & known issues
+
+- **TP10 / Trail5 live exit test (ACTIVE — do not revert without sign-off).**
+  `EXIT_DEFAULTS` currently runs TP **10%** / trailing **5%**; SL **2%** and
+  max-hold **24h** unchanged. Live on the two internal QA accounts
+  (`is_internal_account=true`): teedelgado@gmail.com (pro) and
+  info@mixtapepsd.com (starter). Both pin `trailing_stop_percent=5` explicitly so
+  the config is deploy-order-independent. Revert target = TP4 / trail2 (recorded
+  in `exitConfig.ts`).
+- **Per-user LIVE max-hold can leave positions open past 24h (UNDER
+  INVESTIGATION).** The max-hold trigger is sound and DOES fire, but a LIVE close
+  needs a successful broker order (`closeUserPosition` →
+  `placeLiveCloseOrderForUser`); when the broker rejects it, the row stays open
+  and re-fails every tick. There is **no per-user force-close fallback**
+  (`MAX_HOLD_FORCE_CLOSE` self-heal covers the GLOBAL `trades` book only). Two
+  classes: dust rows (`quantity≈1e-08`, ~$0 notional, e.g. XLMUSD) below broker
+  min-size = permanent zombies; and real $10–$20 rows failing on min-notional /
+  sellable balance / connection. Reject reason is Render-stdout only (pino), not
+  the DB `logs` table. Detail: memory `live-maxhold-broker-close-zombies.md`.
+- **Live SHORTs are NOT filtered differently than BUYs (current prod behavior).**
+  The SELL-only 1H-trend filter (`LIVE_BLOCK_SELLS_IN_BULLISH_1H`, gate 0TREND) is
+  unset in prod → OFF (0 `sell_blocked_bullish_1h` events all-time). No
+  SELL-specific confidence threshold (single side-agnostic floor); allocation is
+  by asset category (`DEFAULT_CATEGORY_ALLOCATION`), never by side. BUY/SELL
+  entries run ~50/50.
 
 ---
 

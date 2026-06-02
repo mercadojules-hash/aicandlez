@@ -56,8 +56,10 @@ each item became:
 - **P3 — Category allocation default:** majors-heavy default allocation applied
   when an account has no explicit allocation (gate `0ALLOC`).
 - **P4 — Exit optimization:** trailing-stop default. Initially set to 1.5%, then
-  **widened to 2% post-deploy** (the approved value now in `exitConfig.ts`).
-  SL 2% / TP 4% / max-hold 24h kept.
+  **widened to 2% post-deploy**. SL 2% / TP 4% / max-hold 24h were kept at the
+  time. **Later superseded** by the active TP10 / trailing5 live test (current
+  values live in `exitConfig.ts`; see `replit.md` → "Active live experiments &
+  known issues").
 - **P5 — Confidence floor:** intentionally **no code change**; floor stays 40.
 - **P6 — Capital scaling:** post-deploy production-DB data change (per-account
   sizing + allocation), applied operationally after deploy — not a code change.
