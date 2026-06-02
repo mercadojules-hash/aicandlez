@@ -62,5 +62,27 @@ on a much bigger sample than the original 8-trade day.
   the decomposition avoids SL entirely by anchoring forward from the real exit.
 - Mechanics for any future candle recon here: prod DB = RENDER_PROD_DATABASE_URL;
   candles via Coinbase Exchange public (`/products/{SYM}-USD/candles?granularity=60`,
-  300/page) with Kraken OHLC fallback (only returns last ~720 1m candles → trades
-  opened >12h before now lose entry-side coverage).
+  300/page, paginate + retry on 429/5xx for full history) — Kraken OHLC fallback
+  only returns last ~720 1m candles, so trust Coinbase pagination for entry-side
+  coverage.
+
+## TP+trailing JOINT grid (varying BOTH tp and trailing)
+- **Full-path candle sim CANNOT be calibrated to the live engine's trailing/SL.**
+  Across 3 entry/peak/SL-stabilization calibrations the baseline TP4/Tr2 sim
+  predicted the actual live day at −$8 to −$17 vs the real +$12.35 (≈$20+ gap,
+  bigger than the effect measured) and never reproduced the real exit mix
+  (51TP/40trail/57SL). **NEVER quote absolute $ or PF from this sim.** Trailing is
+  the hardest to model: arming from breakeven over-fires trailing (116 vs 40),
+  arming only after +trail% profit flips to over-firing SL. Tick-level grace +
+  spread buffer can't be reproduced at 1m granularity.
+- **Censoring bias favors wide combos:** wider TP/trailing hold positions past the
+  candle window; up to ~25 unresolved get marked-to-market as winners. Always
+  recompute on the common subset resolved in EVERY combo before ranking.
+- **What IS robust = the RELATIVE RANKING.** Across all calibrations AND the
+  common-resolved subset, the ordering was monotonic and identical:
+  TP4/Tr2 < TP6/Tr3 < TP8/Tr3 < TP8/Tr4 < TP10/Tr4 < TP10/Tr5 (PF ~0.4→~1.8).
+  **A wider TP must be paired with a wider trailing** — the 2% trailing (not the
+  TP ceiling) was the binding constraint that made TP-alone increases lose. Best
+  of the six = widest tested (TP10/Tr5), but improvement had NOT plateaued at the
+  grid edge, so the true optimum is unbracketed. Magnitude unprovable from one
+  noisy day → validate via paper/live A/B, do NOT blind-deploy off the backtest.
