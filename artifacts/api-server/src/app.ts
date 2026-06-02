@@ -182,6 +182,7 @@ app.post(
           webhookSecretSource:    wh.source,
           webhookSecretLength:    wh.length,
           webhookSecretPrefixOk:  wh.prefixOk,
+          webhookSecretHadWhitespace: wh.hadSurroundingWhitespace ?? false,
           bodyIsBuffer:           Buffer.isBuffer(req.body),
           bodyLength:             Buffer.isBuffer(req.body) ? (req.body as Buffer).length : -1,
         },
@@ -212,7 +213,7 @@ app.post(
     // from "raw body altered in transit" (length/sha mismatch). The secret
     // value is used only as an HMAC key here and is NEVER logged.
     try {
-      const selfSecret          = process.env.STRIPE_WEBHOOK_SECRET;
+      const selfSecret          = process.env.STRIPE_WEBHOOK_SECRET?.trim();
       const rawBuf              = req.body as Buffer;
       const contentLengthHeader = Number(req.headers["content-length"] ?? -1);
       const parts               = sig.split(",").map((kv) => kv.split("="));

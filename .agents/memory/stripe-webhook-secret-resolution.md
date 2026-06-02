@@ -13,6 +13,24 @@ first; if empty/unset, **silent fallback** to a SQL lookup on
 Replit-dev only). On Render that table is usually empty OR holds a stale
 Replit-dev `whsec_` bound to a different endpoint.
 
+**Whitespace trap (survives a correct paste + redeploy):** a trailing newline or
+stray surrounding quote pasted into the dashboard env value is invisible but makes
+Stripe's HMAC compare fail with the identical "No signatures found". All env reads
+of `STRIPE_WEBHOOK_SECRET` are now `.trim()`-normalized at every resolution site
+(getStripeSync + DB fallback, describeWebhookSecret, maybeHandleCreditEvent,
+trace-verify, app.ts DIAG2). `describeWebhookSecret` reports
+`hadSurroundingWhitespace` and the route DIAG logs `webhookSecretHadWhitespace` so
+a whitespace-contaminated value is now self-evident in Render stdout.
+
+**Raw body is PROVEN correct — stop re-investigating it.** Empirically verified
+locally: POST a known payload, the route's DIAG2 logged `bufferByteLength`,
+`lengthMatch:true`, and a `bodySha256Prefix` that matched the sent bytes exactly,
+even with `Content-Type: application/json; charset=utf-8` (express.raw
+`type:"application/json"` matches via type-is regardless of charset param). The
+route 400 (not the 500 buffer-guard) on a bad sig already proves req.body is the
+raw Buffer. So "No signatures found" is NEVER a raw-body/middleware-ordering bug
+on this codebase — it is always secret-vs-endpoint (or whitespace) mismatch.
+
 **The trap (cost real debugging):** if the Render env var is empty/whitespace
 or the service was not redeployed after editing it, verification silently uses a
 **stale dev secret from the DB**, and Stripe fails every delivery with

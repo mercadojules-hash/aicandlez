@@ -203,7 +203,7 @@ async function maybeHandleCreditEvent(payload: Buffer, signature: string): Promi
   let event: Stripe.Event;
   try {
     const stripe        = await getUncachableStripeClient();
-    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET?.trim();
     if (!webhookSecret) return;
     event = stripe.webhooks.constructEvent(payload, signature, webhookSecret);
   } catch {
@@ -255,7 +255,7 @@ export class WebhookHandlers {
     let tracedEvent: Stripe.Event | null = null;
     try {
       const traceStripe = await getUncachableStripeClient();
-      const traceSecret = process.env.STRIPE_WEBHOOK_SECRET;
+      const traceSecret = process.env.STRIPE_WEBHOOK_SECRET?.trim();
       if (!traceSecret) {
         logger.warn(
           { phase: "VERIFY_SKIPPED_NO_ENV_SECRET" },

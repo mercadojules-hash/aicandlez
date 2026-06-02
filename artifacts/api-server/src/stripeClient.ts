@@ -117,7 +117,11 @@ export async function getStripeSync(): Promise<StripeSync> {
   // (boot-enforced by validateEnv), so the DB-managed fallback is restricted to
   // non-production. This prevents prod from ever silently verifying against a
   // stale stripe._managed_webhooks secret left behind by the dev auto-registrar.
-  let webhookSecret: string | undefined = process.env["STRIPE_WEBHOOK_SECRET"];
+  // Trim defensively: a trailing newline / stray quote pasted into a dashboard
+  // env var is invisible but makes Stripe's HMAC compare fail with the classic
+  // "No signatures found matching the expected signature".
+  let webhookSecret: string | undefined =
+    process.env["STRIPE_WEBHOOK_SECRET"]?.trim() || undefined;
   if (!webhookSecret && process.env["NODE_ENV"] !== "production") {
     try {
       const { Pool } = await import("pg");
@@ -128,7 +132,7 @@ export async function getStripeSync(): Promise<StripeSync> {
             WHERE enabled = true OR status = 'enabled'
             ORDER BY updated_at DESC LIMIT 1`,
         );
-        if (r.rows[0]?.secret) webhookSecret = r.rows[0].secret;
+        if (r.rows[0]?.secret) webhookSecret = r.rows[0].secret.trim() || undefined;
       } finally {
         await pool.end();
       }
@@ -150,18 +154,21 @@ export async function getStripeSync(): Promise<StripeSync> {
 export interface WebhookSecretInfo {
   source:   "env" | "db" | "none";
   loaded:   boolean;
-  length:   number;
-  prefixOk: boolean; // true if it starts with the Stripe webhook prefix "whsec_"
+  length:   number;   // length AFTER trimming (the value actually used)
+  prefixOk: boolean;  // true if it starts with the Stripe webhook prefix "whsec_"
+  hadSurroundingWhitespace?: boolean; // raw env/DB value had leading/trailing whitespace
 }
 
 export async function describeWebhookSecret(): Promise<WebhookSecretInfo> {
-  const envSecret = process.env["STRIPE_WEBHOOK_SECRET"];
+  const rawEnvSecret = process.env["STRIPE_WEBHOOK_SECRET"];
+  const envSecret    = rawEnvSecret?.trim();
   if (envSecret) {
     return {
-      source:   "env",
-      loaded:   true,
-      length:   envSecret.length,
-      prefixOk: envSecret.startsWith("whsec_"),
+      source:                    "env",
+      loaded:                    true,
+      length:                    envSecret.length,
+      prefixOk:                  envSecret.startsWith("whsec_"),
+      hadSurroundingWhitespace:  rawEnvSecret !== envSecret,
     };
   }
 
@@ -177,13 +184,15 @@ export async function describeWebhookSecret(): Promise<WebhookSecretInfo> {
             WHERE enabled = true OR status = 'enabled'
             ORDER BY updated_at DESC LIMIT 1`,
         );
-        const dbSecret = r.rows[0]?.secret;
+        const rawDbSecret = r.rows[0]?.secret;
+        const dbSecret    = rawDbSecret?.trim();
         if (dbSecret) {
           return {
-            source:   "db",
-            loaded:   true,
-            length:   dbSecret.length,
-            prefixOk: dbSecret.startsWith("whsec_"),
+            source:                    "db",
+            loaded:                    true,
+            length:                    dbSecret.length,
+            prefixOk:                  dbSecret.startsWith("whsec_"),
+            hadSurroundingWhitespace:  rawDbSecret !== dbSecret,
           };
         }
       } finally {
