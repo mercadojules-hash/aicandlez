@@ -1,0 +1,45 @@
+Make a targeted production-safe change for ONLY this user and ONLY this exchange:
+
+User:
+teedelgado@gmail.com
+
+Exchange:
+Coinbase only
+
+Required changes:
+1. Increase Coinbase trade size for teedelgado@gmail.com from $20 to $50 per entry.
+2. Limit teedelgado@gmail.com Coinbase to a maximum of 10 concurrent/open trades at a time.
+3. Do NOT change teedelgado@gmail.com Kraken settings. Kraken must remain at $20 per entry.
+4. Do NOT change info@mixtapepsd.com.
+5. Do NOT change global defaults.
+6. Do NOT change any other users.
+7. Do NOT change all Coinbase users globally.
+
+Implementation requirements:
+- Use the existing per-user / per-exchange settings system if available.
+- If a per-user / per-exchange override already exists, update only the Coinbase row for teedelgado@gmail.com.
+- If it does not exist, add the minimal scoped override needed.
+- Confirm which database table stores the override.
+- Confirm whether this is stored in user_settings, user_exchange_settings, user_risk_settings, user_trade_limits, or another table.
+- Confirm the exact user id for teedelgado@gmail.com before applying the change.
+- Confirm the exact exchange key is coinbase and not kraken.
+- Add a verification query/output showing:
+  - teedelgado@gmail.com Coinbase trade size = $50
+  - teedelgado@gmail.com Coinbase max concurrent/open trades = 10
+  - teedelgado@gmail.com Kraken trade size remains $20
+  - info@mixtapepsd.com settings unchanged
+
+Safety requirements:
+- No global defaults changed.
+- No schema changes unless absolutely necessary.
+- No changes to Render env vars unless required.
+- No changes to confidence threshold, MTF, TP, trailing stop, stop loss, or max hold.
+- No changes to Kraken.
+- No changes to info@mixtapepsd.com.
+
+After applying the change, produce a short report showing:
+1. Files changed, if any.
+2. Database rows changed, if any.
+3. Final effective settings for teedelgado@gmail.com Coinbase.
+4. Final effective settings for teedelgado@gmail.com Kraken.
+5. Confirmation that info@mixtapepsd.com was not affected.
