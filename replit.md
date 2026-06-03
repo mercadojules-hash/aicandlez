@@ -159,13 +159,12 @@ role-gated; never merge the two worlds.
   admin → `<AdminPortalShell />` (legacy `<AdminPortalLegacy />` rollback hatch
   via `VITE_ADMIN_PORTAL_LEGACY=true`, byte-frozen — see
   `docs/replit-history.md`).
-  **Operator → customer-view override:** an admin can opt into the customer
-  surface at `/portal` via the floating "View as Customer" toggle (localStorage
-  `aicandlez:operator-customer-view`, or `?previewCustomer=1|0`). Clerk role +
-  `/command` + all server role checks untouched — flag only lets an admin
-  render the lower-privilege customer shell (no escalation).
+  **Operator → customer-view override:** an admin can render the customer shell
+  at `/portal` via the floating "View as Customer" toggle (localStorage
+  `aicandlez:operator-customer-view` or `?previewCustomer=1|0`);
   `PortalCustomerShell` takes `operatorPreview` to suppress its defense-in-depth
-  `isAdmin` render refusal only when the override is set.
+  `isAdmin` render refusal. Clerk role, `/command`, and all server role checks
+  untouched (no escalation).
 - `components/portal/PortalCustomerShell.tsx` — single primary file. Owns
   shared `nowShell` 1Hz tick, lifted `/api/engine/status` query
   (`["engine-status-portal"]`), `MarketPulse` view-model, `signalsPerMin`
@@ -292,15 +291,13 @@ with a catastrophic-move override fast-path (`runHardStopMonitor` in
 `LIVE_STOP_CATASTROPHIC_MULT` (default 2.5×), `LIVE_STOP_IMMEDIATE_FRACTION`
 (immediate-fire band, must sit inside the catastrophic band). Paper SL untouched.
 
-**Exit config** (`lib/exitConfig.ts`): SL **2%** / max-hold **6h** (lowered
-24h → 6h — **universal, applies to all users** with no per-account/exchange
-override; prod has 0 such overrides), with an **active live test** of TP **10%**
-/ trailing **5%** (`EXIT_DEFAULTS` =
-`takeProfitPercent:10`, `trailingStopPercent:5`; revert target TP4/trail2 noted
-in-file). Precedence (TP-side + trailing knobs): per-exchange → account → env
-(`LIVE_TRAILING_STOP_PERCENT`) → hardcoded default; `0` = disabled. Env is a
-gap-filler only and must NOT override an explicit per-account/exchange edit. See
-"Active live experiments & known issues" for scope + revert policy.
+**Exit config** (`lib/exitConfig.ts`): SL **2%** / max-hold **6h** (universal —
+all users, 0 per-account/exchange overrides in prod) / TP **10%** / trailing
+**5%** (`EXIT_DEFAULTS`; active live test, revert target TP4/trail2 in-file — see
+"Active live experiments & known issues"). Precedence (TP-side + trailing knobs):
+per-exchange → account → env (`LIVE_TRAILING_STOP_PERCENT`) → hardcoded default;
+`0` = disabled. Env is a gap-filler only and must NOT override an explicit
+per-account/exchange edit.
 
 **Trading-mode presets** (`lib/tradingModePresets.ts`): conservative/balanced/
 aggressive bundles that WRITE already-wired fields (minConfidence,
@@ -323,22 +320,18 @@ execution-blockers,profit-report}` — advisory, never change caps.
   info@mixtapepsd.com (starter). Both pin `trailing_stop_percent=5` explicitly so
   the config is deploy-order-independent. Revert target = TP4 / trail2 (recorded
   in `exitConfig.ts`).
-- **Per-user LIVE max-hold (now 6h) — broker-reject zombies self-heal via
-  balance-verified local reconciliation (DEPLOYED).** The max-hold trigger fires
-  at 6h; a LIVE close still needs a successful broker order (`closeUserPosition`
-  → `placeLiveCloseOrderForUser`). When the broker repeatedly rejects it, the
-  reconciler (`reconcileZombiePosition` + `getUserBrokerBaseBalance`, wired into
-  `runHardStopMonitor`) retires the row LOCALLY **only** after age ≥ max-hold,
-  N consecutive failed live closes (`LIVE_RECONCILE_FAILED_CLOSE_STREAK`,
-  default 3), AND verified broker base-balance < recorded qty (minus
-  `LIVE_RECONCILE_BALANCE_TOLERANCE`, default 0.02). Balance-sufficient rejects
-  are treated as transient → keep retrying (real holdings, incl. below-min-size
-  rows that still hold balance, are protected). Reconciled rows: DELETE
-  `sim_positions` + tagged `sim_trades` audit (`reconciliation_tag`, closeReason
-  `RECONCILED_INSUFFICIENT_FUNDS`, realizedPnL 0); cash / total_realized /
-  total_trades untouched. Lowering max-hold 24h → 6h makes both the close attempt
-  and (for true zombies) reconciliation trigger ~4× sooner. Detail: memory
-  `live-maxhold-broker-close-zombies.md`.
+- **Per-user LIVE max-hold (now 6h) — broker-reject zombies self-heal
+  (DEPLOYED).** Max-hold fires at 6h; the LIVE close still needs a broker fill
+  (`closeUserPosition` → `placeLiveCloseOrderForUser`). On repeated rejects the
+  reconciler (`reconcileZombiePosition` + `getUserBrokerBaseBalance` in
+  `runHardStopMonitor`) retires the row LOCALLY only when ALL hold: age ≥
+  max-hold, N consecutive failed closes (`LIVE_RECONCILE_FAILED_CLOSE_STREAK`,
+  default 3), AND verified broker base-balance < recorded qty (tol
+  `LIVE_RECONCILE_BALANCE_TOLERANCE`, default 0.02). Balance-sufficient rejects →
+  transient → keep retrying (real holdings protected). Reconcile = DELETE
+  `sim_positions` + tagged `sim_trades` audit (`RECONCILED_INSUFFICIENT_FUNDS`,
+  realizedPnL 0; cash/totals untouched). 6h makes both close + reconcile fire ~4×
+  sooner. Detail: memory `live-maxhold-broker-close-zombies.md`.
 - **Live SHORTs are NOT filtered differently than BUYs (current prod behavior).**
   The SELL-only 1H-trend filter (`LIVE_BLOCK_SELLS_IN_BULLISH_1H`, gate 0TREND) is
   unset in prod → OFF (0 `sell_blocked_bullish_1h` events all-time). No
