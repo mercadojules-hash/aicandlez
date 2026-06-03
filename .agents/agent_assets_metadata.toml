@@ -125,3 +125,9 @@ id = "3bYEFoJVriCeSQnT4KL2P"
 uri = "file://docs/aicandlez-system-architecture.md"
 type = "text"
 title = "AICandlez — System Architecture Report"
+
+[[outputs]]
+id = "pyThhL5J6AXfEYV46HNnO"
+uri = "file://docs/aicandlez-file-reference.md"
+type = "text"
+title = "AICandlez — File & Route Technical Reference"
