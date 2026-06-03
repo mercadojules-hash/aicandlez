@@ -119,3 +119,9 @@ id = "-0IrwJoMvKM7cqQvl20O0"
 uri = "file://reports/profitability-optimization-report.md"
 type = "text"
 title = "AICandlez — Profitability Optimization Report"
+
+[[outputs]]
+id = "3bYEFoJVriCeSQnT4KL2P"
+uri = "file://docs/aicandlez-system-architecture.md"
+type = "text"
+title = "AICandlez — System Architecture Report"
