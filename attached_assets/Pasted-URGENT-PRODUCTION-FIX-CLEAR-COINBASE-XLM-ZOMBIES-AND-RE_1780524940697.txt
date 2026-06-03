@@ -1,0 +1,113 @@
+URGENT PRODUCTION FIX — CLEAR COINBASE XLM ZOMBIES AND RESTORE $50 TEST
+
+We just completed a production audit on [teedelgado@gmail.com](mailto:teedelgado@gmail.com) after the Coinbase trade-size increase from $20 → $50.
+
+Key findings:
+
+1. The $50 override is working correctly.
+2. Coinbase max positions = 10 is working correctly.
+3. ZERO $50 trades have executed.
+4. The primary blocker is 5 XLM dust zombie positions occupying Coinbase slots.
+5. Audit confirms the zombies are 55–85 hours old and consuming 50% of Coinbase capacity.
+6. Repeated production telemetry shows:
+
+   * risk_max_simultaneous
+   * risk_reserve_cash_breach
+7. Current free capital has been reported around $2.79.
+8. The $50 test cannot be evaluated because no $50 entries have been allowed to open.
+
+I need this investigated and fixed immediately.
+
+TASK 1 — XLM ZOMBIE RECONCILIATION
+
+Identify all XLM Coinbase positions for [teedelgado@gmail.com](mailto:teedelgado@gmail.com) that:
+
+* Are dust quantities
+* Have size_usd effectively $0
+* Have exceeded maximum hold duration
+* Are no longer represented by meaningful broker positions
+* Are preventing slot utilization
+
+Use the approved reconciliation process previously used for BTC zombie cleanup.
+
+Requirements:
+
+* Do NOT place broker orders.
+* Do NOT affect account balances.
+* Do NOT modify realized P&L.
+* Create proper audit records.
+* Mark all reconciliation actions clearly.
+* Remove zombie positions from active position counts.
+
+Deliver:
+
+* Position IDs removed
+* Symbols removed
+* Age of each zombie
+* Before/after position counts
+
+---
+
+TASK 2 — VERIFY COINBASE SLOT AVAILABILITY
+
+Immediately after reconciliation:
+
+Report:
+
+* Coinbase open positions before cleanup
+* Coinbase open positions after cleanup
+* Coinbase available slots after cleanup
+
+Expected result:
+
+Before:
+10 / 10
+
+After:
+Approximately 5 / 10
+
+---
+
+TASK 3 — CAPITAL UTILIZATION AUDIT
+
+Provide exact production values for:
+
+* Coinbase USD balance
+* Coinbase available buying power
+* Capital locked in open positions
+* Capital reserved by risk engine
+* Capital available for new entries
+
+Determine whether a new $50 trade can currently be opened.
+
+---
+
+TASK 4 — $50 TEST STATUS
+
+After cleanup determine:
+
+* Is the $50 override active?
+* Is the override being read by the live execution engine?
+* Are new Coinbase entries eligible to open at $50?
+* What remaining blockers exist?
+
+---
+
+TASK 5 — ROOT CAUSE REPORT
+
+Explain exactly why the $50 deployment has produced zero executions.
+
+Rank blockers by impact:
+
+1. XLM zombie slots
+2. Capital constraints
+3. Confidence filtering
+4. Risk controls
+5. Any additional execution bottlenecks
+
+Provide evidence from production logs and database records.
+
+This is a READ-ONLY INVESTIGATION except for the approved zombie reconciliation cleanup.
+
+Goal:
+Restore accurate Coinbase position accounting and allow the $50 production test for [teedelgado@gmail.com](mailto:teedelgado@gmail.com) to begin operating as intended.
