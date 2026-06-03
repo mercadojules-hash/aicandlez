@@ -1,0 +1,140 @@
+AICANDLEZ PERFORMANCE AUDIT REQUEST
+
+Please perform a complete audit of account:
+
+[teedelgado@gmail.com](mailto:teedelgado@gmail.com)
+
+Time Window:
+Last 8 hours since trade size was increased from $20 to $50 per trade on Coinbase.
+
+I need a detailed report with actual database values and executed trades.
+
+REPORT REQUIRED
+
+1. TRADE SIZE VERIFICATION
+
+Confirm:
+
+* Current configured trade size
+* Current liquidity guard settings
+* Current allocation settings
+* Current max positions
+* Current active exchange
+
+Most importantly:
+
+How many currently open positions are using:
+
+* $20 entries
+* $50 entries
+
+Provide symbol, entry size, and timestamp for every open trade.
+
+---
+
+2. PERFORMANCE SINCE CHANGE
+
+Compare:
+
+BEFORE CHANGE
+($20 trade size)
+
+VS
+
+AFTER CHANGE
+($50 trade size)
+
+Provide:
+
+* Total signals evaluated
+* Signals passing confidence
+* Trades attempted
+* Trades executed
+* Trades rejected
+* Open positions
+* Closed positions
+* Win rate
+* Average profit
+* Average loss
+* Net realized P&L
+* Unrealized P&L
+* Total account growth
+
+---
+
+3. CURRENT OPEN POSITIONS
+
+List every currently open position:
+
+Symbol
+Entry Price
+Current Price
+Position Size
+Current P&L
+Confidence
+Trade Age
+
+Identify:
+
+* Best performing trade
+* Worst performing trade
+* Trades currently near TP
+* Trades currently near stop
+
+---
+
+4. CAPITAL DEPLOYMENT
+
+Current Coinbase balance
+
+Available buying power
+
+Capital currently deployed
+
+Capital reserved
+
+Maximum possible additional positions
+
+Can all 10 slots now support $50 trades?
+
+If not:
+
+What is limiting capacity?
+
+---
+
+5. EXECUTION QUALITY
+
+Since increasing to $50:
+
+Did execution quality improve?
+
+Did profitability improve?
+
+Did trade frequency decrease?
+
+Did rejection rate change?
+
+Are there any unintended side effects?
+
+---
+
+6. RECOMMENDATION
+
+Based on actual data from the last 8 hours:
+
+Should [teedelgado@gmail.com](mailto:teedelgado@gmail.com) remain at:
+
+* $50 trades
+* Return to $20 trades
+* Increase above $50
+
+Provide reasoning supported by actual performance data.
+
+IMPORTANT
+
+Use database records and actual executed trades.
+
+Do not estimate.
+
+Show exact values from the production system.

@@ -54,3 +54,15 @@ verified below the recorded quantity. Hard rules that must never be relaxed:
   overstates equity. The tag excludes the row from the realized recompute.
 **Why:** the original close path is gated on a real fill so realized PnL matches the broker; the
 valve only bypasses that fill when the asset provably no longer exists to fill against.
+
+**Dust zombies silently eat per-exchange capacity (observed prod).** Unclosable dust rows
+(`size_usd=0`, `quantity≈1e-8`, e.g. XLMUSD) still count as OPEN `sim_positions` toward the
+per-(user,exchange) `maxPositions` cap. With a tight per-exchange cap (e.g. Coinbase max=10),
+several dust zombies can occupy half the slots, so the venue sits pinned at its cap
+(`risk_max_simultaneous`) and NO new real entry can open — making an unrelated config change
+(e.g. a per-trade size bump) operationally inert even though it's stored correctly. The
+balance-probe reconciler does NOT retire these: tiny qty (~1e-8) is satisfiable by ~any residual
+balance, so `balance < qty*(1−tol)` is false → "transient" → keep retrying forever.
+**How to apply:** when a per-exchange size/cap change "isn't doing anything," first count dust
+zombies in `sim_positions` (size_usd=0 / qty≈1e-8) AND check real broker free capital in the
+`risk_reserve_cash_breach` logs before suspecting the setting didn't apply.
