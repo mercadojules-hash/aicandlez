@@ -292,8 +292,10 @@ with a catastrophic-move override fast-path (`runHardStopMonitor` in
 `LIVE_STOP_CATASTROPHIC_MULT` (default 2.5×), `LIVE_STOP_IMMEDIATE_FRACTION`
 (immediate-fire band, must sit inside the catastrophic band). Paper SL untouched.
 
-**Exit config** (`lib/exitConfig.ts`): SL **2%** / max-hold **24h**, with an
-**active live test** of TP **10%** / trailing **5%** (`EXIT_DEFAULTS` =
+**Exit config** (`lib/exitConfig.ts`): SL **2%** / max-hold **6h** (lowered
+24h → 6h — **universal, applies to all users** with no per-account/exchange
+override; prod has 0 such overrides), with an **active live test** of TP **10%**
+/ trailing **5%** (`EXIT_DEFAULTS` =
 `takeProfitPercent:10`, `trailingStopPercent:5`; revert target TP4/trail2 noted
 in-file). Precedence (TP-side + trailing knobs): per-exchange → account → env
 (`LIVE_TRAILING_STOP_PERCENT`) → hardcoded default; `0` = disabled. Env is a
@@ -314,22 +316,29 @@ execution-blockers,profit-report}` — advisory, never change caps.
 ## Active live experiments & known issues
 
 - **TP10 / Trail5 live exit test (ACTIVE — do not revert without sign-off).**
-  `EXIT_DEFAULTS` currently runs TP **10%** / trailing **5%**; SL **2%** and
-  max-hold **24h** unchanged. Live on the two internal QA accounts
+  `EXIT_DEFAULTS` currently runs TP **10%** / trailing **5%**; SL **2%**
+  unchanged; max-hold lowered **24h → 6h** (universal — all users). Live on the
+  two internal QA accounts
   (`is_internal_account=true`): teedelgado@gmail.com (pro) and
   info@mixtapepsd.com (starter). Both pin `trailing_stop_percent=5` explicitly so
   the config is deploy-order-independent. Revert target = TP4 / trail2 (recorded
   in `exitConfig.ts`).
-- **Per-user LIVE max-hold can leave positions open past 24h (UNDER
-  INVESTIGATION).** The max-hold trigger is sound and DOES fire, but a LIVE close
-  needs a successful broker order (`closeUserPosition` →
-  `placeLiveCloseOrderForUser`); when the broker rejects it, the row stays open
-  and re-fails every tick. There is **no per-user force-close fallback**
-  (`MAX_HOLD_FORCE_CLOSE` self-heal covers the GLOBAL `trades` book only). Two
-  classes: dust rows (`quantity≈1e-08`, ~$0 notional, e.g. XLMUSD) below broker
-  min-size = permanent zombies; and real $10–$20 rows failing on min-notional /
-  sellable balance / connection. Reject reason is Render-stdout only (pino), not
-  the DB `logs` table. Detail: memory `live-maxhold-broker-close-zombies.md`.
+- **Per-user LIVE max-hold (now 6h) — broker-reject zombies self-heal via
+  balance-verified local reconciliation (DEPLOYED).** The max-hold trigger fires
+  at 6h; a LIVE close still needs a successful broker order (`closeUserPosition`
+  → `placeLiveCloseOrderForUser`). When the broker repeatedly rejects it, the
+  reconciler (`reconcileZombiePosition` + `getUserBrokerBaseBalance`, wired into
+  `runHardStopMonitor`) retires the row LOCALLY **only** after age ≥ max-hold,
+  N consecutive failed live closes (`LIVE_RECONCILE_FAILED_CLOSE_STREAK`,
+  default 3), AND verified broker base-balance < recorded qty (minus
+  `LIVE_RECONCILE_BALANCE_TOLERANCE`, default 0.02). Balance-sufficient rejects
+  are treated as transient → keep retrying (real holdings, incl. below-min-size
+  rows that still hold balance, are protected). Reconciled rows: DELETE
+  `sim_positions` + tagged `sim_trades` audit (`reconciliation_tag`, closeReason
+  `RECONCILED_INSUFFICIENT_FUNDS`, realizedPnL 0); cash / total_realized /
+  total_trades untouched. Lowering max-hold 24h → 6h makes both the close attempt
+  and (for true zombies) reconciliation trigger ~4× sooner. Detail: memory
+  `live-maxhold-broker-close-zombies.md`.
 - **Live SHORTs are NOT filtered differently than BUYs (current prod behavior).**
   The SELL-only 1H-trend filter (`LIVE_BLOCK_SELLS_IN_BULLISH_1H`, gate 0TREND) is
   unset in prod → OFF (0 `sell_blocked_bullish_1h` events all-time). No

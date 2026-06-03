@@ -22,9 +22,14 @@ that assumes "live exits only on fixed SL/TP".
   SL still owns all downside. NOTE: trigger is sampled per-tick ticker — the realised market-close
   fill can still land slightly below entry on a gap/slippage. Set `LIVE_TRAILING_STOP_PERCENT=0` to
   disable.
-- **Max-hold (LIVE-only, NEW)** — hard time ceiling, env `LIVE_POSITION_MAX_HOLD_MS`, **default 24h
-  ON** (mirrors global book). Evaluated **price-independently** (before/without the ticker) so it
-  fires even when market data is down; the broker close fetches its own fill. Set `=0` to disable.
+- **Max-hold (LIVE-only)** — hard time ceiling. For per-user `sim_positions` the value resolves via
+  `resolveExitConfig` → `EXIT_DEFAULTS.maxHoldHours` (the SoT default; lowered 24h → **6h**, universal
+  for all users with no per-account/exchange override), with env `LIVE_POSITION_MAX_HOLD_MS` acting
+  only as a gap-filler in that precedence. Do NOT confuse with `tradingLoop.getLivePositionMaxHoldMs()`
+  — that always-on 24h reader governs the OPERATOR manual `trades` book (`mode='manual'`), NOT per-user
+  positions; `getGlobalPositionMaxHoldMs()` governs the GLOBAL book force-close. Evaluated
+  **price-independently** so it fires even when market data is down; broker close fetches its own fill.
+  `0` = disabled.
 
 **Observability (NEW):** `LIVE_POSITION_EVAL` log line per live position per tick — `evaluatedAt`
 timestamp (proves loop liveness + last-eval time), price, SL, TP, trailPct, trailStop, trailArmed,

@@ -19,13 +19,14 @@ import { eq, and, inArray } from "drizzle-orm";
  *      unset. Per-account / per-exchange edits MUST win over it, otherwise the
  *      per-account controls would be silently ineffective in any environment
  *      where the operator env knob is set. (SL/TP have no env knob.)
- *   4. Hardcoded default — SL 2 %, TP 10 %, trailing 5 %, max-hold 24h.
+ *   4. Hardcoded default — SL 2 %, TP 10 %, trailing 5 %, max-hold 6h.
  *      Evolution: P4 set a fixed 1.5 % default trailing; a counterfactual
  *      widened it to 2 %; an approved joint TP+trailing change then moved TP
  *      4 → 10 % and trailing 2 → 5 % together (the 2 % trailing was the binding
- *      constraint clipping winners before a higher TP could be reached). SL and
- *      max-hold are unchanged. An account that never touches the controls now
- *      takes profit at 10 % and trails at 5 %.
+ *      constraint clipping winners before a higher TP could be reached). SL is
+ *      unchanged; max-hold was later lowered 24h → 6h universally (applies to
+ *      all users without an explicit override). An account that never touches
+ *      the controls now takes profit at 10 % and trails at 5 %.
  *
  * `trailingStopPercent === null` is still honored by the live monitor (mirror
  * each position's own stored stop-loss band) if a row explicitly carries it, but
@@ -40,11 +41,16 @@ export const EXIT_DEFAULTS = {
   // together. A joint TP+trailing grid on a full live-trade day showed the 2 %
   // trailing (not the TP ceiling) was the binding constraint — it clipped
   // winners before they could reach a higher TP. Widening TP alone loses; TP
-  // and trailing must move together. SL stays 2 % and max-hold stays 24h. To
-  // revert, restore takeProfitPercent: 4 / trailingStopPercent: 2.
+  // and trailing must move together. SL stays 2 %. (Max-hold was later lowered
+  // 24h → 6h universally — see maxHoldHours below.) To revert TP/trailing,
+  // restore takeProfitPercent: 4 / trailingStopPercent: 2.
   takeProfitPercent:   10,
   trailingStopPercent: 5,
-  maxHoldHours:        24,
+  // Universal max-hold lowered 24h → 6h (approved, applies to ALL users). Every
+  // user's LIVE sim_positions now time-exit at 6h when neither SL/TP nor the
+  // trailing stop has fired. Per-account / per-exchange overrides (if a user has
+  // one) still win over this default. To revert, restore 24.
+  maxHoldHours:        6,
 } as const;
 
 // Safe clamp ranges, centralized so every write path (customer + admin) reuses

@@ -1,24 +1,26 @@
 ---
 name: Live max-hold close depends on a successful broker order (zombie risk)
-description: Why per-user LIVE positions can sit open well past the 24h max-hold ceiling
+description: Why per-user LIVE positions can sit open well past the max-hold ceiling; balance-verified local reconciliation valve
 ---
 
 Per-user LIVE positions exit ONLY through `closeUserPosition` → `placeLiveCloseOrderForUser`.
-The max-hold trigger itself is sound (price-independent, fires when age ≥ maxHoldMs; maxHoldMs
-hardcodes a 24h fallback so it's effectively always > 0; age uses `sim_positions.entry_time`,
-which is reliably populated). It DOES fire — MAX_HOLD closes exist in prod history.
+The max-hold trigger itself is sound (price-independent, fires when age ≥ maxHoldMs; maxHoldMs has a
+hardcoded fallback — `EXIT_DEFAULTS.maxHoldHours`, lowered 24h → 6h universal — so it's effectively
+always > 0; age uses `sim_positions.entry_time`, which is reliably populated). It DOES fire —
+MAX_HOLD closes exist in prod history.
 
-**The gap:** when the broker rejects the close order, `closeUserPosition` returns
-`success:false` and the row STAYS OPEN. The monitor re-triggers MAX_HOLD next tick and
-re-fails — indefinitely. There is **no force-close / local-reconciliation fallback for
-per-user positions**. (The `MAX_HOLD_FORCE_CLOSE` self-heal only covers the GLOBAL `trades`
-book — per-user `sim_positions` are explicitly excluded.)
+**The gap (now closed — see Resolution below):** when the broker rejects the close order,
+`closeUserPosition` returns `success:false` and the row STAYS OPEN. The monitor re-triggers
+MAX_HOLD next tick and re-fails. Historically there was **no force-close / local-reconciliation
+fallback for per-user positions** (the `MAX_HOLD_FORCE_CLOSE` self-heal only covers the GLOBAL
+`trades` book — per-user `sim_positions` are excluded); the balance-verified reconciler below now
+closes that gap for true orphans.
 
 **Why:** the close is gated on a real exchange fill so realized PnL matches the broker;
 there's no safety valve to mark a position closed locally when the venue won't accept the close.
 
-**How to apply:** "live position open >> 24h" is almost always a repeatedly-failing broker
-close, NOT a broken max-hold trigger or a null entry_time. Diagnose the close-rejection
+**How to apply:** "live position open well past max-hold" is almost always a repeatedly-failing
+broker close, NOT a broken max-hold trigger or a null entry_time. Diagnose the close-rejection
 reason first. Two common classes:
 - **Dust** (`quantity` ~1e-08, ~$0 notional, e.g. XLMUSD): below broker min order size →
   rejected every tick → permanent zombie. Inflates open-position count.
