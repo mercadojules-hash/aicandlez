@@ -46,11 +46,11 @@ export const EXIT_DEFAULTS = {
   // restore takeProfitPercent: 4 / trailingStopPercent: 2.
   takeProfitPercent:   10,
   trailingStopPercent: 5,
-  // Universal max-hold lowered 24h → 6h (approved, applies to ALL users). Every
-  // user's LIVE sim_positions now time-exit at 6h when neither SL/TP nor the
-  // trailing stop has fired. Per-account / per-exchange overrides (if a user has
-  // one) still win over this default. To revert, restore 24.
-  maxHoldHours:        6,
+  // Universal max-hold lowered 24h → 6h → 1h (approved, applies to ALL users).
+  // Every user's LIVE sim_positions now time-exit at 1h when neither SL/TP nor
+  // the trailing stop has fired. Per-account / per-exchange overrides (if a user
+  // has one) still win over this default. To revert, restore 6 (prior) or 24.
+  maxHoldHours:        1,
 } as const;
 
 // Safe clamp ranges, centralized so every write path (customer + admin) reuses

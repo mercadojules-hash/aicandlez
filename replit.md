@@ -291,7 +291,7 @@ with a catastrophic-move override fast-path (`runHardStopMonitor` in
 `LIVE_STOP_CATASTROPHIC_MULT` (default 2.5×), `LIVE_STOP_IMMEDIATE_FRACTION`
 (immediate-fire band, must sit inside the catastrophic band). Paper SL untouched.
 
-**Exit config** (`lib/exitConfig.ts`): SL **2%** / max-hold **6h** (universal —
+**Exit config** (`lib/exitConfig.ts`): SL **2%** / max-hold **1h** (universal —
 all users, 0 per-account/exchange overrides in prod) / TP **10%** / trailing
 **5%** (`EXIT_DEFAULTS`; active live test, revert target TP4/trail2 in-file — see
 "Active live experiments & known issues"). Precedence (TP-side + trailing knobs):
@@ -314,14 +314,14 @@ execution-blockers,profit-report}` — advisory, never change caps.
 
 - **TP10 / Trail5 live exit test (ACTIVE — do not revert without sign-off).**
   `EXIT_DEFAULTS` currently runs TP **10%** / trailing **5%**; SL **2%**
-  unchanged; max-hold lowered **24h → 6h** (universal — all users). Live on the
+  unchanged; max-hold lowered **24h → 6h → 1h** (universal — all users). Live on the
   two internal QA accounts
   (`is_internal_account=true`): teedelgado@gmail.com (pro) and
   info@mixtapepsd.com (starter). Both pin `trailing_stop_percent=5` explicitly so
   the config is deploy-order-independent. Revert target = TP4 / trail2 (recorded
   in `exitConfig.ts`).
-- **Per-user LIVE max-hold (now 6h) — broker-reject zombies self-heal
-  (DEPLOYED).** Max-hold fires at 6h; the LIVE close still needs a broker fill
+- **Per-user LIVE max-hold (now 1h) — broker-reject zombies self-heal
+  (DEPLOYED).** Max-hold fires at 1h; the LIVE close still needs a broker fill
   (`closeUserPosition` → `placeLiveCloseOrderForUser`). On repeated rejects the
   reconciler (`reconcileZombiePosition` + `getUserBrokerBaseBalance` in
   `runHardStopMonitor`) retires the row LOCALLY only when ALL hold: age ≥
