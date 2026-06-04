@@ -1514,7 +1514,12 @@ async function autoExecute(
         let mirroredPositionId: string | null = null;
         try {
           const userEntry = r.fillPrice ?? price;
-          const userQty   = r.quantity  ?? sizeUSD / userEntry;
+          // BUG #1 fix: persist the RESOLVED per-user/per-exchange notional the
+          // broker actually filled (gate 0SIZE output on the result), not the
+          // engine-global allocation `sizeUSD`. Falls back to the global only
+          // when the result omitted it (legacy/dry-run paths).
+          const resolvedSizeUSD = r.sizeUSD ?? sizeUSD;
+          const userQty   = r.quantity  ?? resolvedSizeUSD / userEntry;
           // Per-account / per-exchange exit config (Task #220). Resolves the
           // customer's own SL/TP for THIS exchange, falling back to their
           // account default → 2/4. Replaces the prior global `settings.*` band
@@ -1529,7 +1534,7 @@ async function autoExecute(
             side,
             quantity:        userQty,
             entryPrice:      userEntry,
-            sizeUSD,
+            sizeUSD:         resolvedSizeUSD,
             signalId,
             confidence,
             stopLoss:        parseFloat(userSL.toFixed(2)),

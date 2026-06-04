@@ -1256,6 +1256,7 @@ export async function closeUserPosition(
   let brokerFilledQty: number | undefined;
   let brokerExitFee: number | undefined;
   let brokerExitFeeCurrency: string | undefined;
+  let liquidatedFullBalance = false;
   const isLive = !!(pos.exchange && pos.exchangeOrderId);
   if (isLive) {
     // Mirror the open-side sandbox decision on the close. The authoritative
@@ -1284,6 +1285,7 @@ export async function closeUserPosition(
       };
     }
     exchangeCloseOrderId = closeRes.exchangeCloseOrderId;
+    liquidatedFullBalance = closeRes.liquidatedFullBalance === true;
     if (closeRes.fillPrice && closeRes.fillPrice > 0) {
       brokerFillPrice = closeRes.fillPrice;
     }
@@ -1320,7 +1322,11 @@ export async function closeUserPosition(
   // and the user can retry. When brokerFilledQty matches pos.quantity
   // (or this is a non-live close), behaviour is the standard full close.
   const closedQty = brokerFilledQty !== undefined ? brokerFilledQty : pos.quantity;
-  const isPartial = closedQty < pos.quantity - 1e-12;
+  // A balance-clamped LIVE close (broker free base balance < recorded qty, e.g.
+  // entry-fee/rounding shrinkage) liquidates the ENTIRE real holding. Treat it
+  // as a FULL close — never a partial — so no phantom dust remainder is left
+  // open to re-trap the position past max-hold and starve turnover.
+  const isPartial = !liquidatedFullBalance && closedQty < pos.quantity - 1e-12;
   const closedSizeUSD = isPartial
     ? parseFloat(((pos.sizeUSD * closedQty) / pos.quantity).toFixed(2))
     : pos.sizeUSD;

@@ -101,6 +101,10 @@ export interface LiveUserOrderResult {
   exchangeOrderId?: string;
   fillPrice?:      number;
   quantity?:       number;
+  /** Resolved per-user/per-exchange order notional actually sent to the broker
+   *  (gate 0SIZE output). Mirror-writers MUST persist THIS as size_usd, not the
+   *  engine-global allocation, so DB/exposure match the real broker notional. */
+  sizeUSD?:        number;
   // Broker-reported entry-leg commission, in `brokerFeeCurrency`, when the
   // exchange's order/fill payload included a real fee figure. Only set when
   // `order.fee.source === "broker"` on the underlying StandardOrder — left
@@ -283,6 +287,11 @@ export interface LiveUserCloseResult {
   exchangeCloseOrderId?: string;
   fillPrice?:           number;
   quantity?:            number;
+  /** True when the close was clamped to the broker's actual free base balance
+   *  (free < recorded qty) — i.e. we liquidated the ENTIRE real holding. The
+   *  caller treats this as a FULL close so no phantom fee-shrinkage dust remains
+   *  open to re-trap the position past max-hold. */
+  liquidatedFullBalance?: boolean;
   // Broker-reported close-leg commission (see LiveUserOrderResult.brokerFee).
   brokerFee?:           number;
   brokerFeeCurrency?:   string;
@@ -1828,6 +1837,7 @@ export async function placeLiveAutoOrderForUser(
       exchangeOrderId: `DRYRUN-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       fillPrice:       parseFloat(referencePrice.toFixed(2)),
       quantity:        qtyBase,
+      sizeUSD,
       dryRun:          true,
     };
     await emitFillNotification(
@@ -1989,6 +1999,7 @@ export async function placeLiveAutoOrderForUser(
       exchangeOrderId: order.exchangeOrderId || order.id,
       fillPrice:       parseFloat(fill.toFixed(2)),
       quantity:        order.filledQty > 0 ? order.filledQty : qtyBase,
+      sizeUSD,
       brokerFee:         brokerFeeOpen?.amount,
       brokerFeeCurrency: brokerFeeOpen?.currency,
     };
@@ -2188,11 +2199,50 @@ export async function placeLiveCloseOrderForUser(
   }
 
   try {
+    // ── Balance-aware close sizing (turnover fix) ──────────────────────────
+    // `quantity` is the base qty recorded at OPEN. Entry broker fees + venue
+    // rounding mean the actual FREE base balance is slightly smaller, so a
+    // market close for the full recorded qty is rejected WHOLESALE
+    // (Coinbase INSUFFICIENT_FUND / Kraken "Insufficient funds") on every
+    // SL/TP/max-hold pass — trapping the position open indefinitely and
+    // starving turnover. Probe the real free base balance and clamp the sell to
+    // what we actually hold (rounded DOWN so we never request more than is
+    // available). Only ever clamps DOWN when free < recorded — never sizes up,
+    // so the full-balance path is the ONLY behavioural change.
+    let sellQty          = quantity;
+    let clampedToBalance = false;            // we downsized the close to free balance
+    let freeAtClamp:  number | null = null;
+    let totalAtClamp: number | null = null;
+    try {
+      const acct      = await adapter.getAccount();
+      const baseAsset = deriveBaseAsset(symbol);
+      const bal       = acct.balances[baseAsset];
+      freeAtClamp  = bal && Number.isFinite(bal.free)  ? bal.free  : null;
+      totalAtClamp = bal && Number.isFinite(bal.total) ? bal.total : null;
+      if (freeAtClamp !== null && freeAtClamp > 0 && freeAtClamp < quantity) {
+        const clamped = Math.floor(freeAtClamp * 1e8) / 1e8;
+        if (clamped > 0) {
+          sellQty          = clamped;
+          clampedToBalance = true;
+          logger.info(
+            { userId, exchange: row.exchange, symbol, recordedQty: quantity,
+              freeBalance: freeAtClamp, totalBalance: totalAtClamp, sellQty },
+            "liveUserExecution: close clamped to free base balance (turnover fix)",
+          );
+        }
+      }
+    } catch (probeErr) {
+      logger.warn(
+        { err: probeErr instanceof Error ? probeErr.message : String(probeErr), userId, exchange: row.exchange, symbol },
+        "liveUserExecution: pre-close balance probe failed — submitting recorded qty",
+      );
+    }
+
     let order = await adapter.placeOrder({
       symbol,
       side:     closeSide === "BUY" ? "buy" : "sell",
       type:     "market",
-      qty:      parseFloat(quantity.toFixed(8)),
+      qty:      parseFloat(sellQty.toFixed(8)),
       clientId: `close-u-${userId.slice(0, 8)}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     });
 
@@ -2215,7 +2265,7 @@ export async function placeLiveCloseOrderForUser(
       timedOut = poll.timedOut && !isTerminal(order.status);
     }
 
-    const requestedQty = order.requestedQty > 0 ? order.requestedQty : quantity;
+    const requestedQty = order.requestedQty > 0 ? order.requestedQty : sellQty;
     const unfilled     = !(order.filledQty > 0);
     const partial      = order.filledQty > 0 && order.filledQty < requestedQty - 1e-12;
 
@@ -2241,13 +2291,27 @@ export async function placeLiveCloseOrderForUser(
       order.fee && order.fee.source === "broker" && Number.isFinite(order.fee.amount)
         ? { amount: parseFloat(order.fee.amount.toFixed(8)), currency: order.fee.currency }
         : undefined;
+    // Only signal a FULL close to the caller when (1) we deliberately clamped to
+    // the free balance, (2) the clamped order actually filled IN FULL (not a
+    // broker partial — otherwise residual live exposure remains), and (3)
+    // essentially nothing was locked (free ≈ total — otherwise locked balance
+    // that later unlocks would be left untracked). Any failure of these →
+    // standard partial-fill handling keeps the position open for retry.
+    const FREE_LOCK_TOLERANCE = 0.01;
+    const notLocked =
+      freeAtClamp !== null && totalAtClamp !== null && totalAtClamp > 0
+        ? freeAtClamp >= totalAtClamp * (1 - FREE_LOCK_TOLERANCE)
+        : false;
+    const liquidatedFullBalance =
+      clampedToBalance && !partial && order.filledQty > 0 && notLocked;
     const result: LiveUserCloseResult = {
       success:              true,
       userId,
       exchange:             row.exchange,
       exchangeCloseOrderId: order.exchangeOrderId || order.id,
       fillPrice:            parseFloat(fill.toFixed(2)),
-      quantity:             order.filledQty > 0 ? order.filledQty : quantity,
+      quantity:             order.filledQty > 0 ? order.filledQty : sellQty,
+      liquidatedFullBalance,
       brokerFee:            brokerFeeClose?.amount,
       brokerFeeCurrency:    brokerFeeClose?.currency,
     };

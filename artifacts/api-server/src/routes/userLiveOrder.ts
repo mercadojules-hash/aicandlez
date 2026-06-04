@@ -395,7 +395,10 @@ router.post(
 
       try {
         const entry = result.fillPrice ?? 0;
-        const qty   = result.quantity  ?? (entry > 0 ? sizeUSD / entry : 0);
+        // BUG #1 fix: persist the RESOLVED notional the broker actually filled
+        // (gate 0SIZE may override the requested size per exchange).
+        const resolvedSizeUSD = result.sizeUSD ?? sizeUSD;
+        const qty   = result.quantity  ?? (entry > 0 ? resolvedSizeUSD / entry : 0);
         if (entry > 0 && qty > 0) {
           // Resolve SL/TP from the SAME per-account/per-exchange resolver the AI
           // live open-path uses (tradingLoop), so a manual live order inherits a
@@ -418,7 +421,7 @@ router.post(
             side:                   parsed.side,
             quantity:               qty,
             entryPrice:             entry,
-            sizeUSD,
+            sizeUSD:                resolvedSizeUSD,
             stopLoss:               parseFloat(sl.toFixed(2)),
             takeProfit:             parseFloat(tp.toFixed(2)),
             exchange:               result.exchange ?? "unknown",

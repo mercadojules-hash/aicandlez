@@ -37,3 +37,8 @@ mirror-write use `r.sizeUSD ?? sizeUSD`. Mirror the same into the manual
 
 **Coercion is NOT the cause:** ALLOWED_TRADE_SIZES=[10,20,50,100],
 DEFAULT_TRADE_SIZE_USD=10; $10/$50 are valid presets and do not coerce to $20.
+
+**RESOLVED:** `sizeUSD` added to `LiveUserOrderResult` + set on both open-success
+returns (real + dry-run); both mirror-writes (`tradingLoop.ts` AI fan-out and
+`userLiveOrder.ts` manual path) now persist `resolvedSizeUSD = result.sizeUSD ??
+sizeUSD`. New fills record the true broker notional; pre-fix rows stay $20.
