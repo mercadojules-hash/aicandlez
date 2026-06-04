@@ -3,6 +3,38 @@ name: Coinbase portfolio scope vs equity read
 description: Why Coinbase "account is not available"/INSUFFICIENT_FUND happens while the portal shows a healthy equity; how per-user live equity is sourced for risk sizing.
 ---
 
+# UPDATE 2 (raw API audit): getAccount() DROPS the USD fiat account — un-paginated /accounts fetch
+
+**Verified by a fresh read-only raw pull after the QA user converted USDC→USD:**
+- Coinbase consumer app + raw `/api/v3/brokerage/accounts?limit=250` BOTH show
+  **USD available = $612.21** (single "Default" portfolio), USDC ≈ $0.00006 dust,
+  total_crypto ≈ $3,843, portfolio total ≈ $4,455.
+- But `adapter.getAccount()` returned **cash: 0**, totalEquityUSD ≈ $0.00006
+  (USDC dust only). The USD fiat account was MISSING from `balances` entirely.
+- **Root cause:** `getAccount()` calls `signedGet("/api/v3/brokerage/accounts")`
+  with NO `limit` and NO pagination loop. Coinbase auto-provisions a wallet per
+  supported asset (200+); the default page (~49, crypto first / fiat last) does
+  NOT include the USD fiat account, so the `if (asset === "USD")` branch never
+  runs → cash stays 0. The code DOES intend to count USD+USDC; it just never
+  receives the USD row. Adding `?limit=250` (or cursor pagination) makes USD
+  appear. This UNDERSTATES deployable equity to ~$0 whenever USD sits past the
+  first page.
+- **Why the dashboard "Coinbase balance" tracked $604→~$0:** the customer tile is
+  fed by `usdBreakdown.total` (cash + USDC). When the headline was USDC, it read
+  ~$604; after USDC→USD conversion the USDC went to dust and the USD that replaced
+  it is invisible to `getAccount()` → tile collapses to ~$0 ("$6.02" = the 6025…
+  dust significand).
+- **Liquidity guard is decoupled from broker cash:** `evaluateLiquidityGuard`'s
+  `availableCashUsd` is sourced from `sim_accounts.cashBalance` (PAPER ledger) in
+  BOTH the 0LIQ execution gate and the `/user/ai-trading/liquidity` UI route
+  (`readUserCashBalance`). So "buying power $0.00 / shortfall" is NOT the broker
+  USD; a live broker-cash display reading `usdBreakdown.cash` (=$0 from the bug)
+  is the only thing that shows $0 buying power.
+
+**How to apply:** when Coinbase equity/cash reads ~$0 but the user has real USD,
+suspect the un-paginated `/accounts` page cutoff FIRST (pull `?limit=250` to
+confirm USD reappears) before any currency-wallet/portfolio theory below.
+
 # UPDATE (raw API audit): the real cause is currency-wallet mismatch, NOT portfolio scope
 
 **Verified by a read-only raw `/api/v3/brokerage/accounts` + `/portfolios` pull
