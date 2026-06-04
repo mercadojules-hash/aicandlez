@@ -3,7 +3,36 @@ name: Coinbase portfolio scope vs equity read
 description: Why Coinbase "account is not available"/INSUFFICIENT_FUND happens while the portal shows a healthy equity; how per-user live equity is sourced for risk sizing.
 ---
 
-# Coinbase "account is not available" = trade-portfolio scope mismatch
+# UPDATE (raw API audit): the real cause is currency-wallet mismatch, NOT portfolio scope
+
+**Verified by a read-only raw `/api/v3/brokerage/accounts` + `/portfolios` pull
+for the QA Coinbase account that showed "~$604.85 but every $50 order rejected":**
+- The account has exactly ONE portfolio ("Default", DEFAULT type). EVERY account
+  row carries the SAME `retail_portfolio_id`. So the view⊋trade portfolio-scope
+  theory below was a RED HERRING for this case — there is no second portfolio/vault.
+- The displayed "$604.85" is literally the **USDC** wallet balance (604.850060…).
+  **USD cash is only ~$8.38.** Portfolio breakdown: total_balance ~$4,337,
+  total_cash_equivalent ~$613 (USD 8.38 + USDC 604.85), total_crypto ~$3,724
+  (SHIB/XLM/DOT/ALGO/JASMY/GRT/FET/… spread across ~16 alts).
+- Why $50 orders still fail INSUFFICIENT_FUND despite "$604.85":
+  - **BUY** → engine trades `BASE-USD` products (normaliseSymbol → `-USD`); a
+    `-USD` market BUY draws the **USD** quote wallet = only $8.38. The $604.85
+    USDC is NOT auto-spent on `-USD` pairs (it funds `-USDC` pairs / needs convert).
+  - **SELL** (majority of attempts; spot has no shorting) → a market SELL needs
+    the **exact base coin** in the wallet. Engine SELL signals on coins not held
+    (or held < $50 worth) → "Insufficient balance in source account".
+- Funds are NOT missing/hidden — they're real, in one portfolio, just in the
+  WRONG currency/asset for the orders being placed.
+
+**How to apply (updated):** when Coinbase shows healthy equity but every order
+rejects, FIRST pull raw `/accounts` and check the split: is the headline number
+USDC while USD cash (the `-USD` BUY source) is ~empty, and are the SELLs for
+coins not held? That is the common cause. Only chase portfolio-scope (below) if
+`/portfolios` actually returns >1 portfolio or accounts carry differing
+`retail_portfolio_id`s. Decrypting QA creds for a one-off read-only audit is
+acceptable when explicitly requested by the operator; never print the key/secret.
+
+# (legacy theory) Coinbase "account is not available" = trade-portfolio scope mismatch
 
 **Rule:** Coinbase `getAccount()` (`GET /api/v3/brokerage/accounts`) returns every
 account the API key can *view* across the profile, but `placeOrder`
