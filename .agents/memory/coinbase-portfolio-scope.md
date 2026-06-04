@@ -3,6 +3,31 @@ name: Coinbase portfolio scope vs equity read
 description: Why Coinbase "account is not available"/INSUFFICIENT_FUND happens while the portal shows a healthy equity; how per-user live equity is sourced for risk sizing.
 ---
 
+# UPDATE 3 (raw API audit): STAKED balances are invisible to getAccount() → equity under-reports by the staked $
+
+**Verified by a read-only per-portfolio breakdown pull (`/api/v3/brokerage/portfolios/{uuid}`)
+for a QA account whose Coinbase Advanced "Total Balance" exceeded our equity by ~$1,398:**
+- ONE portfolio ("Default"). Coinbase breakdown total = $4,368.83; `getAccount()` = $2,970.94.
+- Per-asset `spot_positions[]` reconciled exactly: every asset with `available_to_trade_fiat > 0`
+  IS counted by us; every asset with **`available_to_trade_fiat = 0` (STAKED)** is DROPPED. The
+  gap was SOL ($966) + ADA ($280) + ETH ($152) + dust POL/NU ≈ $1,398 — all staked.
+- **Root cause:** `getAccount()` builds `balances[asset].total = available_balance + hold` from
+  `/api/v3/brokerage/accounts`. Staked/bonded amounts are NOT in `available_balance` or `hold`
+  (they live in a separate staked balance), so `total = 0` → the `bal.total > 0` filter excludes
+  them from `heldCrypto` → $0 contribution. NOT a pricing failure (best_bid priced every liquid
+  asset fine; our priced spot ≈ Coinbase fiat within ~$2 best-bid-vs-mid drift).
+- **The staked $ is REAL account value but NOT deployable** (must unstake w/ cooldown before it's
+  even liquid spot, let alone tradable). So the correct fix is a DISPLAY split (Total Account
+  Value incl. staked vs Available Trading Cash vs Deployed) — and the risk/free-capital gate must
+  keep sizing off DEPLOYABLE funds, NOT the staked-inclusive total, or it approves BUYs the broker
+  can't fund. The authoritative total incl. staked = portfolio breakdown `total_balance`, not the
+  available+hold sum.
+
+**How to apply:** when Coinbase "Total Balance" > our equity and `/portfolios` returns ONE
+portfolio with USD present, check `spot_positions[].available_to_trade_fiat == 0` (staked) before
+any pagination/currency theory. Reconcile via the portfolio breakdown endpoint (Coinbase's own
+per-asset fiat), not just `/accounts`.
+
 # UPDATE 2 (raw API audit): getAccount() DROPS the USD fiat account — un-paginated /accounts fetch
 
 **Verified by a fresh read-only raw pull after the QA user converted USDC→USD:**
