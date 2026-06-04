@@ -663,15 +663,50 @@ export async function getUserAccountSummary(userId: string) {
   // fills never persist a fee value.
   const feeRows = await db
     .select({
-      entryFee: simTradesTable.entryFee,
-      exitFee:  simTradesTable.exitFee,
+      entryFee:          simTradesTable.entryFee,
+      exitFee:           simTradesTable.exitFee,
+      exchange:          simTradesTable.exchange,
+      realizedPnL:       simTradesTable.realizedPnL,
+      reconciliationTag: simTradesTable.reconciliationTag,
     })
     .from(simTradesTable)
     .where(eq(simTradesTable.userId, userId));
-  const totalFeesPaid = feeRows.reduce(
-    (s, r) => s + (r.entryFee ?? 0) + (r.exitFee ?? 0),
-    0,
-  );
+
+  // ── Per-exchange LIVE breakdown (DISPLAY-ONLY) ─────────────────────────────
+  // Scopes open-position + realized figures to a single connected exchange so
+  // the customer dashboard can show e.g. "Coinbase Deployed / Open / Unrealized
+  // / Realized" distinctly from paper-sim activity AND from other live venues
+  // (e.g. Kraken). Keyed by `sim_*.exchange` (e.g. "Coinbase"), which matches
+  // `connectedExchanges[].exchange`. Paper fills (exchange NULL) are excluded.
+  // Reconciliation-tagged trade rows are excluded from realized (same rule as
+  // the canonical realized ledger). Presentational only — does NOT feed risk,
+  // sizing, or the canonical account equity/realized totals above.
+  const liveByExchange: Record<string, {
+    openCount: number; deployedUSD: number; unrealizedPnL: number; realizedPnL: number;
+  }> = {};
+  const ensureEx = (ex: string) =>
+    (liveByExchange[ex] ??= { openCount: 0, deployedUSD: 0, unrealizedPnL: 0, realizedPnL: 0 });
+  for (const p of enriched) {
+    if (!p.exchange) continue;
+    const slot = ensureEx(p.exchange);
+    slot.openCount     += 1;
+    slot.deployedUSD   += p.sizeUSD ?? 0;
+    slot.unrealizedPnL += p.unrealizedPnL ?? 0;
+  }
+
+  let totalFeesPaid = 0;
+  for (const r of feeRows) {
+    totalFeesPaid += (r.entryFee ?? 0) + (r.exitFee ?? 0);
+    // Clean realized: live rows only, reconciliation-tagged rows excluded.
+    if (r.exchange && !r.reconciliationTag) {
+      ensureEx(r.exchange).realizedPnL += r.realizedPnL ?? 0;
+    }
+  }
+  for (const slot of Object.values(liveByExchange)) {
+    slot.deployedUSD   = parseFloat(slot.deployedUSD.toFixed(2));
+    slot.unrealizedPnL = parseFloat(slot.unrealizedPnL.toFixed(2));
+    slot.realizedPnL   = parseFloat(slot.realizedPnL.toFixed(2));
+  }
 
   // FILLS · TODAY — real per-day metric: count of trades CLOSED since 00:00
   // UTC today. `sim_trades.exitTime` is the authoritative close timestamp
@@ -703,6 +738,9 @@ export async function getUserAccountSummary(userId: string) {
     fillsToday,
     totalRealized: parseFloat(state.account.totalRealized.toFixed(2)),
     totalFeesPaid: parseFloat(totalFeesPaid.toFixed(2)),
+    // DISPLAY-ONLY per-exchange LIVE breakdown (see computation above). Empty
+    // object for paper-only users. Frontend reads e.g. liveByExchange["Coinbase"].
+    liveByExchange,
     positions:     enriched.map((p) => ({
       ...p,
       unrealizedPnL:    p.unrealizedPnL    != null ? parseFloat(p.unrealizedPnL.toFixed(2))    : undefined,

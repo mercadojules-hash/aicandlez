@@ -92,8 +92,18 @@ export interface UsdBreakdown {
    *  value. 0 when the adapter prices no holdings. Present signals the adapter
    *  folds held crypto into `totalEquityUSD`. */
   holdings:         number;
-  /** cash + stablecoin + holdings — equals `totalEquityUSD`. */
+  /** cash + stablecoin + holdings — equals `totalEquityUSD`. This is the
+   *  DEPLOYABLE figure: the ONLY value risk / sizing / execution may read. */
   total:            number;
+  /** DISPLAY-ONLY USD value of staked / bonded balances the broker reports as
+   *  available=0 (so they are excluded from `total`/`totalEquityUSD`). Present
+   *  only when an adapter resolves it. NEVER buying power — never feed to
+   *  risk/sizing. Surfaced purely so the dashboard can show staked separately. */
+  staked?:          number;
+  /** DISPLAY-ONLY authoritative total account value incl. staked
+   *  (= `total` + `staked`), sourced from the broker's portfolio total. Present
+   *  only when resolved. For transparency in the UI; NOT a risk/sizing input. */
+  accountValue?:    number;
   /** Asset tickers contributing to `stablecoin` (e.g. ["USDC"]). */
   stablecoinAssets: string[];
 }

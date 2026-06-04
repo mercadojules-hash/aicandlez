@@ -349,6 +349,48 @@ export class CoinbaseAdapter extends BaseExchangeAdapter {
   }
 
   /**
+   * DISPLAY-ONLY authoritative total account value (USD), INCLUDING staked /
+   * bonded balances. `getAccount()` deliberately excludes staked balances from
+   * `totalEquityUSD` because Coinbase reports them as available=0 — they are
+   * NOT deployable buying power. This method reads the broker's portfolio
+   * `total_balance` (the figure shown in the Coinbase UI), which folds staked
+   * value back in, so the dashboard can show a "Total Account Value" line for
+   * transparency alongside the deployable equity.
+   *
+   * SAFETY: NEVER call this from the risk / sizing / execution path. Risk reads
+   * `getAccount().totalEquityUSD` (cash + stablecoin + liquid holdings) only.
+   * Staked value must never be treated as deployable.
+   *
+   * Best-effort: returns 0 on any failure (unconfigured, no portfolio, bad
+   * payload) so callers can fall back to the deployable total. Does not throw
+   * on missing data — only the underlying signed request can reject.
+   */
+  async getAccountValueUSD(): Promise<number> {
+    if (!this.isConfigured()) return 0;
+    this.checkRequestRateLimit();
+    const list = await this.withRetry(
+      () => this.signedGet<{ portfolios?: Array<{ uuid: string; type?: string; deleted?: boolean }> }>(
+        "/api/v3/brokerage/portfolios",
+      ),
+      3, 500, "getAccountValueUSD.list",
+    );
+    const portfolios = (list.portfolios ?? []).filter(p => !p.deleted && p.uuid);
+    // Prefer the DEFAULT portfolio (where Advanced Trade balances + staking
+    // live); fall back to the first non-deleted portfolio if type is absent.
+    const chosen = portfolios.find(p => p.type === "DEFAULT") ?? portfolios[0];
+    if (!chosen) return 0;
+    const detail = await this.withRetry(
+      () => this.signedGet<{ breakdown?: { portfolio_balances?: { total_balance?: { value?: string } } } }>(
+        `/api/v3/brokerage/portfolios/${encodeURIComponent(chosen.uuid)}`,
+      ),
+      3, 500, "getAccountValueUSD.breakdown",
+    );
+    const raw = detail.breakdown?.portfolio_balances?.total_balance?.value;
+    const val = parseFloat(raw ?? "");
+    return Number.isFinite(val) && val >= 0 ? val : 0;
+  }
+
+  /**
    * Value non-USD spot holdings at their realizable (best-bid) USD price via the
    * AUTHENTICATED best_bid_ask endpoint. Best-bid (not mid/ask) is deliberate:
    * it's the conservative price the account could realize selling now, so equity

@@ -753,7 +753,16 @@ export type BalanceConnection = {
   usdBreakdown?:  {
     cash:             number;
     stablecoin:       number;
+    /** USD value of liquid (non-USD, non-stable) spot holdings, best-bid priced. */
+    holdings:         number;
+    /** Deployable equity = cash + stablecoin + holdings (= totalEquityUSD). */
     total:            number;
+    /** DISPLAY-ONLY staked / bonded value (excluded from `total`). NOT buying
+     *  power; present only when the adapter resolves it. */
+    staked?:          number;
+    /** DISPLAY-ONLY authoritative total account value incl. staked
+     *  (= total + staked). Present only when resolved. */
+    accountValue?:    number;
     stablecoinAssets: string[];
   };
   balances:       Record<string, { free: number; locked: number; total: number }>;
@@ -938,6 +947,15 @@ async function emitConnectionTestFailureNotification(
   }
 }
 
+// DISPLAY-ONLY cache for the authoritative total account value (incl. staked).
+// `loadBalanceForRow` runs on hot poll paths (runtime-state + balances polls),
+// so a short TTL keyed by connection id caps the extra broker calls this makes
+// on the shared trading key. Risk / sizing / execution NEVER read this — it is
+// purely for the dashboard's "Total Account Value" transparency line, so a few
+// seconds of staleness is harmless.
+const accountValueCache = new Map<string, { at: number; value: number }>();
+const ACCOUNT_VALUE_TTL_MS = 15_000;
+
 export async function loadBalanceForRow(
   userId: string,
   row: typeof userExchangeConnectionsTable.$inferSelect,
@@ -973,11 +991,45 @@ export async function loadBalanceForRow(
       assetCount: Object.keys(account.balances).length,
       latencyMs:  Date.now() - t0,
     });
+    // DISPLAY-ONLY enrichment: fold staked-inclusive total account value into
+    // the breakdown when the adapter exposes it (currently Coinbase). This is
+    // additive — `totalEquityUSD` and the deployable `total` are UNCHANGED, so
+    // the risk / sizing / execution path (which reads getAccount() directly,
+    // not this function) is untouched. Best-effort + cached: any failure leaves
+    // the deployable breakdown intact.
+    let usdBreakdown = account.usdBreakdown;
+    const accountValueFn = (adapter as { getAccountValueUSD?: () => Promise<number> }).getAccountValueUSD;
+    if (usdBreakdown && typeof accountValueFn === "function") {
+      try {
+        const cached = accountValueCache.get(row.id);
+        const accountValue = cached && Date.now() - cached.at < ACCOUNT_VALUE_TTL_MS
+          ? cached.value
+          : await accountValueFn.call(adapter);
+        accountValueCache.set(row.id, { at: Date.now(), value: accountValue });
+        // Only surface when the broker total exceeds the deployable total —
+        // otherwise there is no staked component to show and we avoid reporting
+        // a "Total Account Value" lower than deployable due to pricing drift.
+        if (Number.isFinite(accountValue) && accountValue > usdBreakdown.total) {
+          usdBreakdown = {
+            ...usdBreakdown,
+            accountValue,
+            staked: Math.max(0, accountValue - usdBreakdown.total),
+          };
+        }
+      } catch (err) {
+        logger.warn({
+          tag:      "ACCOUNT_VALUE_FETCH_FAILED",
+          userId,
+          exchange: row.exchange,
+          err:      (err as Error).message,
+        }, "[ACCOUNT_VALUE_FETCH_FAILED] staked-inclusive total unavailable; showing deployable breakdown only");
+      }
+    }
     return {
       ...base,
       ok:             true,
       totalEquityUSD: account.totalEquityUSD,
-      ...(account.usdBreakdown ? { usdBreakdown: account.usdBreakdown } : {}),
+      ...(usdBreakdown ? { usdBreakdown } : {}),
       balances:       account.balances,
       lastUpdated:    account.lastUpdated,
     };

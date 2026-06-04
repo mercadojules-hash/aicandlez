@@ -5605,6 +5605,16 @@ export function PortalCustomerShell({ operatorPreview = false }: { operatorPrevi
     fillsToday:    number;
     totalRealized: number;
     positions:     ServerSimPosition[];
+    // DISPLAY-ONLY per-exchange LIVE breakdown from getUserAccountSummary. Keyed
+    // by exchange (e.g. "Coinbase") matching connectedExchanges[].exchange.
+    // Scopes Deployed / Open / Unrealized / Realized to one live venue, distinct
+    // from paper-sim activity. Absent for paper-only users.
+    liveByExchange?: Record<string, {
+      openCount:     number;
+      deployedUSD:   number;
+      unrealizedPnL: number;
+      realizedPnL:   number;
+    }>;
   };
   // Convergence fix: previously gated `enabled: isLiveRuntime`, which left
   // PAPER-mode customers with no subscriber to /api/simulation/account.
@@ -7318,6 +7328,79 @@ export function PortalCustomerShell({ operatorPreview = false }: { operatorPrevi
               strictRuntime={strictRuntime}
               runtimePending={runtimePending || runtimeResyncing}
             />
+            {/* ACCOUNT BREAKDOWN (display-only) — staked-inclusive total account
+                value + deployable buying power + per-exchange live position
+                economics for the ACTIVE live venue (currently Coinbase, the only
+                adapter that resolves a staked-inclusive account value). SAFETY:
+                staked is shown for transparency ONLY — risk / sizing / execution
+                read deployable funds (cash + stablecoin + liquid holdings) via
+                getAccount().totalEquityUSD and NEVER staked. All values are
+                Coinbase-scoped (distinct from paper-sim + other venues). Renders
+                only in LIVE runtime when the active connection exposes a USD
+                breakdown. */}
+            {(() => {
+              if (!isLiveRuntime) return null;
+              const conn = (runtimeState?.connectedExchanges ?? []).find(
+                (c) => c.exchange === liveExchange && c.ok && c.usdBreakdown,
+              );
+              const bd = conn?.usdBreakdown;
+              if (!conn || !bd) return null;
+              const agg = serverAccount?.liveByExchange?.[conn.exchange];
+              const PLAN_CONCURRENT: Record<string, number> = { free: 0, starter: 3, pro: 6, elite: 12 };
+              const limit = isMultiExchangeParallel ? perExchangeLimit : (PLAN_CONCURRENT[plan] ?? 0);
+              const usd = (v: number) =>
+                `$${nz(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+              const signed = (v: number) => `${v >= 0 ? "+" : "−"}${usd(Math.abs(v))}`;
+              const accountValue = bd.accountValue ?? bd.total;
+              const buyingPower  = nz(bd.cash) + nz(bd.stablecoin);
+              const realized     = nz(agg?.realizedPnL);
+              const unrealized   = nz(agg?.unrealizedPnL);
+              const rows: Array<{ label: string; value: string; hint?: string; tone?: "pos" | "neg" | "muted" }> = [
+                { label: "TOTAL ACCOUNT VALUE",   value: usd(accountValue),         hint: "liquid + staked" },
+                { label: "AVAILABLE TRADING CASH", value: usd(buyingPower),          hint: "USD + USDC · buying power" },
+                { label: "STAKED VALUE",          value: usd(nz(bd.staked)),        hint: "not deployable", tone: "muted" },
+                { label: "LIQUID CRYPTO VALUE",   value: usd(nz(bd.holdings)) },
+                { label: "DEPLOYED CAPITAL",      value: usd(nz(agg?.deployedUSD)), hint: "Σ open position size" },
+                { label: "OPEN POSITIONS",        value: `${agg?.openCount ?? 0}${limit > 0 ? ` / ${limit}` : ""}` },
+                { label: "REALIZED P&L",          value: signed(realized),   tone: realized   >= 0 ? "pos" : "neg" },
+                { label: "UNREALIZED P&L",        value: signed(unrealized), tone: unrealized >= 0 ? "pos" : "neg" },
+              ];
+              return (
+                <section style={{ background: T.BG_TERMINAL, border: `1px solid rgba(124,255,0,0.10)`, fontFamily: T.FONT_MONO }}>
+                  <div style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    padding: "8px 10px", borderBottom: `1px solid rgba(124,255,0,0.08)`,
+                    fontSize: 9.5, fontWeight: 700, letterSpacing: T.TRACK_LABEL, color: T.TEXT_3,
+                  }}>
+                    <span>{(conn.label || conn.exchange).toUpperCase()} ACCOUNT BREAKDOWN</span>
+                    <span style={{ opacity: 0.6 }}>LIVE</span>
+                  </div>
+                  {rows.map((r) => (
+                    <div key={r.label} style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      padding: "7px 10px", borderBottom: `1px solid rgba(124,255,0,0.05)`, gap: 10,
+                    }}>
+                      <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+                        <span style={{ fontSize: 9.5, fontWeight: 600, letterSpacing: T.TRACK_LABEL, color: T.TEXT_2, whiteSpace: "nowrap" }}>
+                          {r.label}
+                        </span>
+                        {r.hint && (
+                          <span style={{ fontSize: 8, color: T.TEXT_3, opacity: 0.7, marginTop: 1, whiteSpace: "nowrap" }}>
+                            {r.hint}
+                          </span>
+                        )}
+                      </div>
+                      <span style={{
+                        fontSize: 12, fontWeight: 700, fontVariantNumeric: "tabular-nums", flexShrink: 0,
+                        color: r.tone === "pos" ? T.NEON : r.tone === "neg" ? T.RED : r.tone === "muted" ? T.TEXT_3 : T.TEXT_0,
+                      }}>
+                        {r.value}
+                      </span>
+                    </div>
+                  ))}
+                </section>
+              );
+            })()}
             {/* CONNECTED EXCHANGES — informational per-exchange balances.
                 Decoupled from runtime math: the headline equity + risk gate
                 + execution engine reference ONLY the active exchange

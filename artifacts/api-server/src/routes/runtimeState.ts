@@ -65,6 +65,11 @@ interface ExchangeConnectionState {
   lastBalanceFetchAt:     Date | null;
   lastBalanceFetchError:  string | null;
   totalEquityUSD:         number;
+  // DISPLAY-ONLY USD breakdown (cash / stablecoin / liquid holdings / staked /
+  // staked-inclusive accountValue) when the adapter exposes it. The runtime /
+  // risk / execution path reads only `totalEquityUSD` (= deployable); this is
+  // surfaced purely so the dashboard can render an account breakdown.
+  usdBreakdown?:          BalanceConnection["usdBreakdown"];
 }
 
 interface CustomerTradingRuntimeContext {
@@ -105,6 +110,7 @@ function shapeConnection(
     lastBalanceFetchAt:    row.lastBalanceFetchAt,
     lastBalanceFetchError: row.lastBalanceFetchError,
     totalEquityUSD:        snapshot.ok ? snapshot.totalEquityUSD : 0,
+    ...(snapshot.ok && snapshot.usdBreakdown ? { usdBreakdown: snapshot.usdBreakdown } : {}),
   };
 }
 

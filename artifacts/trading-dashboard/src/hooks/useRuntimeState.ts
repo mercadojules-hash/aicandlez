@@ -32,6 +32,19 @@ export interface RuntimeConnection {
   ok:                    boolean;
   canTrade?:             boolean;    // API key authorized for trading (false = blocked in switcher)
   totalEquityUSD:        number;
+  // DISPLAY-ONLY USD breakdown (deployable split + staked/accountValue when the
+  // adapter exposes it, e.g. Coinbase). Risk/exec read `totalEquityUSD` only;
+  // this powers the dashboard account-breakdown card. Absent for adapters that
+  // don't distinguish — render falls back to `totalEquityUSD`.
+  usdBreakdown?:         {
+    cash:             number;
+    stablecoin:       number;
+    holdings:         number;
+    total:            number;
+    staked?:          number;
+    accountValue?:    number;
+    stablecoinAssets: string[];
+  };
   balances:              Record<string, { free: number; locked: number; total: number }>;
   lastUpdated:           number;
   lastBalanceFetchAt:    string | null;
