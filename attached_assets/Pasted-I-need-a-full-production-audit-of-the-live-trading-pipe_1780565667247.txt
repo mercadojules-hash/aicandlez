@@ -1,0 +1,77 @@
+I need a full production audit of the live trading pipeline because the current behavior does not match expectations.
+
+Context:
+
+* LIVE max hold was reduced from 6 hours to 1 hour.
+* My goal is intentionally high turnover and faster capital recycling.
+* I expect significantly more trade activity with a 1-hour max hold versus a 6-hour max hold.
+* Coinbase funding issues have already been corrected and the account now shows approximately $612 USD cash available.
+* Coinbase per-exchange trade size is configured at $50.
+* Kraken falls back to the global $20 setting.
+
+Please investigate the following:
+
+1. Coinbase trade size override
+
+* Confirm whether the Coinbase $50 override is being ignored on the AI auto-trading path.
+* Identify the exact code path where the per-exchange override is dropped.
+* Verify whether Coinbase trades are still executing at $20.
+* Provide production evidence from recent live trades.
+
+2. Trade bottleneck analysis
+
+* Identify every gate that can prevent a signal from becoming a live trade.
+* Confidence thresholds
+* MTF filters
+* Volume filters
+* Regime filters
+* Risk engine
+* Position limits
+* Exchange-specific restrictions
+* Allocation limits
+* Cash reserve protection
+* Liquidity protection
+* Any other blocking mechanism
+
+For the last 24 hours provide:
+
+* Total opportunities evaluated
+* Total opportunities passing confidence
+* Total opportunities blocked
+* Block count by reason
+* Percentage blocked by each reason
+
+3. Impact of the 1-hour max hold change
+
+* Compare the last 24 hours against the period before the 1-hour deployment.
+* Did fills per day increase?
+* Did position turnover increase?
+* Did average hold duration decrease?
+* Did capital recycling increase?
+* Did opportunities executed per hour increase?
+
+4. Coinbase live trade count
+
+* Explain why Coinbase currently has a low number of concurrent live trades despite:
+
+  * available USD cash
+  * reduced max hold
+  * active AI trading
+* Determine whether there is still a hidden bottleneck preventing new entries.
+
+5. Capital utilization
+
+* Report:
+
+  * available cash
+  * deployed capital
+  * average open positions
+  * average concurrent positions
+  * maximum concurrent positions reached
+* Determine whether the engine is under-utilizing available buying power.
+
+Goal:
+
+I want to know whether there is a bottleneck limiting trade frequency and whether the 1-hour max hold change is actually producing the higher turnover that it was intended to create.
+
+Please provide production data and code-level findings, not assumptions.
