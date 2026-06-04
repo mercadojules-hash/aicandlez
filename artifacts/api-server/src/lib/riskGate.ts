@@ -221,6 +221,17 @@ async function readUserLiveEquity(userId: string, exchangeScope?: string): Promi
   if (!creds) return null;
   const adapter = makeAdapter(row.exchange, creds, { testnet: false, demoMode: row.demoMode });
   const acct = await adapter.getAccount();
+  // Adapters that value their own non-USD holdings into `totalEquityUSD` expose
+  // a numeric `holdings` figure in `usdBreakdown` (Coinbase). When present, that
+  // adapter-priced total IS the true account equity — use it directly instead of
+  // re-pricing here via `priceUserLiveAccount`/`getCachedSpotPriceUSD`, which
+  // builds an UNAUTHENTICATED adapter and prices Coinbase crypto at $0 (the
+  // auth-gated best_bid_ask endpoint 401s), collapsing equity to cash-only and
+  // double-counting deployed capital in the free-capital gate. Legacy adapters
+  // (no `holdings` field) keep the existing pricing path unchanged.
+  if (acct.usdBreakdown && typeof acct.usdBreakdown.holdings === "number") {
+    return acct.totalEquityUSD;
+  }
   return priceUserLiveAccount(row.exchange, acct.balances);
 }
 

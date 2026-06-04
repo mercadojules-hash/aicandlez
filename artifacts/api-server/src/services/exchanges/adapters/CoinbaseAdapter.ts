@@ -317,7 +317,21 @@ export class CoinbaseAdapter extends BaseExchangeAdapter {
         }
       }
     }
-    const totalEquityUSD = cash + stablecoin;
+    // Value non-USD spot holdings (priced via the AUTHENTICATED best_bid_ask
+    // endpoint) so `totalEquityUSD` reflects TRUE total account value — cash +
+    // stablecoin + held crypto — not cash-only. Without this, every Coinbase
+    // crypto holding is invisible to equity, and the per-user risk free-capital
+    // gate double-counts already-deployed capital (equity collapses to cash, yet
+    // open notional is still subtracted), starving the account of new-position
+    // capacity. Fail-safe: unpriceable assets are skipped (under-report, never
+    // overstate, never throw).
+    const heldCrypto: Array<{ asset: string; qty: number }> = [];
+    for (const [asset, bal] of Object.entries(balances)) {
+      if (asset === "USD" || STABLECOIN_ASSETS.has(asset)) continue;
+      if (bal.total > 0) heldCrypto.push({ asset, qty: bal.total });
+    }
+    const { usd: holdings } = await this.priceHoldingsUSD(heldCrypto);
+    const totalEquityUSD = cash + stablecoin + holdings;
     return {
       exchange: "Coinbase",
       balances,
@@ -325,12 +339,103 @@ export class CoinbaseAdapter extends BaseExchangeAdapter {
       usdBreakdown: {
         cash,
         stablecoin,
+        holdings,
         total:            totalEquityUSD,
         stablecoinAssets: Array.from(stablecoinHit).sort(),
       },
       positions:   [],
       lastUpdated: Date.now(),
     };
+  }
+
+  /**
+   * Value non-USD spot holdings at their realizable (best-bid) USD price via the
+   * AUTHENTICATED best_bid_ask endpoint. Best-bid (not mid/ask) is deliberate:
+   * it's the conservative price the account could realize selling now, so equity
+   * is never overstated.
+   *
+   * Resilience: Coinbase rejects the ENTIRE batched best_bid_ask request with a
+   * 400 INVALID_ARGUMENT if ANY single product_id is unknown/delisted (common
+   * for dust wallets like CLV/NU). So we batch on the happy path, but on a batch
+   * failure we fall back to pricing each product in that chunk individually — a
+   * bad id then only drops itself and valid holdings still count.
+   *
+   * Fail-safe by construction — any asset that can't be priced (no `${asset}-USD`
+   * product, missing bid, malformed level, or a failed/rejected request) is
+   * skipped rather than throwing. Returns the summed USD value plus how many
+   * assets were successfully priced (telemetry).
+   */
+  private async priceHoldingsUSD(
+    holdings: Array<{ asset: string; qty: number }>,
+  ): Promise<{ usd: number; pricedCount: number }> {
+    if (holdings.length === 0) return { usd: 0, pricedCount: 0 };
+    // Map product_id ("BTC" → "BTC-USD") → qty. normaliseSymbol can throw on
+    // unrecognised assets; guard per-asset so one bad ticker can't sink the sum.
+    const qtyByProduct = new Map<string, number>();
+    for (const h of holdings) {
+      if (!(h.qty > 0)) continue;
+      try {
+        qtyByProduct.set(this.normaliseSymbol(`${h.asset}USD`), h.qty);
+      } catch { /* unpriceable asset — skip */ }
+    }
+    const productIds = Array.from(qtyByProduct.keys());
+    if (productIds.length === 0) return { usd: 0, pricedCount: 0 };
+
+    const bidByProduct = new Map<string, number>();
+    const CHUNK = 25;
+    for (let i = 0; i < productIds.length; i += CHUNK) {
+      const chunk = productIds.slice(i, i + CHUNK);
+      try {
+        for (const [pid, bid] of await this.fetchBestBids(chunk)) bidByProduct.set(pid, bid);
+      } catch (err) {
+        // Batch rejected (likely one invalid product_id). Price each product on
+        // its own so the valid ones survive; a bad id throws alone and is skipped.
+        logger.warn({
+          tag:      "COINBASE_HOLDINGS_PRICE",
+          event:    "batch_failed_fallback_singles",
+          products: chunk,
+          err:      err instanceof Error ? err.message : String(err),
+        }, "[COINBASE_HOLDINGS_PRICE] batch pricing failed — falling back to per-product");
+        const singles = await Promise.all(chunk.map(async pid => {
+          try { return [pid, (await this.fetchBestBids([pid])).get(pid)] as const; }
+          catch { return [pid, undefined] as const; }
+        }));
+        for (const [pid, bid] of singles) if (bid !== undefined) bidByProduct.set(pid, bid);
+      }
+    }
+
+    let usd = 0;
+    let pricedCount = 0;
+    for (const [pid, qty] of qtyByProduct) {
+      const bid = bidByProduct.get(pid);
+      if (bid === undefined || !(bid > 0) || !(qty > 0)) continue;
+      usd += qty * bid;
+      pricedCount++;
+    }
+    return { usd, pricedCount };
+  }
+
+  /**
+   * Fetch best-bid USD prices for a set of product_ids in one best_bid_ask call.
+   * Returns product_id → best-bid; products with no positive bid are omitted.
+   * Throws if the request fails (caller decides batch-vs-single fallback). No
+   * retry: pricing is best-effort and recomputed each getAccount, and retrying a
+   * 400 invalid-product just wastes calls.
+   */
+  private async fetchBestBids(productIds: string[]): Promise<Map<string, number>> {
+    const qs = productIds.map(p => `product_ids=${encodeURIComponent(p)}`).join("&");
+    const data = await this.withRetry(
+      () => this.get<{ pricebooks: Array<{ product_id: string; bids: CbLevel[]; asks: CbLevel[] }> }>(
+        `/api/v3/brokerage/best_bid_ask?${qs}`,
+      ),
+      1, 0, "priceHoldings",
+    );
+    const out = new Map<string, number>();
+    for (const pb of data.pricebooks ?? []) {
+      const bid = parseFloat(pb.bids?.[0]?.price ?? "");
+      if (Number.isFinite(bid) && bid > 0) out.set(pb.product_id, bid);
+    }
+    return out;
   }
 
   /**

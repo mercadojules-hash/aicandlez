@@ -111,3 +111,39 @@ notional) only when no live default connection.
 - Equity is per-user **isDefault** connection only. A user with two live
   connections (e.g. Kraken default + Coinbase non-default) is sized off the
   default/active exchange; `user_settings.active_runtime_exchange` mirrors it.
+
+# Option A (APPROVED): Coinbase equity = TRUE total account value
+
+`CoinbaseAdapter.getAccount()` now sets `totalEquityUSD = USD cash + USDC +
+priced non-USD crypto holdings`, and `usdBreakdown` carries a numeric `holdings`
+field. `riskGate.readUserLiveEquity` returns `acct.totalEquityUSD` directly
+whenever `usdBreakdown.holdings` is numeric (the Coinbase capability marker),
+bypassing the legacy `priceUserLiveAccount` repricer. Kraken (no `holdings`
+field) stays on the legacy path, untouched.
+
+**Why:** `priceUserLiveAccount` builds an UNAUTHENTICATED adapter → Coinbase
+`best_bid_ask` 401s → all non-USD crypto priced at $0 → equity collapses to
+cash-only. Then `freeCapital = equity − openNotional − reserve` subtracts the
+notional of deployed capital that was never counted in equity → free capital
+drains ~2× too fast (double-count). Pricing holdings INTO equity fixes it.
+
+**How to apply / invariants:**
+- Holdings are marked at **best-BID** (conservative, never overstates), priced
+  via the AUTHENTICATED `best_bid_ask`. One batched call; Coinbase 400s the whole
+  batch if ANY `product_id` is delisted/invalid (e.g. CLV-USD), so on batch
+  failure it falls back to per-product pricing — a bad id drops only itself.
+- **Degrades SAFE:** any unpriceable asset is skipped (under-report, never
+  throw); a full `best_bid_ask` outage → holdings=0 → equity = cash-only (the
+  old conservative number), never an overstatement.
+- Equity intentionally now exceeds deployable USD cash (that older "overstates
+  deployable USD" bullet above is now the DELIBERATE Option-A tradeoff): equity
+  reflects total account value for the free-capital gate; a BUY still needs
+  USD/USDC and can still fail INSUFFICIENT_FUND when the account is mostly coins.
+  That is expected — Option A fixed sizing double-count, NOT the currency mix.
+- Cost: `getAccount()` now adds pricing call(s) on every caller (balance polls,
+  reconciler, risk gate). Acceptable at current scale; if rate-limit pressure
+  shows up, add a short per-connection TTL cache or a balance-only fast path.
+- Did NOT implement depth/order-book-walked liquidation valuation (architect
+  raised it): best-bid single-price marking is already conservative and
+  consistent with how the rest of the system marks equity; depth-walking is out
+  of scope for Option A.
