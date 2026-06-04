@@ -1,0 +1,65 @@
+Production Audit Request – teedelgado@gmail.com Coinbase $50 Test
+
+We changed teedelgado@gmail.com from $20 entries to $50 entries approximately 8+ hours ago.
+
+I need a production-only audit using actual database values and live execution logs.
+
+Please answer the following:
+
+1. Have any Coinbase trades actually opened at $50 since the change?
+   - List every trade opened after the sizing change.
+   - Include:
+     - Symbol
+     - Timestamp
+     - Intended position size
+     - Actual executed size
+     - Exchange
+     - Status
+
+2. If ZERO $50 trades have opened:
+   - Explain exactly why.
+   - Show the specific gate preventing execution.
+   - Include counts for:
+     - Confidence gate
+     - Risk gate
+     - Exchange allocation gate
+     - Capital gate
+     - Symbol disabled gate
+     - Any other execution blockers
+
+3. Verify the current live settings for teedelgado@gmail.com:
+   - Coinbase entry size
+   - Coinbase max positions
+   - Coinbase open positions
+   - Coinbase available slots
+   - Coinbase available capital
+   - Coinbase category allocation settings
+
+4. Verify whether the system is currently attempting to create $50 trades.
+   - If signals pass execution, would the next Coinbase trade be:
+     - $10
+     - $20
+     - $50
+     - $100
+   - Show the exact value being read from production.
+
+5. Search execution logs from the last 8 hours and identify:
+   - Every signal that passed confidence.
+   - Every signal that reached execution.
+   - Every signal that was rejected.
+   - Exact rejection reason for each.
+
+6. Determine whether there is any remaining side effect from:
+   - XLM zombie positions
+   - allocation cache
+   - reserve calculations
+   - free capital calculations
+   - exchange allocation calculations
+
+7. Confirm whether any code path is still referencing the old $20 sizing configuration.
+
+Most important question:
+
+If a qualifying Coinbase signal arrived right now for teedelgado@gmail.com, would the system open a $50 position?
+
+Answer YES or NO and provide the exact production evidence supporting the answer.
