@@ -1,0 +1,163 @@
+PRODUCTION AUDIT – EXECUTION, SIZING, HOLD TIME, AND VISIBILITY
+
+Before making any changes, perform a READ-ONLY production audit and provide evidence.
+
+Issue #1 – 1-Hour Max Hold Verification
+
+The LIVE max-hold was changed from 6h to 1h.
+
+Verify:
+
+Is production actually using 1 hour right now?
+How many positions have opened since deployment?
+For each position:
+Open time
+Current age
+Expected forced-close time
+Are any positions exceeding 1 hour?
+Are there any code paths, overrides, account settings, exchange settings, or user-specific settings that can bypass the 1-hour EXIT_DEFAULTS value?
+
+Provide production evidence.
+
+Issue #2 – Coinbase $50 Override Verification
+
+The account has:
+
+Coinbase override = $50
+Kraken = default
+Global size = $20
+
+Previous audit showed:
+
+Coinbase trades still executing at $20
+Kraken trades still executing at $20
+
+Verify:
+
+Is Coinbase currently executing at:
+$10
+$20
+$50
+some other amount
+Show the last 50 Coinbase fills:
+timestamp
+symbol
+intended size
+actual executed size
+Show the last 50 Kraken fills:
+timestamp
+symbol
+intended size
+actual executed size
+If Coinbase override is still ignored:
+identify exact code path
+identify exact root cause
+provide fix plan
+
+Do not implement yet.
+
+Issue #3 – Trade Volume Bottleneck Analysis
+
+We expected trade volume to increase after:
+
+reducing max hold from 24h → 6h
+reducing max hold from 6h → 1h
+
+Current trade counts appear lower than expected.
+
+Provide production evidence for the last 24 hours:
+
+Total signals generated
+Passed confidence
+Passed MTF
+Passed volume
+Trade attempts
+Filled trades
+Rejected trades
+
+Break out separately:
+
+Coinbase
+Kraken
+
+Then determine:
+
+What is currently the #1 bottleneck?
+
+Rank:
+
+Confidence gate
+MTF gate
+Volume gate
+Risk engine
+Max positions
+Buying power
+Long-only restrictions
+Short rejections
+Exchange limitations
+Any other bottleneck
+
+Provide percentages.
+
+Issue #4 – Operator Visibility Deficiency
+
+Currently there is no way to verify from the dashboard:
+
+actual per-trade size
+exchange-specific size
+override status
+active hold time
+
+without asking engineering.
+
+Provide implementation plan for UI visibility:
+
+For each exchange show:
+
+Coinbase:
+
+Trade Size = $X
+Hold Time = X min
+Override Active = Yes/No
+
+Kraken:
+
+Trade Size = $X
+Hold Time = X min
+Override Active = Yes/No
+
+Operator must be able to see these values directly from the dashboard without database access.
+
+Provide proposed UI location and screenshots/mockup description.
+
+Issue #5 – Trust Verification Audit
+
+We have identified multiple cases where previous fixes were reported as complete but later audits showed:
+
+feature not active
+override not applied
+runtime behavior differed from expected behavior
+
+Perform a production verification audit.
+
+For every critical execution setting currently in production report:
+
+Configured value
+Runtime value
+Source file
+Override source
+Effective value being used by live trades
+
+Include:
+
+SL
+TP
+Trailing stop
+Max hold
+Trade size
+Coinbase override
+Kraken override
+Confidence floor
+MTF settings
+
+The goal is to identify any disconnect between configured settings and actual runtime behavior.
