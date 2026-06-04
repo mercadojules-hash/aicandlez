@@ -259,10 +259,30 @@ export class CoinbaseAdapter extends BaseExchangeAdapter {
   async getAccount(): Promise<StandardAccount> {
     if (!this.isConfigured()) return emptyAccount("Coinbase");
     this.checkRequestRateLimit();
-    const data = await this.withRetry(
-      () => this.signedGet<{ accounts: CbAccount[] }>("/api/v3/brokerage/accounts"),
-      3, 500, "getAccount",
-    );
+    // Coinbase auto-provisions a wallet account per supported asset (200+), and
+    // `GET /api/v3/brokerage/accounts` paginates (default ~49/page, cursor-based).
+    // A SINGLE un-paginated fetch silently dropped accounts beyond the first
+    // page — most damagingly the USD FIAT account (fiat sorts after crypto), so
+    // `cash` resolved to 0 and a real $612 USD wallet read as ~$0 deployable
+    // equity. We now walk the cursor to completion (page size 250) so every
+    // account — fiat included — is summed. Bounded page cap is a runaway guard.
+    const allAccounts: CbAccount[] = [];
+    let cursor: string | undefined;
+    const seenCursors = new Set<string>(); // cycle guard: stop if Coinbase repeats a cursor
+    const MAX_PAGES = 40; // 40 × 250 = 10,000 accounts ceiling
+    for (let page = 0; page < MAX_PAGES; page++) {
+      const qs = `?limit=250${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`;
+      const data = await this.withRetry(
+        () => this.signedGet<{ accounts: CbAccount[]; has_next?: boolean; cursor?: string }>(
+          `/api/v3/brokerage/accounts${qs}`,
+        ),
+        3, 500, "getAccount",
+      );
+      for (const acc of data.accounts ?? []) allAccounts.push(acc);
+      if (!data.has_next || !data.cursor || seenCursors.has(data.cursor)) break;
+      seenCursors.add(data.cursor);
+      cursor = data.cursor;
+    }
     const balances: Record<string, ReturnType<typeof emptyAccount>["balances"][string]> = {};
 
     // Coinbase users commonly park trading capital in USDC rather than USD
@@ -282,7 +302,7 @@ export class CoinbaseAdapter extends BaseExchangeAdapter {
     let cash             = 0;
     let stablecoin       = 0;
     const stablecoinHit: Set<string> = new Set();
-    for (const acc of data.accounts ?? []) {
+    for (const acc of allAccounts) {
       const asset  = acc.currency;
       const avail  = parseFloat(acc.available_balance.value);
       const hold   = parseFloat(acc.hold.value);
