@@ -6290,54 +6290,72 @@ export function PortalCustomerShell({ operatorPreview = false }: { operatorPrevi
             rgba(0,0,0,0.78) 100%
           );
         }
-        /* Phase 8.1 — TEN-ROW VIEWPORT LOCK (customer /portal only).
-           Each battlefield column (MAJORS + ALTS) shows exactly the
-           top ~10 conviction-ranked rows before internal scroll. Was
-           maxHeight:940 in SignalsRow.tsx (shared with /command), which
-           pushed the right-rail ACCOUNT / LIVE TRADES / TRADE HISTORY
-           well below the fold on 13–15" laptop heights and buried the
-           account telemetry. Override is scoped to
-           .cd-customer-battlefield-matrix .blotter-scroll so /command
-           keeps its 940px height untouched (admin operators want to
-           see the full universe at a glance, customers want focus).
-           Phase 8.1 follow-up — production measurement showed the
-           original 72px row estimate was wrong; the actual rendered
-           SignalRow (confidence ring + mini sparkline + BUY/SELL
-           controls + padding) lands closer to ~108-118px per row, so
-           780px was only clearing ~6 visible rows. 10 rows × ~115px
-           + 2 GroupDividers (~30px each, LONG SETUPS / SHORT SETUPS)
-           ≈ 1210px. Cap raised to 1220px so 10 full rows render
-           cleanly before scroll engages, with a hair of breathing
-           room. Confidence DESC sort + 5pt bucket stability guard
-           upstream remain authoritative for which rows make the cut.
-           On ≤720px (single-column matrix) the cap drops to 1080px
-           so the stacked phone viewport still shows ~9 rows without
-           dominating the screen. Virtualization / DOM-keeping behavior
-           in SignalRow is unchanged — only the visible viewport is
-           constrained.
+        /* FILL-TO-RAIL (customer /portal only, desktop two-column layout).
+           The dual crypto matrix sits in a grid cell that alignItems:stretch
+           (outer .cd-customer-battlefield-grid) stretches to the height of
+           the RIGHT RAIL (account hero + LIVE TRADES + TRADE HISTORY).
+           Previously each panel's .blotter-scroll was capped at
+           calc(100dvh - 200px) and the columns kept their natural (shorter)
+           height, so a large black gap opened below the cards down to the
+           bottom of the stretched cell.
 
-           UPDATE — DYNAMIC VIEWPORT SIZING. The fixed 1220px cap (~10 rows)
-           left tall monitors with one column-height regardless of available
-           space and short laptops with a hard scroll. The column now sizes
-           to the viewport: calc(100vh - 200px) lets the matrix grow to use
-           whatever vertical room the screen offers (a 1440–4K monitor clears
-           ~14-15+ conviction-ranked rows before any scroll), while a
-           min-height floor keeps roughly the prior ~8-10 rows on a 13–15"
-           laptop so the right-rail account/trades telemetry stays readable.
-           The 200px offset reserves the top brand header + portal pill strip
-           + liquidity guard strip. Each SignalRow still renders ~108-118px;
-           row count is now a function of the live viewport, not a constant.
-           Confidence DESC sort + 5pt bucket stability guard upstream remain
-           authoritative for which rows surface first. */
+           Fix: make the matrix a flex row of two columns, and host each
+           panel inside a position:relative column whose panel is
+           position:absolute (inset:0). Because the scrollers are taken out
+           of flow, the matrix contributes ~0 intrinsic height to the outer
+           grid row, so the RAIL (aside) drives the row height and the matrix
+           columns stretch to match it — the matrix bottom tracks the rail
+           bottom no matter how many cards exist. All cards still render (no
+           slice); each column's .blotter-scroll fills its column and scrolls
+           internally. Scoped to .cd-customer-battlefield-matrix, so
+           /command's shared SignalsRow (no wrapper class) is byte-identical. */
+        .cd-customer-battlefield-matrix {
+          display: flex !important;
+          min-height: 0;
+          align-items: stretch;
+        }
+        .cd-customer-battlefield-matrix > .cd-customer-majors-panel,
+        .cd-customer-battlefield-matrix > .cd-customer-alts-panel {
+          flex: 1 1 0;
+          min-width: 0;
+          min-height: 0;
+          position: relative;
+        }
+        .cd-customer-battlefield-matrix > .cd-customer-majors-panel > div,
+        .cd-customer-battlefield-matrix > .cd-customer-alts-panel > div {
+          position: absolute;
+          inset: 0;
+          display: flex;
+          flex-direction: column;
+          min-height: 0;
+        }
         .cd-customer-battlefield-matrix .blotter-scroll {
-          /* dvh (not vh) so mobile/tablet browser chrome — the collapsing
-             address bar — doesn't over- or under-size the column and break
-             the "fits without scrolling" target. */
-          max-height: calc(100dvh - 200px) !important;
-          min-height: 880px !important;
+          flex: 1 1 auto;
+          min-height: 0;
+          max-height: none !important;
           overflow-y: auto !important;
         }
+        /* Tablet/phone: the matrix stacks ABOVE the rail (single-column outer
+           grid ≤1024px), so there is no rail to fill to. Drop the absolute
+           positioning back to normal flow and re-cap the scroll body to a
+           viewport-relative height with internal scroll, so a tall card list
+           doesn't collapse (absolute → 0 height) or run multi-thousand-px. */
+        @media (max-width: 1024px) {
+          .cd-customer-battlefield-matrix > .cd-customer-majors-panel,
+          .cd-customer-battlefield-matrix > .cd-customer-alts-panel,
+          .cd-customer-battlefield-matrix > .cd-customer-majors-panel > div,
+          .cd-customer-battlefield-matrix > .cd-customer-alts-panel > div {
+            position: static;
+          }
+          .cd-customer-battlefield-matrix .blotter-scroll {
+            flex: 0 0 auto;
+            max-height: calc(100dvh - 200px) !important;
+          }
+        }
         @media (max-width: 720px) {
+          .cd-customer-battlefield-matrix {
+            flex-direction: column;
+          }
           .cd-customer-battlefield-matrix .blotter-scroll {
             max-height: 1080px !important;
             min-height: 0 !important;
@@ -7267,7 +7285,7 @@ export function PortalCustomerShell({ operatorPreview = false }: { operatorPrevi
         >
           <div
             className="grid cd-customer-battlefield-matrix"
-            style={{ gridTemplateColumns: "1fr 1fr", gap: 10, alignItems: "start" }}
+            style={{ gridTemplateColumns: "1fr 1fr", gap: 10, alignItems: "stretch" }}
           >
             {/* TOP CRYPTO SIGNALS — sorted LONG-then-SHORT by AI
                 confidence DESC inside SignalsRow (5pt bucket stability
@@ -7294,8 +7312,13 @@ export function PortalCustomerShell({ operatorPreview = false }: { operatorPrevi
             <div className="cd-customer-majors-panel">
               <CryptoMajorsSignalsPanel engine={engineStatus as unknown as InstitutionalEngineStatus | undefined} dominantTitle allowedSymbols={panelAllowedSymbols} />
             </div>
-            {/* ALTS & MEMECOINS — same sort contract. */}
-            <CryptoAltsMemesPanel    engine={engineStatus as unknown as InstitutionalEngineStatus | undefined} dominantTitle allowedSymbols={panelAllowedSymbols} />
+            {/* ALTS & MEMECOINS — same sort contract. Wrapper class mirrors
+                `.cd-customer-majors-panel` so the FILL-TO-RAIL CSS can treat
+                both columns identically (position:relative host for the
+                absolutely-filled scroller). */}
+            <div className="cd-customer-alts-panel">
+              <CryptoAltsMemesPanel    engine={engineStatus as unknown as InstitutionalEngineStatus | undefined} dominantTitle allowedSymbols={panelAllowedSymbols} />
+            </div>
           </div>
 
           <aside className="cd-customer-battlefield-aside" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
