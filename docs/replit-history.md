@@ -65,3 +65,66 @@ each item became:
   sizing + allocation), applied operationally after deploy — not a code change.
 
 The original P1–P6 session-plan text is superseded; do not re-execute it.
+
+---
+
+## Archived from replit.md (trim — 2026-06-05)
+
+Deep implementation narration moved out of the live README. Current behavior
+lives in code + `.agents/memory/` topic files; this is historical context.
+
+### Customer live-execution gate stack (full prose)
+`placeLiveAutoOrderForUser` is the single customer chokepoint for both the AI
+fan-out and manual `/api/user/live-order` (operators bypass). Ordered live-only
+gates: 0UNI (`symbol_not_in_universe`); 0SYM per-symbol disable list + size
+multiplier (`symbol_disabled`, SoT `symbolPolicy.ts`); 0SHORT spot-short block
+(`spot_short_blocked`, NEW SELL entries only, pre-broker, no notification; venue
+must be in `SHORT_CAPABLE_EXCHANGES` env allowlist — default empty = no shorting;
+closes via `placeLiveCloseOrderForUser` unaffected); 0TREND SELL-only 1H-trend
+filter (`sell_blocked_bullish_1h`, behind `LIVE_BLOCK_SELLS_IN_BULLISH_1H`,
+default OFF); 0c platform concurrent-cap (`concurrent_live_cap_reached`); risk
+gates; 0ALLOC category-allocation soft-cap (falls back to
+`DEFAULT_CATEGORY_ALLOCATION` majors-heavy when no explicit allocation); 0CASH
+pre-flight buying-power probe (`cash_unavailable`, BUY only, after adapter build
+/ before submit; `usdBreakdown.cash`+stablecoin, fallback quote-asset free
+balance; fails OPEN on probe error, no notification). Paper/sim never routes here.
+
+### SELL-only 1H-trend filter (full prose)
+When `LIVE_BLOCK_SELLS_IN_BULLISH_1H=true`, a new customer LIVE SELL (short) is
+blocked while the engine's current 1H trend (EMA9 vs EMA21, read from
+`engineStats.symbolBreakdowns`, not recomputed) is `bullish`; SELL allowed on
+`bearish`/`unknown`. BUY unchanged. Default OFF = legacy. Block logs carry user,
+exchange, symbol, confidence, 1H trend, reason `SELL_BLOCKED_BULLISH_1H`.
+
+### LIVE stop-loss stabilization (full prose)
+2% stop LEVEL unchanged; LIVE TRIGGER de-noised via stabilization grace +
+consecutive-breach confirm, catastrophic-move override fast-path
+(`runHardStopMonitor`). Knobs: `LIVE_STOP_STABILIZATION_MS` (90000),
+`LIVE_STOP_CATASTROPHIC_MULT` (2.5×), `LIVE_STOP_IMMEDIATE_FRACTION` (must sit
+inside the catastrophic band). Paper SL untouched.
+
+### Active live experiments (as of trim)
+- TP10/Trail5 live exit test (ACTIVE — do not revert without sign-off):
+  `EXIT_DEFAULTS` TP 10% / trailing 5%; SL 2% unchanged; max-hold lowered
+  24h→6h→1h universal. Live on the two internal QA accounts (teedelgado pro,
+  info@mixtapepsd starter), both pin `trailing_stop_percent=5` explicitly.
+  Revert target = TP4 / trail2 (recorded in `exitConfig.ts`).
+- Per-user LIVE max-hold broker-reject zombies self-heal (DEPLOYED): detail in
+  memory `live-maxhold-broker-close-zombies.md` + `balance-aware-live-close.md`.
+- Live SHORTs not filtered differently from BUYs in prod (0TREND unset → OFF;
+  BUY/SELL ~50/50; allocation by asset category, never by side).
+
+### Active customer portal architecture (full prose)
+Operator → customer-view override: an admin can render the customer shell at
+`/portal` via the floating "View as Customer" toggle (localStorage
+`aicandlez:operator-customer-view` or `?previewCustomer=1|0`);
+`PortalCustomerShell` takes `operatorPreview` to suppress its defense-in-depth
+`isAdmin` render refusal. Clerk role, `/command`, all server role checks
+untouched (no escalation). `PortalCustomerShell` owns shared `nowShell` 1Hz
+tick, lifted `/api/engine/status` query (`["engine-status-portal"]`),
+`MarketPulse` view-model, `signalsPerMin` (ref-anchored, 15s warmup). Animation
+policy: every motion answers "what intelligence state is this communicating?",
+gated on `isReady`/`isFreshSignal`(<30s)/`isLiveTick`(<10s); idle systems stay
+still. Polish tokens: `T.TRACK_LABEL=0.10em`, `T.TRACK_TITLE=0.18em`,
+`T.TRACK_DISPLAY=-0.04em`, `T.TX_FAST=120ms`, `T.TX_MED=200ms`; `.cd-scroll` =
+institutional thin neon scrollbar.
