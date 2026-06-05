@@ -25,11 +25,14 @@ export type AttributionReason =
   | "slot_cap"     // concurrent / plan / per-exchange slot cap reached
   | "liquidity"    // liquidity cushion protection paused new entries
   | "allocation"   // category allocation weight reached for this category
+  | "spot_short_blocked" // spot-only venue cannot open a short (SELL) entry
+  | "cash_unavailable"   // insufficient deployable USD for the BUY notional
   | "other";       // anything else (config state, universe mismatch, etc.)
 
 export const ATTRIBUTION_REASONS: readonly AttributionReason[] = [
   "confidence", "duplicate", "cooldown", "risk", "exchange",
-  "slot_cap", "liquidity", "allocation", "other",
+  "slot_cap", "liquidity", "allocation", "spot_short_blocked",
+  "cash_unavailable", "other",
 ] as const;
 
 export interface AttributionAttempt {
@@ -55,7 +58,8 @@ const store = new Map<string, UserAttributionState>();
 function emptyByReason(): Record<AttributionReason, number> {
   return {
     confidence: 0, duplicate: 0, cooldown: 0, risk: 0, exchange: 0,
-    slot_cap: 0, liquidity: 0, allocation: 0, other: 0,
+    slot_cap: 0, liquidity: 0, allocation: 0, spot_short_blocked: 0,
+    cash_unavailable: 0, other: 0,
   };
 }
 
@@ -88,6 +92,10 @@ export function classifyErrorCode(errorCode: string | undefined | null): Attribu
       return "liquidity";
     case "allocation_limit":
       return "allocation";
+    case "spot_short_blocked":
+      return "spot_short_blocked";
+    case "cash_unavailable":
+      return "cash_unavailable";
     case "exchange_reject":
     case "unsupported_symbol":
     case "unsupported":

@@ -270,12 +270,18 @@ Admin switches via `CommandBar` (`POST /api/exchange/select` →
 customer chokepoint for both the AI fan-out and manual `/api/user/live-order`;
 operators bypass these gates). In order, the live-only gates include: 0UNI
 (`symbol_not_in_universe`), **0SYM** per-symbol disable list + size multiplier
-(`symbol_disabled`, SoT `symbolPolicy.ts`), **0TREND** SELL-only 1H-trend filter
-(`sell_blocked_bullish_1h`, behind `LIVE_BLOCK_SELLS_IN_BULLISH_1H`, default
-OFF), 0c platform concurrent-cap (`concurrent_live_cap_reached`), risk gates,
-and **0ALLOC** category-allocation soft-cap (falls back to
-`DEFAULT_CATEGORY_ALLOCATION` majors-heavy when an account has no explicit
-allocation). Paper/sim never routes through this function.
+(`symbol_disabled`, SoT `symbolPolicy.ts`), **0SHORT** spot-short block
+(`spot_short_blocked`, NEW SELL entries only, pre-broker, no notification;
+venue must be in `SHORT_CAPABLE_EXCHANGES` env allowlist — default empty = no
+shorting; closes via `placeLiveCloseOrderForUser` are unaffected), **0TREND**
+SELL-only 1H-trend filter (`sell_blocked_bullish_1h`, behind
+`LIVE_BLOCK_SELLS_IN_BULLISH_1H`, default OFF), 0c platform concurrent-cap
+(`concurrent_live_cap_reached`), risk gates, **0ALLOC** category-allocation
+soft-cap (falls back to `DEFAULT_CATEGORY_ALLOCATION` majors-heavy when an
+account has no explicit allocation), and **0CASH** pre-flight buying-power
+probe (`cash_unavailable`, BUY only, after adapter build / before submit;
+`usdBreakdown.cash`+stablecoin, fallback quote-asset free balance; **fails OPEN**
+on probe error, no notification). Paper/sim never routes through this function.
 
 **SELL-only 1H-trend filter (approved strategy change):** when
 `LIVE_BLOCK_SELLS_IN_BULLISH_1H=true`, a new customer LIVE **SELL** (short) is

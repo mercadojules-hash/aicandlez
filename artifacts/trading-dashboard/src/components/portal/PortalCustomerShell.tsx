@@ -5172,21 +5172,20 @@ function CustomerBlotterShell({
       background: N.SURFACE_1, fontFamily: N.FONT_MONO, overflow: "hidden",
       // Phase 8.1 — AI ACTIVITY panel was removed from the right rail so the
       // customer surface stays focused on SIGNALS → ACCOUNT → TRADES (not
-      // backend engine telemetry). Vertical real estate the feed used to
-      // consume is redistributed here: 360 → 720 gives LIVE TRADES + TRADE
-      // HISTORY ~10 visible rows each before internal scroll (matches the
-      // battlefield column row-cap, so the eye reads the entire rail at
-      // the same density). /command is untouched — this shell is only
-      // mounted by PortalCustomerShell.
+      // backend engine telemetry). /command is untouched — this shell is
+      // only mounted by PortalCustomerShell.
       //
-      // UPDATE — flex-fill. With the battlefield section now `stretch`-aligned
-      // and viewport-sized, the rail is as tall as the matrix. `flex: 1` +
-      // `minHeight: 0` lets LIVE TRADES and TRADE HISTORY share the remaining
-      // vertical space equally (their bodies scroll internally), so the rail
-      // bottom aligns with the matrix instead of leaving dead space. The
-      // maxHeight is raised to a high ceiling so it never caps the fill on
-      // tall monitors but still bounds the stacked mobile/tablet grid layout.
-      maxHeight: 1100, flex: 1, minHeight: 0, boxShadow: `inset 0 0 24px ${accent}08`,
+      // UPDATE — content-sized, 10-row cap. The earlier `flex: 1` fill made
+      // each blotter stretch to the full battlefield height, which is far
+      // taller than the realistic rail content (account + a handful of
+      // trades). On a typical session — few or no open positions — that left
+      // LIVE TRADES and TRADE HISTORY as giant empty black boxes down the
+      // right rail. The shell now sizes to its content and the scroll body is
+      // capped at ~10 rows (see body maxHeight below); beyond that it scrolls
+      // internally via `.cd-scroll`. The MAJORS/ALTS matrix columns remain the
+      // tallest elements and extend to the bottom; the rail simply ends where
+      // its content ends, eliminating the dead black space.
+      flex: "0 0 auto", minHeight: 0, boxShadow: `inset 0 0 24px ${accent}08`,
     }}>
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -5215,7 +5214,10 @@ function CustomerBlotterShell({
         <span style={{ textAlign: "right" }}>{headerRight}</span>
         <span style={{ textAlign: "right" }}>PNL</span>
       </div>
-      <div style={{ flex: 1, overflowY: "auto" }} className="cd-scroll">
+      {/* ~10-row visible cap, then internal scroll. 10 rows × ~50px
+          (row padding + symbol line + origin chip) ≈ 500px; 520 leaves a
+          hair of breathing room so the 10th row is never clipped. */}
+      <div style={{ maxHeight: 520, overflowY: "auto" }} className="cd-scroll">
         {!hasRows ? (
           <div style={{
             padding: 32, fontSize: 11, color: N.TEXT_3,

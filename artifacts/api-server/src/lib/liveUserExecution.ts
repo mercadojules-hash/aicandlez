@@ -114,7 +114,7 @@ export interface LiveUserOrderResult {
   dryRun?:         boolean;
   /** True when the order was routed through the exchange's public sandbox. */
   sandbox?:        boolean;
-  errorCode?:      "no_connection" | "not_trade_authorized" | "decrypt_failed" | "unsupported" | "unsupported_symbol" | "symbol_not_in_universe" | "symbol_disabled" | "sell_blocked_bullish_1h" | "no_sandbox" | "price_unavailable" | "exchange_reject" | "trade_limit_exhausted" | "user_status_blocked" | "customer_live_execution_disabled" | "user_ai_disabled" | "concurrent_live_cap_reached" | "risk_max_per_trade" | "risk_max_simultaneous" | "risk_max_allocation" | "risk_reserve_cash_breach" | "risk_no_equity" | "ai_disclaimer_not_accepted" | "low_confidence_signal" | "volume_safety_gate" | "liquidity_protected" | "plan_max_positions_reached" | "allocation_limit";
+  errorCode?:      "no_connection" | "not_trade_authorized" | "decrypt_failed" | "unsupported" | "unsupported_symbol" | "symbol_not_in_universe" | "symbol_disabled" | "sell_blocked_bullish_1h" | "no_sandbox" | "price_unavailable" | "exchange_reject" | "trade_limit_exhausted" | "user_status_blocked" | "customer_live_execution_disabled" | "user_ai_disabled" | "concurrent_live_cap_reached" | "risk_max_per_trade" | "risk_max_simultaneous" | "risk_max_allocation" | "risk_reserve_cash_breach" | "risk_no_equity" | "ai_disclaimer_not_accepted" | "low_confidence_signal" | "volume_safety_gate" | "liquidity_protected" | "plan_max_positions_reached" | "allocation_limit" | "spot_short_blocked" | "cash_unavailable";
   error?:          string;
 }
 
@@ -165,6 +165,37 @@ export function isSellBlockedInBullish1h(): boolean {
   return /^(true|1|yes|on)$/i.test(
     (process.env["LIVE_BLOCK_SELLS_IN_BULLISH_1H"] ?? "").trim(),
   );
+}
+
+/**
+ * Spot short-entry capability (gate 0SHORT).
+ *
+ * Every customer exchange adapter in this codebase executes against the venue's
+ * SPOT order book. A spot market SELL can only sell base currency the account
+ * already holds — it can NOT open a new short position. New customer LIVE SELL
+ * *entries* are therefore structurally impossible to fill on spot: they either
+ * reject with INSUFFICIENT_FUND (no base held) or, worse, liquidate base held
+ * by an unrelated long. (Production audit: spot SELL entries were the dominant
+ * source of broker rejects + `live_trade_failed` notifications, with a ~0% true
+ * short fill rate across Coinbase AND Kraken.)
+ *
+ * Catalog `features` advertises what the EXCHANGE supports (some list
+ * futures/perps), but our adapters do NOT trade those venues on margin — so
+ * short capability is gated by an explicit env allowlist, NOT by catalog
+ * features. Default empty ⇒ no venue supports short entries ⇒ all new live SELL
+ * entries are blocked pre-broker. To re-enable shorts on a venue once a
+ * margin/perps adapter exists, list its catalog id (comma-separated,
+ * case-insensitive) in `SHORT_CAPABLE_EXCHANGES`.
+ *
+ * Scope: customer per-user OPEN path only (`placeLiveAutoOrderForUser`). Exits
+ * route through `placeLiveCloseOrderForUser` and are never gated here, so
+ * closing / reducing an existing long is unaffected. BUY is never touched.
+ */
+export function exchangeSupportsShortEntry(exchange: string): boolean {
+  const raw = (process.env["SHORT_CAPABLE_EXCHANGES"] ?? "").trim();
+  if (!raw) return false;
+  const allow = raw.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+  return allow.includes(exchange.trim().toLowerCase());
 }
 
 /**
@@ -1723,6 +1754,28 @@ export async function placeLiveAutoOrderForUser(
     return { success: false, userId, errorCode: "no_connection", error: msg };
   }
 
+  // 1c. Spot short-entry block (gate 0SHORT). A NEW customer LIVE SELL on a
+  // spot-only venue can never open a short — reject it HERE, before any broker
+  // call, so we never burn a doomed attempt or emit a `live_trade_failed`
+  // notification. Closing/reducing an existing long is unaffected: exits route
+  // through `placeLiveCloseOrderForUser`, never this OPEN path. BUY untouched.
+  if (side === "SELL" && !exchangeSupportsShortEntry(row.exchange)) {
+    const msg = `${row.exchange} is spot-only — new short (SELL) entries cannot open a position and are blocked before submission`;
+    executionStreamBus.emitEvent({
+      type:     "order_rejected",
+      severity: "info",
+      symbol, side, mode: "live",
+      gate:     "spot_short_blocked",
+      reason:   "spot_short_blocked",
+      message:  msg,
+      details:  { userId, exchange: row.exchange, sizeUSD },
+    });
+    await recordExecTrace("execution_spot_short_blocked", "info", {
+      userId, symbol, side, sizeUSD, exchange: row.exchange,
+    });
+    return { success: false, userId, exchange: row.exchange, errorCode: "spot_short_blocked", error: msg };
+  }
+
   // 1b. Trade-authorization gate (defense-in-depth at the real-money
   // chokepoint). Runtime-state resolution + the cohort writeback + PUT
   // /user/settings now all exclude trade-unauthorized venues, but a row
@@ -1915,6 +1968,53 @@ export async function placeLiveAutoOrderForUser(
     const msg = err instanceof Error ? err.message : String(err);
     await emitFailureNotification(userId, symbol, side, msg, row.exchange);
     return { success: false, userId, exchange: row.exchange, errorCode: "unsupported", error: msg };
+  }
+
+  // 0CASH. Pre-flight buying-power check (BUY only, gate 0CASH). Skip the order
+  // entirely when the account's deployable USD (cash + USD-pegged stablecoin)
+  // cannot cover the order notional — the dominant cause of broker
+  // INSUFFICIENT_FUND rejects + `live_trade_failed` notifications once cash is
+  // fully deployed. This is an OPTIMIZATION gate, not a safety gate: a probe
+  // failure fails OPEN (the broker still enforces the real balance), and no
+  // failure notification is emitted on the skip.
+  if (side === "BUY") {
+    try {
+      const acct = await adapter.getAccount();
+      let buyingPower: number;
+      if (
+        acct.usdBreakdown &&
+        Number.isFinite(acct.usdBreakdown.cash) &&
+        Number.isFinite(acct.usdBreakdown.stablecoin)
+      ) {
+        buyingPower = acct.usdBreakdown.cash + acct.usdBreakdown.stablecoin;
+      } else {
+        const quoteAsset = deriveQuoteAsset(symbol);
+        const qb = acct.balances[quoteAsset];
+        buyingPower = qb && Number.isFinite(qb.free) ? qb.free : 0;
+      }
+      if (buyingPower < sizeUSD) {
+        const msg = `Insufficient buying power on ${row.exchange}: $${buyingPower.toFixed(2)} available < $${sizeUSD.toFixed(2)} order — BUY skipped before submission`;
+        executionStreamBus.emitEvent({
+          type:     "order_rejected",
+          severity: "info",
+          symbol, side, mode: "live",
+          gate:     "cash_unavailable",
+          reason:   "cash_unavailable",
+          message:  msg,
+          details:  { userId, exchange: row.exchange, sizeUSD, buyingPower },
+        });
+        await recordExecTrace("execution_cash_unavailable", "info", {
+          userId, symbol, side, sizeUSD, exchange: row.exchange, buyingPower,
+        });
+        return { success: false, userId, exchange: row.exchange, errorCode: "cash_unavailable", error: msg };
+      }
+    } catch (err) {
+      // Probe failure → fail OPEN. The broker still enforces the real balance.
+      logger.warn(
+        { userId, exchange: row.exchange, symbol, err: err instanceof Error ? err.message : String(err) },
+        "liveUserExecution: cash pre-flight probe failed — proceeding (broker enforces balance)",
+      );
+    }
   }
 
   // Tracks whether a real broker fill landed. Once true, a throw from any
@@ -2373,6 +2473,17 @@ function deriveBaseAsset(symbol: string): string {
     if (s.endsWith(quote) && s.length > quote.length) return s.slice(0, -quote.length);
   }
   return s;
+}
+
+// Recover the quote-currency asset key for a trading symbol (mirror of
+// `deriveBaseAsset`). Longest quote suffix first so "…USDT"/"…USDC" win over
+// "…USD". Falls back to "USD" when no known quote suffix is present.
+function deriveQuoteAsset(symbol: string): string {
+  const s = symbol.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  for (const quote of ["USDT", "USDC", "USD"]) {
+    if (s.endsWith(quote) && s.length > quote.length) return quote;
+  }
+  return "USD";
 }
 
 export async function getUserBrokerBaseBalance(

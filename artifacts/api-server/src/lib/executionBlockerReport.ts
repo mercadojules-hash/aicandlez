@@ -121,6 +121,25 @@ export const BLOCKER_META: Record<AttributionReason, BlockerMeta> = {
     action:
       "Core protection — check the connected exchange and that the symbol is tradable.",
   },
+  spot_short_blocked: {
+    reason: "spot_short_blocked",
+    label: "Spot venue — short not supported",
+    blockerClass: "safety",
+    tunableViaPreset: false,
+    explanation:
+      "Your connected exchange trades spot only, so a new short (SELL) entry cannot open a position and was skipped before submission.",
+    action:
+      "Core protection — long (BUY) entries are unaffected; shorting requires a margin/derivatives venue.",
+  },
+  cash_unavailable: {
+    reason: "cash_unavailable",
+    label: "Insufficient buying power",
+    blockerClass: "safety",
+    tunableViaPreset: false,
+    explanation:
+      "Your deployable USD (cash + USD-pegged stablecoin) could not cover the order size, so the BUY was skipped before submission.",
+    action: "Core protection — fund the account or close positions to free cash.",
+  },
   other: {
     reason: "other",
     label: "Eligibility / configuration",
