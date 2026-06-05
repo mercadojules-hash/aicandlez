@@ -423,7 +423,7 @@ priority-ordered decision tree reading `breakdowns` + `tickersData`. Logic in
 
 ## Controlled-beta operational mode
 
-- **Platform-wide concurrent live-trade cap = 20** (prod; customer side). Enforced in
+- **Platform-wide concurrent live-trade cap = 30** (prod; customer side). Enforced in
   `placeLiveAutoOrderForUser` gate 0c by counting open `sim_positions WHERE
   exchange IS NOT NULL` across all users. Admin/super-admin bypass; operator
   path (no userId) not gated here. Per-user ceilings still enforced by
