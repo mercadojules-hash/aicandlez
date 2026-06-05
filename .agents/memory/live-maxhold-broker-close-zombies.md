@@ -57,6 +57,22 @@ verified below the recorded quantity. Hard rules that must never be relaxed:
 **Why:** the original close path is gated on a real fill so realized PnL matches the broker; the
 valve only bypasses that fill when the asset provably no longer exists to fill against.
 
+**Connection-removed orphans (observed prod, now closed).** If the user DELETES the exchange
+connection, a still-open LIVE position on that venue can NEVER be closed (no credentials) AND the
+balance probe `getUserBrokerBaseBalance` returns `errorCode:"no_connection"` (no active row) →
+under the old "fail-CLOSED on unverified balance" rule it deferred forever, eating
+concurrency/deployment slots indefinitely. Fix: the monitor now treats a `no_connection` probe as
+a PERMANENT orphan (unambiguous + permanent, unlike transient `getaccount_failed`/`decrypt_failed`/
+`unsupported` which keep deferring) and reconciles it via `reconcileZombiePosition` (closeReason
+`RECONCILED_CONNECTION_REMOVED`, actualBalance null, same ZOMBIE tag → excluded from realized).
+Removing our API key never liquidates the user's real holdings — they remain under manual control
+at the exchange. **Convergence caveat:** the customer summary reads in-memory `state.positions`
+(getOrLoad caches forever, no prod eviction), so the retire only reflects in the UI once it runs
+IN the prod process (the monitor calls `reconcileZombiePosition`, which splices memory + deletes DB
++ writes audit + notification atomically). A raw out-of-process DB delete would NOT converge prod
+memory (UI stays stale + STATE_DB_DIVERGENCE error spam) → never hand-delete these; ship the code
+fix and let the in-process monitor retire them on the next deploy/restart.
+
 **Dust zombies silently eat per-exchange capacity (observed prod).** Unclosable dust rows
 (`size_usd=0`, `quantity≈1e-8`, e.g. XLMUSD) still count as OPEN `sim_positions` toward the
 per-(user,exchange) `maxPositions` cap. With a tight per-exchange cap (e.g. Coinbase max=10),

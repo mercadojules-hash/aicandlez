@@ -2459,7 +2459,7 @@ export interface BrokerBaseBalanceResult {
   baseAsset:    string;
   freeBalance:  number | null;
   totalBalance: number | null;
-  errorCode?:   "no_connection" | "decrypt_failed" | "unsupported" | "getaccount_failed";
+  errorCode?:   "connection_missing" | "connection_inactive" | "decrypt_failed" | "unsupported" | "getaccount_failed";
   error?:       string;
 }
 
@@ -2510,7 +2510,24 @@ export async function getUserBrokerBaseBalance(
     )
     .limit(1);
   if (!row) {
-    return { ...base, errorCode: "no_connection", error: `No active ${exchange} connection` };
+    // Distinguish a fully-REMOVED connection (no row at all → permanent orphan,
+    // safe for the monitor to reconcile) from a present-but-INACTIVE one (status
+    // drift / temporarily disabled → may be reactivated, so the monitor must keep
+    // deferring fail-closed, never retire a position whose assets may still exist).
+    const [anyRow] = await db
+      .select({ id: userExchangeConnectionsTable.id })
+      .from(userExchangeConnectionsTable)
+      .where(
+        and(
+          eq(userExchangeConnectionsTable.userId,   userId),
+          eq(userExchangeConnectionsTable.exchange, exchange),
+        ),
+      )
+      .limit(1);
+    if (!anyRow) {
+      return { ...base, errorCode: "connection_missing", error: `No ${exchange} connection` };
+    }
+    return { ...base, errorCode: "connection_inactive", error: `${exchange} connection not active` };
   }
 
   const creds = vault.decryptBlob(userId, row.encryptedBlob);

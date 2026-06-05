@@ -2529,10 +2529,46 @@ async function runHardStopMonitor() {
                     "[ZOMBIE_RECONCILE_SKIPPED] broker balance still covers recorded qty — keeping position",
                   );
                 }
+              } else if (probe.errorCode === "connection_missing") {
+                // PERMANENT orphan: the user fully REMOVED the exchange connection
+                // (no row at all), so this LIVE position can NEVER be closed (no
+                // credentials) and can NEVER be balance-verified (the probe needs
+                // the connection it no longer has). Without this branch it loops
+                // forever, counting toward concurrency/deployment limits.
+                // "connection_missing" is unambiguous and permanent — distinct
+                // from a present-but-inactive connection ("connection_inactive",
+                // which may be reactivated → keeps deferring below) and from
+                // transient probe failures — so we retire it locally. Any real
+                // underlying assets remain in the user's exchange account under
+                // their own manual control (removing our API key never liquidates
+                // holdings).
+                const recon = await reconcileZombiePosition({
+                  userId:           p.userId,
+                  positionId:       p.positionId,
+                  brokerError:      `exchange connection removed — ${closeResult.error ?? "broker close unreachable"}`,
+                  actualBalance:    null,
+                  recordedQuantity: p.quantity,
+                  closeReason:      "RECONCILED_CONNECTION_REMOVED",
+                });
+                if (recon.reconciled) {
+                  failedLiveCloseStreak.delete(p.positionId);
+                  logger.warn(
+                    {
+                      tag:        "ZOMBIE_RECONCILE_CONNECTION_REMOVED",
+                      userId:     p.userId,
+                      positionId: p.positionId,
+                      symbol:     p.symbol,
+                      exchange:   p.exchange,
+                    },
+                    "[ZOMBIE_RECONCILE_CONNECTION_REMOVED] retired orphaned live position — exchange connection removed (unmanageable)",
+                  );
+                }
               } else {
-                // Balance probe failed → fail-CLOSED: never reconcile without a
-                // verified balance. Keep the streak so once the probe recovers
-                // and confirms the asset is gone, reconciliation fires then.
+                // Balance probe failed for a TRANSIENT reason (the connection
+                // still exists: getaccount_failed / decrypt_failed / unsupported)
+                // → fail-CLOSED: never reconcile without a verified balance. Keep
+                // the streak so once the probe recovers and confirms the asset is
+                // gone, reconciliation fires then.
                 logger.warn(
                   {
                     tag:        "ZOMBIE_RECONCILE_DEFERRED",
