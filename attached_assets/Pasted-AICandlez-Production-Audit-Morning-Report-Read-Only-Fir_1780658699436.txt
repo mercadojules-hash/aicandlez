@@ -1,0 +1,156 @@
+AICandlez Production Audit – Morning Report (Read-Only First)
+
+Perform a read-only production audit on teedelgado@gmail.com (Coinbase live account).
+
+Do NOT make any code changes until after the report is complete.
+
+Part 1 – Execution Funnel Analysis
+
+For the last 12 hours and last 24 hours provide:
+
+Attempts
+Total attempts
+Filled
+Held Back
+Exchange Reject
+Risk Gate
+Other
+Breakdown of Held Back
+
+Specifically identify:
+
+How many are LONG entries
+How many are SHORT entries
+How many are Coinbase Spot short-entry attempts
+How many are confidence rejects
+How many are MTF rejects
+How many are volume rejects
+How many are trend rejects
+How many are other reasons
+Breakdown of Exchange Rejects
+
+Identify:
+
+INSUFFICIENT_FUND
+Spot short SELL rejection
+Symbol unsupported
+Quantity too small
+Other
+
+Provide exact counts and percentages.
+
+Part 2 – Spot Short Audit
+
+Yesterday's audit suggested most of the 579 Held Back events were Coinbase Spot short-entry attempts.
+
+Verify:
+
+Of all rejected SELL orders, how many were:
+New short-entry attempts
+Long-position exits
+If they are new short-entry attempts:
+quantify the exact count
+quantify percentage of total rejects
+Would implementing a "Spot Short Blocked" gate reduce these rejected attempts?
+Estimate the impact on:
+execution funnel
+exchange API calls
+held-back statistics
+
+No implementation yet.
+Report only.
+
+Part 3 – Position Lifecycle Audit
+
+Current account status:
+
+Open Positions
+Available Trading Cash
+Deployed Capital
+Total Account Value
+Staked Value
+
+Then provide:
+
+Last 24 Hours
+Positions Opened
+Positions Closed
+Closed by Take Profit
+Closed by Stop Loss
+Closed by Trailing Stop
+Closed by Max Hold
+Closed by Reconciliation
+
+For every Reconciliation closure:
+
+Provide:
+
+symbol
+timestamp
+reason
+broker balance at time of reconcile
+
+Determine whether reconciliations are expected or indicate a remaining issue.
+
+Part 4 – Why Only 5 Open Positions?
+
+Current dashboard shows:
+
+Max Positions = 20
+Open Positions = 5
+
+Determine the primary reason Coinbase is not filling toward 10+ positions.
+
+Rank causes from largest to smallest:
+
+Confidence filter
+MTF filter
+Volume filter
+Spot short restrictions
+Risk gate
+Available cash
+Other
+
+Provide actual counts.
+
+Do NOT speculate.
+
+Use production logs and production data.
+
+Part 5 – Recommended Fixes
+
+After the audit:
+
+List ONLY proven bottlenecks.
+
+For each bottleneck provide:
+
+root cause
+supporting evidence
+recommended fix
+expected impact
+
+Separate fixes into:
+
+Safe Fixes (can implement immediately)
+Experimental Fixes (require testing)
+Part 6 – Dashboard Layout Cleanup
+
+After the audit is complete:
+
+Provide implementation plan for:
+
+Left column extends to bottom of page
+Middle column extends to bottom of page
+Remove empty black space
+Live Trades shows maximum 10 rows with internal scrolling
+Trade History shows maximum 10 rows with internal scrolling
+Maintain responsive layout
+
+Do not implement yet.
+
+Provide implementation plan only.
+
+Return a concise executive summary first, then the full audit data and recommendations.
+
+Important: Use production logs, production database, and production execution telemetry. No assumptions. No code changes until the report is complete.
