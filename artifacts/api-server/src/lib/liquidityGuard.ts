@@ -57,7 +57,7 @@ export const PLAN_MAX_OPEN_POSITIONS: Record<CustomerPlan, number> = {
 };
 
 /** Customer trade-size presets surfaced in the PWA + Portal pickers. */
-export const ALLOWED_TRADE_SIZES = [10, 20, 50, 100] as const;
+export const ALLOWED_TRADE_SIZES = [10, 20, 50, 100, 125] as const;
 export type AllowedTradeSize = (typeof ALLOWED_TRADE_SIZES)[number];
 
 /** Default AI trade size for a brand-new customer (smallest preset). */

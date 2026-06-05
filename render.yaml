@@ -52,10 +52,10 @@ services:
         value: price_1TZPqFIzLCdrkUtzWyDLLMmA
       - key: STRIPE_PRICE_PRO_LEGACY
         value: price_1TZPqGIzLCdrkUtzMVJLcxb1
-      # Platform-wide concurrent live-trade cap (Task 2 / Q2). Code default is
-      # already 25; declared here so prod is explicit and version-tracked.
+      # Platform-wide concurrent live-trade cap. Code default is 15; declared
+      # here so prod is explicit and version-tracked.
       - key: LIVE_EXECUTION_CONCURRENT_CAP
-        value: "25"
+        value: "15"
       # GLOBAL AI-engine concurrent-position cap (Gate 1 in tradingLoop.ts).
       # Seeds settingsStore.maxActivePositions at boot. NOT a per-user/tier cap.
       # Code default is 3; raised to 12 so a single saturated symbol cluster no

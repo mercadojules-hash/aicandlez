@@ -220,7 +220,7 @@ export function exchangeSupportsShortEntry(exchange: string): boolean {
  * controls. Admin / super-admin users authenticated on the customer path
  * also bypass.
  */
-export const DEFAULT_LIVE_EXECUTION_CONCURRENT_CAP = 25;
+export const DEFAULT_LIVE_EXECUTION_CONCURRENT_CAP = 15;
 
 export function getLiveExecutionConcurrentCap(): number {
   const raw = process.env["LIVE_EXECUTION_CONCURRENT_CAP"];

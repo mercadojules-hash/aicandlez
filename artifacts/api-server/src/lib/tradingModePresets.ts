@@ -56,7 +56,7 @@ export interface TradingModePresetDef {
 
 // Allowed customer per-trade notional presets (mirrors preferredLiveOrderSizeUsd
 // allowlist + liquidityGuard clamp).
-const SIZE_PRESETS = [10, 20, 50, 100] as const;
+const SIZE_PRESETS = [10, 20, 50, 100, 125] as const;
 
 export const TRADING_MODE_PRESETS: Record<TradingModePreset, TradingModePresetDef> = {
   conservative: {

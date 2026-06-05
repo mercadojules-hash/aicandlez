@@ -708,7 +708,7 @@ export default function Trade() {
       qc.invalidateQueries({ queryKey: ["mobile-status"] });
     },
   });
-  const SIZE_PRESETS = [10, 20, 50, 100] as const;
+  const SIZE_PRESETS = [10, 20, 50, 100, 125] as const;
   const activeSize   = liquidity?.tradeSizeUsd ?? 10;
   const planLabel    = liquidity?.plan === "elite" ? "ELITE" : liquidity?.plan === "pro" ? "PRO" : liquidity?.plan === "starter" ? "STARTER" : "FREE";
 

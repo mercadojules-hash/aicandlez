@@ -3571,7 +3571,7 @@ function Divider({ prio }: { prio?: 2 | 3 } = {}) {
  * are blocked at the UI ("LIQUIDITY PROTECTED") so the AI can never
  * spend the account down to zero. Existing positions are unaffected —
  * monitoring + closing logic runs normally.                              */
-const TRADE_SIZES_USD = [10, 20, 50, 100] as const;
+const TRADE_SIZES_USD = [10, 20, 50, 100, 125] as const;
 type TradeSizeUsd = typeof TRADE_SIZES_USD[number];
 const TRADE_SIZE_LS_KEY = "aicandlez.tradeSizeUsd";
 const DEFAULT_TRADE_SIZE_USD: TradeSizeUsd = 10;
