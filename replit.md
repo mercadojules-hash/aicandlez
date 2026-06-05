@@ -423,15 +423,17 @@ priority-ordered decision tree reading `breakdowns` + `tickersData`. Logic in
 
 ## Controlled-beta operational mode
 
-- **Platform-wide concurrent live-trade cap = 25** (customer side). Enforced in
+- **Platform-wide concurrent live-trade cap = 20** (prod; customer side). Enforced in
   `placeLiveAutoOrderForUser` gate 0c by counting open `sim_positions WHERE
   exchange IS NOT NULL` across all users. Admin/super-admin bypass; operator
   path (no userId) not gated here. Per-user ceilings still enforced by
   `liquidityGuard` (`PLAN_MAX_OPEN_POSITIONS` free0/starter3/pro6/elite12).
 - Rejected: `errorCode: "concurrent_live_cap_reached"` + user notification +
   `executionStreamBus order_rejected` + `logs` row.
-- Tune via env `LIVE_EXECUTION_CONCURRENT_CAP` (no redeploy). `0` disables.
-  Default `DEFAULT_LIVE_EXECUTION_CONCURRENT_CAP=25` in `liveUserExecution.ts`.
+- Tune via env `LIVE_EXECUTION_CONCURRENT_CAP` (set in `render.yaml` = 20; can
+  also be set live in the Render dashboard for immediate effect, no redeploy).
+  `0` disables. Code default `DEFAULT_LIVE_EXECUTION_CONCURRENT_CAP=15` in
+  `liveUserExecution.ts` (the in-file comment still reads "25" and is stale).
 - **Known TOCTOU race** (acceptable at scale): gate reads positions then places
   broker order without reservation; N concurrent placements can overshoot by
   N−1. Before widening cap, harden with advisory lock or `SELECT … FOR UPDATE`.
