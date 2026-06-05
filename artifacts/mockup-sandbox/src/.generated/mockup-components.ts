@@ -4,6 +4,6 @@ export const modules: ModuleMap = {
   "./components/mockups/aicandlez-operator/OperatorDashboard.tsx": () => import("../components/mockups/aicandlez-operator/OperatorDashboard.tsx"),
   "./components/mockups/aicandlez-personal-terminal/PersonalTerminal.tsx": () => import("../components/mockups/aicandlez-personal-terminal/PersonalTerminal.tsx"),
   "./components/mockups/aicandlez-user/UserDashboard.tsx": () => import("../components/mockups/aicandlez-user/UserDashboard.tsx"),
-  "./components/mockups/ait-pulsegrid/PulseGrid.tsx": () => import("../components/mockups/ait-pulsegrid/PulseGrid.tsx"),
-  "./components/mockups/ait-commanddeck/CommandDeck.tsx": () => import("../components/mockups/ait-commanddeck/CommandDeck.tsx")
+  "./components/mockups/ait-commanddeck/CommandDeck.tsx": () => import("../components/mockups/ait-commanddeck/CommandDeck.tsx"),
+  "./components/mockups/ait-pulsegrid/PulseGrid.tsx": () => import("../components/mockups/ait-pulsegrid/PulseGrid.tsx")
 };
