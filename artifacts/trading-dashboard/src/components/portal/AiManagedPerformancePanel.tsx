@@ -50,6 +50,17 @@ function signedUsd(v: number): string {
 function signedPct(v: number): string {
   return `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(2)}%`;
 }
+// Nullable variants — a `null` from the server means "unavailable" (no healthy
+// live exchange / no declared baseline) and MUST render a dash, never a fake 0.
+function usdOrDash(v: number | null): string {
+  return v == null ? "—" : usd(v);
+}
+function signedUsdOrDash(v: number | null): string {
+  return v == null ? "—" : signedUsd(v);
+}
+function signedPctOrDash(v: number | null): string {
+  return v == null ? "—" : signedPct(v);
+}
 
 function Kpi({
   label, value, tone, hint,
@@ -252,16 +263,112 @@ export const AiManagedPerformancePanel = memo(function AiManagedPerformancePanel
             </div>
           </div>
 
+          {/* ── LIVE ACCOUNT (real broker-sourced) ──────────────────────── */}
+          {/* Primary surface for live customers: real exchange cash + the
+              market value of AICandlez-managed live positions. Shown whenever
+              the customer has a healthy live exchange. */}
+          {data.live.hasLiveExchange ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                gap: 8,
+              }}>
+                <span style={{
+                  fontSize: 9, fontWeight: 700, letterSpacing: T.TRACK_LABEL, color: T.NEON,
+                }}>
+                  LIVE ACCOUNT
+                </span>
+                {data.live.exchanges.length > 0 && (
+                  <span style={{ fontSize: 8, color: T.TEXT_3, letterSpacing: T.TRACK_LABEL }}>
+                    {data.live.exchanges.join(" · ").toUpperCase()}
+                  </span>
+                )}
+              </div>
+              {data.live.balanceError && (
+                <div style={{ fontSize: 9, color: T.AMBER, lineHeight: 1.4 }}>
+                  Live balance temporarily unavailable — values may be
+                  incomplete. Retrying.
+                </div>
+              )}
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+                gap: 8,
+              }}>
+                <Kpi
+                  label="STARTING LIVE CAPITAL"
+                  value={usdOrDash(data.live.startingLiveCapital)}
+                  tone={data.live.startingLiveCapital == null ? "muted" : undefined}
+                  hint={data.live.startingLiveCapital == null ? "Set allocation above" : undefined}
+                />
+                <Kpi
+                  label="LIVE CASH BALANCE"
+                  value={usdOrDash(data.live.liveCashBalance)}
+                  hint="USD + USDC"
+                />
+                <Kpi
+                  label="OPEN TRADE VALUE"
+                  value={usd(data.live.openTradeValue)}
+                  hint={`${data.live.openLivePositions} live open`}
+                />
+                <Kpi
+                  label="LIVE ACCOUNT VALUE"
+                  value={usdOrDash(data.live.liveAccountValue)}
+                  hint="cash + open trades"
+                />
+                <Kpi
+                  label="NET LIFETIME PROFIT"
+                  value={signedUsdOrDash(data.live.netLifetimeProfit)}
+                  tone={
+                    data.live.netLifetimeProfit == null
+                      ? "muted"
+                      : data.live.netLifetimeProfit >= 0 ? "pos" : "neg"
+                  }
+                  hint="since starting capital"
+                />
+                <Kpi
+                  label="LIVE ROI"
+                  value={signedPctOrDash(data.live.liveRoiPct)}
+                  tone={
+                    data.live.liveRoiPct == null
+                      ? "muted"
+                      : data.live.liveRoiPct >= 0 ? "pos" : "neg"
+                  }
+                  hint="since starting capital"
+                />
+              </div>
+            </div>
+          ) : (
+            <div style={{
+              padding: "10px 12px", border: `1px solid ${T.BORDER}`,
+              background: "rgba(0,0,0,0.30)", fontSize: 9.5, color: T.TEXT_3,
+            }}>
+              {data.live.balanceError
+                ? "Live balance unavailable — retrying."
+                : "Connect a live exchange to see your live account value."}
+            </div>
+          )}
+
+          {/* AI-trading model (virtual baseline) — section label so the
+              virtual figures below are never mistaken for the live account. */}
+          <span style={{
+            fontSize: 9, fontWeight: 700, letterSpacing: T.TRACK_LABEL, color: T.TEXT_3,
+          }}>
+            AI TRADING PERFORMANCE
+          </span>
+
           {/* Headline KPI grid */}
           <div style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
             gap: 8,
           }}>
-            <Kpi
-              label="CURRENT AI CAPITAL"
-              value={usd(data.currentAiCapital)}
-            />
+            {!data.live.hasLiveExchange && (
+              <Kpi
+                label="CURRENT AI CAPITAL"
+                value={usd(data.currentAiCapital)}
+              />
+            )}
             <Kpi
               label="NET TRADING PROFIT"
               value={signedUsd(data.netTradingProfit)}
@@ -282,19 +389,23 @@ export const AiManagedPerformancePanel = memo(function AiManagedPerformancePanel
               value={signedUsd(data.unrealizedProfit)}
               tone={data.unrealizedProfit >= 0 ? "pos" : "neg"}
             />
-            <Kpi
-              label="CASH AVAILABLE"
-              value={usd(data.cashAvailable)}
-            />
+            {!data.live.hasLiveExchange && (
+              <Kpi
+                label="CASH AVAILABLE"
+                value={usd(data.cashAvailable)}
+              />
+            )}
             <Kpi
               label="CAPITAL DEPLOYED"
               value={usd(data.capitalDeployed)}
               hint="Σ open position size"
             />
-            <Kpi
-              label="OPEN TRADE VALUE"
-              value={usd(data.openTradeValue)}
-            />
+            {!data.live.hasLiveExchange && (
+              <Kpi
+                label="OPEN TRADE VALUE"
+                value={usd(data.openTradeValue)}
+              />
+            )}
           </div>
 
           {/* Window + trade-stat row */}

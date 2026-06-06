@@ -34,6 +34,27 @@ export interface ManagedPerformanceWindows {
   month: number;
 }
 
+/**
+ * Real, exchange-sourced LIVE account view. Unlike the AI-only virtual
+ * figures (currentAiCapital / cashAvailable), every value here is derived
+ * from the customer's actual broker balance + their AICandlez-managed live
+ * positions. `null` = unavailable (no healthy live exchange, or no declared
+ * allocation baseline) and MUST render a dash — never a fabricated number.
+ */
+export interface ManagedPerformanceLive {
+  hasLiveExchange:     boolean;
+  exchanges:           string[];
+  startingLiveCapital: number | null;
+  liveCashBalance:     number | null;
+  openTradeValue:      number;
+  openLivePositions:   number;
+  liveAccountValue:    number | null;
+  netLifetimeProfit:   number | null;
+  liveRoiPct:          number | null;
+  liveExchangeEquity:  number | null;
+  balanceError:        string | null;
+}
+
 export interface ManagedPerformance {
   baseline:         ManagedPerformanceBaseline;
   currentAiCapital: number;
@@ -55,6 +76,7 @@ export interface ManagedPerformance {
   profitFactor:     number | null;
   bestTrade:        number | null;
   worstTrade:       number | null;
+  live:             ManagedPerformanceLive;
   generatedAt:      number;
 }
 

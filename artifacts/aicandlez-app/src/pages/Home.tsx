@@ -567,35 +567,68 @@ function ManagedPerformanceMirror() {
     `${v >= 0 ? "+" : "−"}${fmt$(Math.abs(v))}`;
   const signedPct = (v: number) =>
     `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(2)}%`;
+  // `null` from the server = unavailable; render a dash, never a fake 0.
+  const $orDash = (v: number | null) => (v == null ? "—" : fmt$(v));
+  const signed$orDash = (v: number | null) => (v == null ? "—" : signed$(v));
+  const signedPctOrDash = (v: number | null) =>
+    v == null ? "—" : signedPct(v);
 
-  const stats: { l: string; v: string; c?: string }[] = [
-    { l: "Current AI Capital", v: fmt$(data.currentAiCapital) },
-    {
-      l: "Net Trading P&L",
-      v: signed$(data.netTradingProfit),
-      c: data.netTradingProfit >= 0 ? POS : NEG,
-    },
-    {
-      l: "Net ROI",
-      v: signedPct(data.netTradingRoiPct),
-      c: data.netTradingRoiPct >= 0 ? POS : NEG,
-    },
-    {
-      l: "Today",
-      v: signed$(data.windows.today),
-      c: data.windows.today >= 0 ? POS : NEG,
-    },
-    {
-      l: "This Week",
-      v: signed$(data.windows.week),
-      c: data.windows.week >= 0 ? POS : NEG,
-    },
-    {
-      l: "Win Rate",
-      v: `${data.winRatePct.toFixed(0)}%`,
-      c: data.winRatePct >= 55 ? POS : WARN,
-    },
-  ];
+  const live = data.live;
+  const isLive = live.hasLiveExchange;
+
+  // When a live exchange is connected, the mirror shows the REAL broker-sourced
+  // account (cash + open-trade value), not the virtual AI-capital figures.
+  const stats: { l: string; v: string; c?: string }[] = isLive
+    ? [
+        { l: "Starting Capital", v: $orDash(live.startingLiveCapital) },
+        { l: "Live Cash", v: $orDash(live.liveCashBalance) },
+        { l: "Open Trades", v: fmt$(live.openTradeValue) },
+        { l: "Account Value", v: $orDash(live.liveAccountValue) },
+        {
+          l: "Net Lifetime",
+          v: signed$orDash(live.netLifetimeProfit),
+          c:
+            live.netLifetimeProfit == null
+              ? undefined
+              : live.netLifetimeProfit >= 0 ? POS : NEG,
+        },
+        {
+          l: "Live ROI",
+          v: signedPctOrDash(live.liveRoiPct),
+          c:
+            live.liveRoiPct == null
+              ? undefined
+              : live.liveRoiPct >= 0 ? POS : NEG,
+        },
+      ]
+    : [
+        { l: "Current AI Capital", v: fmt$(data.currentAiCapital) },
+        {
+          l: "Net Trading P&L",
+          v: signed$(data.netTradingProfit),
+          c: data.netTradingProfit >= 0 ? POS : NEG,
+        },
+        {
+          l: "Net ROI",
+          v: signedPct(data.netTradingRoiPct),
+          c: data.netTradingRoiPct >= 0 ? POS : NEG,
+        },
+        {
+          l: "Today",
+          v: signed$(data.windows.today),
+          c: data.windows.today >= 0 ? POS : NEG,
+        },
+        {
+          l: "This Week",
+          v: signed$(data.windows.week),
+          c: data.windows.week >= 0 ? POS : NEG,
+        },
+        {
+          l: "Win Rate",
+          v: `${data.winRatePct.toFixed(0)}%`,
+          c: data.winRatePct >= 55 ? POS : WARN,
+        },
+      ];
 
   return (
     <div style={{
@@ -615,14 +648,22 @@ function ManagedPerformanceMirror() {
           AICandlez Managed Performance
         </span>
         <span style={{
-          fontSize: 9, fontWeight: 700, color: TEXT_DIM,
+          fontSize: 9, fontWeight: 700, color: isLive ? BRAND : TEXT_DIM,
           letterSpacing: 1, textTransform: "uppercase",
         }}>
-          AI Trading Only
+          {isLive ? "Live Account" : "AI Trading Only"}
         </span>
       </div>
 
-      {data.baseline.source === "paper-default" && (
+      {isLive && live.startingLiveCapital == null && (
+        <div style={{
+          fontSize: 10, color: WARN, marginBottom: 12, lineHeight: 1.4,
+        }}>
+          Set your Starting Live Capital to track lifetime profit and ROI.
+        </div>
+      )}
+
+      {!isLive && data.baseline.source === "paper-default" && (
         <div style={{
           fontSize: 10, color: WARN, marginBottom: 12, lineHeight: 1.4,
         }}>
