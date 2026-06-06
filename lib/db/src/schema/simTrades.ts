@@ -30,6 +30,18 @@ export const simTradesTable = pgTable("sim_trades", {
   // live position was flattened. NULL for paper trades and for any legacy
   // live trades closed before close-side submission was wired in.
   exchangeCloseOrderId: text("exchange_close_order_id"),
+  // ── Close-leg broker liquidation verification (orphan-prevention) ──────────
+  // Populated on LIVE closes once the broker outcome is verified. A position is
+  // only booked CLOSED when the broker confirms the close-side SELL filled OR
+  // the remaining base balance is ≤ dust — these columns are the audit proof.
+  // `closeBrokerStatus` = verified terminal status ("FILLED"/"PARTIAL");
+  // `closeFilledQty` = base qty the broker reported actually sold on the close
+  // leg; `postCloseBaseBalance` = base asset still held at the exchange AFTER
+  // the close (≈0 / dust on a true liquidation). NULL for paper trades and for
+  // legacy live trades closed before verification was wired in.
+  closeBrokerStatus:    text("close_broker_status"),
+  closeFilledQty:       real("close_filled_qty"),
+  postCloseBaseBalance: real("post_close_base_balance"),
   // Broker commission charged on each fill (live trades only — NULL for paper).
   // Stored in USD. Computed at close time from the exchange catalog's taker
   // fee rate; surfaced in the customer's trade receipt for audit parity with

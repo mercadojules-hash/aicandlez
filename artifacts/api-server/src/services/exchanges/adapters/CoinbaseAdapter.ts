@@ -688,7 +688,7 @@ export class CoinbaseAdapter extends BaseExchangeAdapter {
       base_size:  baseSizeStr,
       quote_size: quoteSizeStr,
       notional:   Number(notional.toFixed(2)),
-      order_id:   data.order_id ?? null,
+      order_id:   data.success_response?.order_id ?? data.order_id ?? null,
       response:   JSON.stringify(data).slice(0, 800),
     }, "[COINBASE_ORDER_RESULT]");
 
@@ -697,7 +697,7 @@ export class CoinbaseAdapter extends BaseExchangeAdapter {
     const fee  = this.computeFee(qty * fill, true);
     return {
       id:              clientId,
-      exchangeOrderId: data.order_id ?? clientId,
+      exchangeOrderId: data.success_response?.order_id ?? data.order_id ?? clientId,
       exchange:        "Coinbase",
       symbol:          req.symbol,
       nativeSymbol:    productId,
@@ -1113,6 +1113,11 @@ interface CbOrder {
 }
 interface CbOrderResponse {
   success: boolean; order_id?: string;
+  // Coinbase Advanced Trade returns the real broker order id nested under
+  // `success_response.order_id` (NOT top-level `order_id`). Reading only the
+  // top-level field left exchangeOrderId falling back to the synthetic
+  // clientId, which getOrder can't resolve — masking unliquidated closes.
+  success_response?: { order_id?: string };
   order?: { average_filled_price?: string; filled_size?: string };
 }
 // Coinbase Advanced Trade product spec (GET /api/v3/brokerage/products/{id}).

@@ -94,6 +94,13 @@ export interface UserSimTrade {
   exchange?: string;
   exchangeOrderId?: string;
   exchangeCloseOrderId?: string;
+  // Close-leg broker liquidation verification (orphan-prevention). Persisted
+  // on live closes: the verified close status ("FILLED"/"PARTIAL"), the base
+  // qty the broker reported sold on the close leg, and the base balance still
+  // held at the exchange after the close (≈0 / dust on a true liquidation).
+  closeBrokerStatus?: string;
+  closeFilledQty?: number;
+  postCloseBaseBalance?: number;
   // Catalog-estimated fees (existing): computed from CATALOG_BY_ID taker rate.
   entryFee?: number;
   exitFee?: number;
@@ -454,6 +461,9 @@ export async function finalizeClose(args: {
       exchange:             trade.exchange ?? null,
       exchangeOrderId:      trade.exchangeOrderId ?? null,
       exchangeCloseOrderId: trade.exchangeCloseOrderId ?? null,
+      closeBrokerStatus:    trade.closeBrokerStatus ?? null,
+      closeFilledQty:       trade.closeFilledQty ?? null,
+      postCloseBaseBalance: trade.postCloseBaseBalance ?? null,
       entryFee:             trade.entryFee ?? null,
       exitFee:              trade.exitFee ?? null,
       entryFeeBroker:         trade.entryFeeBroker ?? null,
@@ -1295,6 +1305,11 @@ export async function closeUserPosition(
   let brokerExitFee: number | undefined;
   let brokerExitFeeCurrency: string | undefined;
   let liquidatedFullBalance = false;
+  // Close-leg broker liquidation verification (orphan-prevention) — persisted
+  // to sim_trades so a CLOSED row carries the audit proof of liquidation.
+  let closeBrokerStatus: string | undefined;
+  let closeFilledQtyVal: number | undefined;
+  let postCloseBaseBalanceVal: number | undefined;
   const isLive = !!(pos.exchange && pos.exchangeOrderId);
   if (isLive) {
     // Mirror the open-side sandbox decision on the close. The authoritative
@@ -1338,6 +1353,10 @@ export async function closeUserPosition(
       brokerExitFee         = closeRes.brokerFee;
       brokerExitFeeCurrency = closeRes.brokerFeeCurrency;
     }
+    // Capture the broker-verified close metadata for the trade audit row.
+    closeBrokerStatus = closeRes.brokerCloseStatus;
+    if (Number.isFinite(closeRes.closeFilledQty)) closeFilledQtyVal = closeRes.closeFilledQty;
+    if (Number.isFinite(closeRes.remainingBaseBalance)) postCloseBaseBalanceVal = closeRes.remainingBaseBalance;
   }
 
   let exitPrice: number;
@@ -1449,6 +1468,9 @@ export async function closeUserPosition(
     exchange:             pos.exchange,
     exchangeOrderId:      pos.exchangeOrderId,
     exchangeCloseOrderId: exchangeCloseOrderId,
+    closeBrokerStatus:    closeBrokerStatus,
+    closeFilledQty:       closeFilledQtyVal,
+    postCloseBaseBalance: postCloseBaseBalanceVal,
     entryFee:             entryFee ?? undefined,
     exitFee:              exitFee ?? undefined,
     netFees:

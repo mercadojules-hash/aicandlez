@@ -17,7 +17,7 @@ overriding `user_risk_settings.max_simultaneous_trades` entirely.
 
 **Why:** a user can appear stuck at an odd concurrent number (e.g. exactly 10)
 even after you raise max_simultaneous_trades to 20 — because the binding value is
-a stale per-exchange override. teedelgado@gmail.com (internal QA, Coinbase) was
+a stale per-exchange override. An internal QA account (Coinbase) was
 pinned at 10 by `user_exchange_settings.max_positions=10` while every other cap
 read 20; the riskGate log said "your cap is 10" with the DB max_simultaneous=20.
 

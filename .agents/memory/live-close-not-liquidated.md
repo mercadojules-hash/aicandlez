@@ -9,11 +9,23 @@ A live `sim_trades` row marked closed (even a "clean" MAX_HOLD / STOP_LOSS /
 TAKE_PROFIT / TRAILING_STOP close with recorded realized P&L) does **not** prove
 the underlying base asset was actually market-sold to ~zero on the exchange.
 
-**Why:** the close path books realized P&L and writes a **synthetic**
-`exchange_close_order_id` (`close-u-<userId>…`), not a verifiable broker fill id.
-The schema has **no column for close-order status, filled/sold qty, or post-close
-remaining balance**. So the DB cannot self-certify liquidation. Forensic proof
-must come from reconciling against **live exchange balances**.
+**Why (historical):** the close path booked realized P&L and wrote a **synthetic**
+`exchange_close_order_id` (`close-u-<userId>…`), not a verifiable broker fill id,
+with **no column for close-order status, filled/sold qty, or post-close remaining
+balance** — the DB could not self-certify liquidation.
+
+**Fix (2026-06-06, now live):** the live close arbiter NEVER books CLOSED on the
+optimistic `placeOrder` ACK. It requires a REAL broker snapshot (`gotBrokerSnapshot`
+= a successful `getOrder` poll, NOT the ACK) showing full fill, OR a post-close
+`getAccount` balance probe proving the remaining base balance is dust
+(`verifiedLiquidated = brokerFilledFull || remainingIsDust`). Unverified → keep the
+position OPEN + retry. Persisted: `close_broker_status`, `close_filled_qty`,
+`post_close_base_balance`. Dust thresholds (`CLOSE_DUST_USD` 1.0/0..100,
+`CLOSE_DUST_QTY` 1e-8/0..1) are fail-safe with UPPER bounds so a malformed env can
+never widen liquidation criteria. **Lesson: any "book closed" decision on real money
+must be driven by a broker-confirmed fill or a balance-verified residual — never an
+order-submit ACK.** Pre-fix orphans still need a separate sweep; this only stops new
+ones.
 
 **Evidence (teedelgado QA acct, Coinbase, 2026-06-06):** AICandlez books showed
 the account flat (only 1e-8 dust "open" rows), but Coinbase held ~$570 of
@@ -23,6 +35,16 @@ COMP, INJ, BTC) for positions booked closed. Crucially this was NOT limited to t
 (13/13 clean) had zero reconciles/partials yet still left whole positions
 un-sold. Fully-liquidated symbols leave only sub-$1 dust (the "good" signature);
 orphans leave whole-position-sized balances.
+
+**Dry-run orphan-sweep preview refinement (2026-06-06):** after excluding the
+protected never-sell set (QNT/SHIB/GRT/JASMY/ALEO/NU/MLN), still-tracked open
+positions (NEAR ~125 held ≈ tracked), cash (USD ~$1.75k + USDC), and sub-min-notional
+dust, the genuinely bot-orphaned + SELL-eligible (≥ Coinbase $1 min_market_funds,
+tradable) set was **9 assets ≈ $318.50**: ALGO, SUI, AXS, AVAX, FIL, ICP, COMP, INJ,
+BTC. 8 more bot-orphaned but sub-$1 → leave as dust. Pricing must use Coinbase PUBLIC
+endpoints (`api.coinbase.com/v2/prices/{A}-USD/spot`, `api.exchange.coinbase.com/
+products/{A}-USD` min_market_funds) — the authenticated per-asset getTicker 429s hard
+under prod polling on the shared key.
 
 **How to apply:**
 - To audit liquidation, decrypt the per-user vault cred and pull live exchange

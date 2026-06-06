@@ -323,6 +323,17 @@ export interface LiveUserCloseResult {
    *  caller treats this as a FULL close so no phantom fee-shrinkage dust remains
    *  open to re-trap the position past max-hold. */
   liquidatedFullBalance?: boolean;
+  /** Broker-verified close-leg outcome (orphan-prevention). `brokerCloseStatus`
+   *  = the status we confirmed ("FILLED"/"PARTIAL"/"UNCONFIRMED");
+   *  `closeFilledQty` = base qty the broker reported sold; `remainingBaseBalance`
+   *  = base still held at the exchange after the close; `verifiedLiquidated` =
+   *  true ONLY when the broker confirmed a (near-)full fill OR the remaining
+   *  balance is ≤ dust. The caller refuses to book a CLOSED position unless
+   *  `verifiedLiquidated` (or a confirmed partial) holds. */
+  brokerCloseStatus?:   "FILLED" | "PARTIAL" | "UNCONFIRMED";
+  closeFilledQty?:      number;
+  remainingBaseBalance?: number;
+  verifiedLiquidated?:  boolean;
   // Broker-reported close-leg commission (see LiveUserOrderResult.brokerFee).
   brokerFee?:           number;
   brokerFeeCurrency?:   string;
@@ -2161,6 +2172,28 @@ export async function placeLiveAutoOrderForUser(
  * Dry-run path: when LIVE_TRADE_DRY_RUN === "true", returns a synthetic
  * `DRYRUN-CLOSE-…` reference and skips the adapter call.
  */
+// ── Live-close dust thresholds (orphan-prevention) ───────────────────────────
+// A live close is a VERIFIED full liquidation when the broker confirms a
+// (near-)full fill OR the base asset still held at the exchange after the close
+// is ≤ dust. Dust is whichever floor is hit first: a USD valuation floor
+// (default $1.00) or an absolute base-qty floor (default 1e-8). Both are
+// env-overridable but fail SAFE: a value must parse finite AND fall inside a
+// sane bounded range, else we fall back to the safe default. Bounding the UPPER
+// end matters as much as the lower — without it a fat-fingered large value
+// (e.g. LIVE_CLOSE_DUST_USD=1000) would silently WIDEN what counts as
+// "liquidated" and book real residual exposure as a full close. Anything above
+// the cap is treated as misconfiguration → safe default.
+const CLOSE_DUST_USD_MAX = 100;   // >$100 "dust" is never legitimate
+const CLOSE_DUST_QTY_MAX = 1;     // >1 base unit "dust" is never legitimate
+const CLOSE_DUST_USD = (() => {
+  const v = Number(process.env.LIVE_CLOSE_DUST_USD);
+  return Number.isFinite(v) && v >= 0 && v <= CLOSE_DUST_USD_MAX ? v : 1.0;
+})();
+const CLOSE_DUST_QTY = (() => {
+  const v = Number(process.env.LIVE_CLOSE_DUST_QTY);
+  return Number.isFinite(v) && v > 0 && v <= CLOSE_DUST_QTY_MAX ? v : 1e-8;
+})();
+
 export async function placeLiveCloseOrderForUser(
   req: LiveUserCloseRequest,
 ): Promise<LiveUserCloseResult> {
@@ -2351,39 +2384,66 @@ export async function placeLiveCloseOrderForUser(
     // even though the fill lands moments later. Without this poll the
     // close path falls back to the ticker price and realized PnL drifts
     // from the actual broker execution.
-    const idForPoll = order.exchangeOrderId || order.id;
-    let timedOut = false;
+    // ── Broker-VERIFIED close (orphan prevention) ──────────────────────────
+    // The placeOrder ACK cannot be trusted to mean "sold": CoinbaseAdapter (and
+    // peers) optimistically report status="filled" with filledQty == requested
+    // on the immediate market ACK, BEFORE the broker has reported a real fill.
+    // Booking a close on that optimistic ACK is exactly what strands the
+    // underlying asset on the exchange (orphan). So for every live close we
+    // independently VERIFY the outcome before declaring liquidation:
+    //   1. Re-read the order from the broker (getOrder) for the REAL filled qty
+    //      + terminal status — never the optimistic ACK numbers.
+    //   2. Re-probe the post-close base-asset balance held at the exchange.
+    // The close is a VERIFIED full liquidation only when the broker confirms a
+    // (near-)full fill OR the base asset remaining at the exchange is ≤ dust.
+    // Anything else keeps the position OPEN for retry (no phantom close).
     const isTerminal = (s: StandardOrder["status"]) =>
       s === "filled" || s === "cancelled" || s === "rejected";
-    if (idForPoll && !isTerminal(order.status)) {
-      const poll = await pollOrderUntilFilled(adapter, idForPoll, symbol, {
+    // A usable broker order id is one the exchange actually returned — NOT the
+    // synthetic `close-u-…` clientId fallback (which getOrder can't resolve).
+    const ackId = order.exchangeOrderId || order.id;
+    const realOrderId =
+      ackId && !ackId.startsWith("close-u-") ? ackId : null;
+
+    let timedOut = false;
+    // `gotBrokerSnapshot` = a fresh getOrder record was actually returned by the
+    // broker. This is the ONLY signal that lets us trust filledQty/status — the
+    // initial placeOrder ACK (which Coinbase et al. fabricate as
+    // status="filled" + requestedQty) must never be trusted on its own.
+    let gotBrokerSnapshot = false;
+    if (realOrderId) {
+      // Force the confirmation poll even when the ACK already claims "filled",
+      // so filledQty / avgFillPrice / status come from the broker's own record.
+      const poll = await pollOrderUntilFilled(adapter, realOrderId, symbol, {
         timeoutMs:  5000,
         intervalMs: 500,
-        logCtx:     { userId, exchange: row.exchange, symbol, closeSide },
+        logCtx:     { userId, exchange: row.exchange, symbol, closeSide, leg: "close-verify" },
       });
-      if (poll.order) order = poll.order;
+      if (poll.order) { order = poll.order; gotBrokerSnapshot = true; }
       timedOut = poll.timedOut && !isTerminal(order.status);
     }
 
-    const requestedQty = order.requestedQty > 0 ? order.requestedQty : sellQty;
-    const unfilled     = !(order.filledQty > 0);
-    const partial      = order.filledQty > 0 && order.filledQty < requestedQty - 1e-12;
-
-    // Hard failures: rejected, cancelled, or timed out with no fill at all.
-    // Surface as live_trade_failed so the position stays open and the caller
-    // (closeUserPosition) can retry on the next pass.
-    if (order.status === "rejected" || order.status === "cancelled" || (timedOut && unfilled)) {
-      const reasonMsg = timedOut
-        ? `Close order ${idForPoll} did not fill within 5s on ${row.exchange} (status=${order.status})`
-        : `Close order ${idForPoll} ${order.status} on ${row.exchange}`;
+    // Explicit broker rejection/cancel → keep the position open and retry.
+    if (order.status === "rejected" || order.status === "cancelled") {
+      const reasonMsg = `Close order ${realOrderId ?? ackId} ${order.status} on ${row.exchange}`;
       logger.warn(
-        { userId, exchange: row.exchange, symbol, closeSide,
-          status: order.status, timedOut, filledQty: order.filledQty, requestedQty },
-        "liveUserExecution: close order not filled",
+        { userId, exchange: row.exchange, symbol, closeSide, status: order.status },
+        "liveUserExecution: close order rejected/cancelled",
       );
       await emitFailureNotification(userId, symbol, closeSide, reasonMsg, row.exchange);
       return { success: false, userId, exchange: row.exchange, errorCode: "exchange_reject", error: reasonMsg };
     }
+
+    const requestedQty = order.requestedQty > 0 ? order.requestedQty : sellQty;
+    // Only TRUST a filled qty that came back from a fresh broker getOrder
+    // snapshot. Without a confirmed snapshot, `order` is still the optimistic
+    // placeOrder ACK (status="filled" + requestedQty fabrication) and must NOT
+    // be believed — fall through to the post-close balance probe instead, which
+    // is the authoritative orphan arbiter.
+    const brokerFilledQty = gotBrokerSnapshot && order.filledQty > 0 ? order.filledQty : 0;
+    const brokerFilledFull =
+      brokerFilledQty > 0 &&
+      brokerFilledQty >= requestedQty - Math.max(1e-12, requestedQty * 1e-6);
 
     const fill = order.avgFillPrice > 0 ? order.avgFillPrice : 0;
     // See open-side path: only forward broker-sourced fees.
@@ -2391,49 +2451,109 @@ export async function placeLiveCloseOrderForUser(
       order.fee && order.fee.source === "broker" && Number.isFinite(order.fee.amount)
         ? { amount: parseFloat(order.fee.amount.toFixed(8)), currency: order.fee.currency }
         : undefined;
-    // Only signal a FULL close to the caller when (1) we deliberately clamped to
-    // the free balance, (2) the clamped order actually filled IN FULL (not a
-    // broker partial — otherwise residual live exposure remains), and (3)
-    // essentially nothing was locked (free ≈ total — otherwise locked balance
-    // that later unlocks would be left untracked). Any failure of these →
-    // standard partial-fill handling keeps the position open for retry.
-    const FREE_LOCK_TOLERANCE = 0.01;
-    const notLocked =
-      freeAtClamp !== null && totalAtClamp !== null && totalAtClamp > 0
-        ? freeAtClamp >= totalAtClamp * (1 - FREE_LOCK_TOLERANCE)
-        : false;
-    const liquidatedFullBalance =
-      clampedToBalance && !partial && order.filledQty > 0 && notLocked;
+
+    // ── Post-close base-balance probe (orphan arbiter) ─────────────────────
+    // When the broker did NOT confirm a full fill, this is the authoritative
+    // check on whether the asset actually left the account. Skip the extra
+    // getAccount round-trip when the broker already confirmed full (cheap path;
+    // also limits Coinbase getAccount 429s under load).
+    const baseAsset = deriveBaseAsset(symbol);
+    let remainingBaseBalance: number | null = null;
+    if (brokerFilledFull) {
+      remainingBaseBalance = 0;
+    } else {
+      try {
+        const acctAfter = await adapter.getAccount();
+        const balAfter  = acctAfter.balances[baseAsset];
+        remainingBaseBalance =
+          balAfter && Number.isFinite(balAfter.total) ? balAfter.total : null;
+      } catch (probeErr) {
+        logger.warn(
+          { err: probeErr instanceof Error ? probeErr.message : String(probeErr),
+            userId, exchange: row.exchange, symbol },
+          "liveUserExecution: post-close balance probe failed — close left UNVERIFIED",
+        );
+      }
+    }
+
+    // Reference price for the dust USD valuation: broker fill → ticker.
+    let dustRefPrice = fill;
+    if (!(dustRefPrice > 0)) {
+      try { dustRefPrice = (await getTicker(symbol)).price; } catch { dustRefPrice = 0; }
+    }
+    const remainingUSD =
+      remainingBaseBalance !== null && dustRefPrice > 0
+        ? remainingBaseBalance * dustRefPrice
+        : null;
+    const remainingIsDust =
+      remainingBaseBalance !== null &&
+      (remainingBaseBalance <= CLOSE_DUST_QTY ||
+        (remainingUSD !== null && remainingUSD <= CLOSE_DUST_USD));
+
+    const verifiedLiquidated = brokerFilledFull || remainingIsDust;
+
+    // Unverified AND nothing provably sold → DO NOT book a phantom close. Keep
+    // the position open so the monitor retries (and the balance-verified zombie
+    // reconciler eventually retires a true permanent orphan).
+    if (!verifiedLiquidated && brokerFilledQty <= 0) {
+      const reasonMsg =
+        remainingBaseBalance === null
+          ? `Close of ${symbol} could not be verified on ${row.exchange} (no broker confirmation, balance probe failed) — keeping position open`
+          : `Close of ${symbol} unverified on ${row.exchange}: ${remainingBaseBalance} ${baseAsset} (~$${remainingUSD?.toFixed(2) ?? "?"}) still held above dust — keeping position open`;
+      logger.warn(
+        { userId, exchange: row.exchange, symbol, closeSide,
+          realOrderId, status: order.status, timedOut, clampedToBalance,
+          brokerFilledQty, requestedQty, remainingBaseBalance, remainingUSD },
+        "liveUserExecution: close UNVERIFIED — position kept open for retry",
+      );
+      await emitFailureNotification(userId, symbol, closeSide, reasonMsg, row.exchange);
+      return {
+        success: false, userId, exchange: row.exchange,
+        errorCode: "exchange_reject", error: reasonMsg,
+        brokerCloseStatus: "UNCONFIRMED",
+        remainingBaseBalance: remainingBaseBalance ?? undefined,
+      };
+    }
+
+    const brokerCloseStatus: "FILLED" | "PARTIAL" = verifiedLiquidated ? "FILLED" : "PARTIAL";
+    // Qty reported as sold: prefer the broker-confirmed fill; fall back to the
+    // clamped sellQty when liquidation was proven by the balance probe (the
+    // asset is gone even though the broker didn't echo a fill, e.g. an ACK with
+    // no order_id). For a confirmed partial, this is the filled slice only.
+    const soldQty =
+      brokerFilledQty > 0 ? brokerFilledQty : (verifiedLiquidated ? sellQty : 0);
+
     const result: LiveUserCloseResult = {
       success:              true,
       userId,
       exchange:             row.exchange,
-      exchangeCloseOrderId: order.exchangeOrderId || order.id,
+      exchangeCloseOrderId: realOrderId ?? ackId,
       fillPrice:            parseFloat(fill.toFixed(2)),
-      quantity:             order.filledQty > 0 ? order.filledQty : sellQty,
-      liquidatedFullBalance,
-      brokerFee:            brokerFeeClose?.amount,
-      brokerFeeCurrency:    brokerFeeClose?.currency,
+      quantity:             soldQty > 0 ? soldQty : sellQty,
+      // FULL-close signal to the caller ONLY on a verified liquidation. A
+      // confirmed partial leaves residual exposure → caller keeps it open.
+      liquidatedFullBalance: verifiedLiquidated,
+      verifiedLiquidated,
+      brokerCloseStatus,
+      closeFilledQty:        soldQty,
+      remainingBaseBalance:  remainingBaseBalance ?? undefined,
+      brokerFee:             brokerFeeClose?.amount,
+      brokerFeeCurrency:     brokerFeeClose?.currency,
     };
-
-    const note = timedOut
-      ? "partial fill — poll timed out"
-      : partial
-        ? "partial fill"
-        : undefined;
 
     logger.info(
       { userId, exchange: row.exchange, symbol, closeSide,
         fillPrice: result.fillPrice, exchangeCloseOrderId: result.exchangeCloseOrderId,
-        status: order.status, partial, timedOut,
-        filledQty: order.filledQty, requestedQty },
-      "liveUserExecution: close order filled",
+        status: order.status, brokerCloseStatus, verifiedLiquidated, clampedToBalance,
+        brokerFilledQty, requestedQty, remainingBaseBalance, remainingUSD, timedOut },
+      "liveUserExecution: close VERIFIED",
     );
     await emitFillNotification(
       userId, symbol, closeSide, row.exchange,
       result.fillPrice!, result.quantity!, result.exchangeCloseOrderId ?? "", false,
-      note
-        ? { note, data: { partial, timedOut, requestedQty, status: order.status } }
+      brokerCloseStatus === "PARTIAL"
+        ? { note: "partial fill — residual kept open",
+            data: { brokerFilledQty, requestedQty, remainingBaseBalance, status: order.status } }
         : undefined,
     );
     return result;
