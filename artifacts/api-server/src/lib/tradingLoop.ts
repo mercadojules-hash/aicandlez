@@ -2181,6 +2181,52 @@ async function runHardStopMonitor() {
     await Promise.all(positions.map(async (p) => {
       const isBuy  = p.side === "BUY";
       const isLive = !!p.exchange;
+
+      // ── Dust-phantom orphan guard (retire locally, no broker round-trip) ─────
+      // A LIVE row with quantity at the absolute floor (≤1e-8) AND sizeUSD 0 is a
+      // phantom: it never represented a real broker fill (real opens require a
+      // min-notional sizeUSD ≫ 0), so the underlying asset cannot exist at the
+      // exchange. The normal exit path keeps firing a broker close the venue
+      // rejects as sub-min-notional dust, and the balance-verified zombie
+      // reconciler can never retire it because its balance probe fail-CLOSES
+      // under exchange rate-limiting (429) — so the row sits open forever,
+      // occupying a concurrency slot. Retire it in-process (delete DB + splice
+      // memory atomically via reconcileZombiePosition) with NO broker probe.
+      // Gate is doubly strict (qty≤1e-8 AND sizeUSD≤0) so no real position can
+      // ever match: opens always carry sizeUSD>0. Runs every tick, independent
+      // of max-hold, so phantoms are cleared the moment they're observed.
+      if (isLive && p.quantity <= 1e-8 && (p.sizeUSD ?? 0) <= 0) {
+        const recon = await reconcileZombiePosition({
+          userId:           p.userId,
+          positionId:       p.positionId,
+          brokerError:      "phantom dust position (quantity ≤ 1e-8, sizeUSD = 0) — never a real broker fill",
+          actualBalance:    0,
+          recordedQuantity: p.quantity,
+          closeReason:        "RECONCILED_DUST_PHANTOM",
+          reconciliationTag:  "RECONCILED_DUST_PHANTOM",
+          notificationTitle:  `Closed phantom ${p.symbol} position`,
+          notificationMessage:
+            `A phantom ${p.symbol} position on ${p.exchange ?? "your exchange"} was retired automatically. ` +
+            `It carried no tradable size (dust quantity, $0 notional) and had no matching exchange balance, so no order was placed and your balance is unaffected.`,
+        });
+        if (recon.reconciled) {
+          failedLiveCloseStreak.delete(p.positionId);
+          logger.warn(
+            {
+              tag:        "ZOMBIE_RECONCILE_DUST_PHANTOM",
+              userId:     p.userId,
+              positionId: p.positionId,
+              symbol:     p.symbol,
+              exchange:   p.exchange,
+              quantity:   p.quantity,
+              sizeUSD:    p.sizeUSD,
+            },
+            "[ZOMBIE_RECONCILE_DUST_PHANTOM] retired phantom dust position locally (qty≤1e-8 & sizeUSD=0 — no real broker fill)",
+          );
+        }
+        return;
+      }
+
       const price  = priceBySym.get(p.symbol);
       const exitCfg = resolveExit(p.userId, p.exchange);
 

@@ -879,6 +879,7 @@ export async function listOpenPositionsForRiskMonitor(): Promise<
     side:       string;
     quantity:   number;
     entryPrice: number;
+    sizeUSD:    number;
     stopLoss:   number | null;
     takeProfit: number | null;
     exchange:   string | null;
@@ -894,6 +895,7 @@ export async function listOpenPositionsForRiskMonitor(): Promise<
         side:       simPositionsTable.side,
         quantity:   simPositionsTable.quantity,
         entryPrice: simPositionsTable.entryPrice,
+        sizeUSD:    simPositionsTable.sizeUSD,
         stopLoss:   simPositionsTable.stopLoss,
         takeProfit: simPositionsTable.takeProfit,
         exchange:   simPositionsTable.exchange,
@@ -1124,9 +1126,17 @@ export async function reconcileZombiePosition(args: {
   actualBalance: number | null;
   recordedQuantity: number;
   closeReason?: string;
+  // Optional overrides so distinct reconciliation causes (e.g. dust phantoms vs
+  // insufficient-funds zombies) carry their own audit tag + user-facing copy.
+  // Ops dashboards key on `reconciliationTag`, so reusing the default tag for a
+  // different cause would mislabel the event.
+  reconciliationTag?: string;
+  notificationTitle?: string;
+  notificationMessage?: string;
 }): Promise<{ reconciled: boolean; error?: string }> {
   const { userId, positionId, brokerError, actualBalance, recordedQuantity } = args;
   const closeReason = args.closeReason ?? "RECONCILED_INSUFFICIENT_FUNDS";
+  const reconciliationTag = args.reconciliationTag ?? ZOMBIE_RECONCILE_TAG;
 
   // Atomic: delete the orphan position (the `.returning()` row is the idempotency
   // gate — if a concurrent close already removed it we no-op) and write the
@@ -1167,7 +1177,7 @@ export async function reconcileZombiePosition(args: {
         exchange:        deleted.exchange ?? null,
         exchangeOrderId: deleted.exchangeOrderId ?? null,
         sandbox:         deleted.sandbox ?? false,
-        reconciliationTag: ZOMBIE_RECONCILE_TAG,
+        reconciliationTag,
       });
       return { applied: true as const, deleted };
     });
@@ -1204,15 +1214,16 @@ export async function reconcileZombiePosition(args: {
     sizeUSD:           posRow.sizeUSD,
     brokerError,
     closeReason,
-    reconciliationTag: ZOMBIE_RECONCILE_TAG,
+    reconciliationTag,
   };
 
   try {
     await db.insert(userNotificationsTable).values({
       userId,
       type:    "live_position_reconciled",
-      title:   `Closed orphaned ${posRow.symbol} position`,
-      message: `A live ${posRow.symbol} position on ${posRow.exchange ?? "your exchange"} was retired after the exchange balance could no longer cover it (broker error: ${brokerError}).`,
+      title:   args.notificationTitle ?? `Closed orphaned ${posRow.symbol} position`,
+      message: args.notificationMessage
+        ?? `A live ${posRow.symbol} position on ${posRow.exchange ?? "your exchange"} was retired after the exchange balance could no longer cover it (broker error: ${brokerError}).`,
       data:    auditData,
     });
   } catch (err) {
