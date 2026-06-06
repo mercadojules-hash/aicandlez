@@ -1312,6 +1312,7 @@ export async function closeUserPosition(
   // price so realized PnL matches the actual exchange execution.
   let exchangeCloseOrderId: string | undefined;
   let brokerFillPrice: number | undefined;
+  let exitPriceSource: "broker" | "ticker" = "ticker";
   let brokerFilledQty: number | undefined;
   let brokerExitFee: number | undefined;
   let brokerExitFeeCurrency: string | undefined;
@@ -1352,6 +1353,7 @@ export async function closeUserPosition(
     liquidatedFullBalance = closeRes.liquidatedFullBalance === true;
     if (closeRes.fillPrice && closeRes.fillPrice > 0) {
       brokerFillPrice = closeRes.fillPrice;
+      exitPriceSource = closeRes.fillPriceSource ?? "broker";
     }
     if (closeRes.quantity && closeRes.quantity > 0) {
       // Clamp to position quantity in case the broker over-reports
@@ -1380,6 +1382,18 @@ export async function closeUserPosition(
     } catch (e) {
       return { success: false, error: `Failed to fetch price: ${e instanceof Error ? e.message : String(e)}` };
     }
+  }
+
+  // INVARIANT: a live close must never silently book exit == entry. The old
+  // bug (broker avgFillPrice=0 → exit fell back to entry → realized PnL zeroed)
+  // is gone: the close path now resolves a real broker fill or a live ticker.
+  // Flag the rare legitimate case where the resolved price genuinely equals
+  // entry so a real break-even can be told apart from an accounting artifact.
+  if (isLive && Math.abs(exitPrice - pos.entryPrice) < 1e-12) {
+    logger.warn(
+      { userId, positionId, symbol: pos.symbol, exitPrice, entryPrice: pos.entryPrice, source: exitPriceSource },
+      "[CLOSE_EXIT_EQ_ENTRY] live close resolved exit == entry — verify broker reported an equal fill (not a zeroed-PnL fallback)",
+    );
   }
 
   // Partial-fill aware close. When the broker reported a filled quantity
@@ -1464,7 +1478,9 @@ export async function closeUserPosition(
     side:            pos.side,
     quantity:        parseFloat(closedQty.toFixed(8)),
     entryPrice:      pos.entryPrice,
-    exitPrice:       parseFloat(exitPrice.toFixed(2)),
+    // Full precision — NO toFixed(2). Rounding sub-$1 coin exits to 2 decimals
+    // collapsed exit == entry and zeroed realized PnL (the remediated bug).
+    exitPrice:       exitPrice,
     entryTime:       pos.entryTime,
     exitTime,
     sizeUSD:         closedSizeUSD,

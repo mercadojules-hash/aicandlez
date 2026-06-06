@@ -673,7 +673,7 @@ async function markTradeRowClosed(
     .update(tradesTable)
     .set({
       status:     "closed",
-      exitPrice:  parseFloat(exitPrice.toFixed(2)),
+      exitPrice:  exitPrice,
       pnl:        parseFloat(pnl.toFixed(2)),
       pnlPercent: parseFloat(pnlPercent.toFixed(2)),
       closedAt:   new Date(),
@@ -2961,7 +2961,25 @@ async function settleManualClose(opts: {
     // Residual is dust — treat as effectively flat and finalize below.
   }
 
-  const exitPrice = opts.exitPrice > 0 ? opts.exitPrice : opts.entryPrice;
+  let exitPrice = opts.exitPrice;
+  if (!(exitPrice > 0)) {
+    // NEVER fall back to entryPrice — that fabricates a break-even close and
+    // zeroes realized PnL (the sub-$1-coin accounting bug). Use a real market
+    // ticker so the exit reflects an actual price; if even that is unavailable,
+    // abort the finalize and keep the row reserved ('closing') for a later tick
+    // rather than booking a zeroed close.
+    try {
+      const t = await getTicker(opts.symbol);
+      exitPrice = t.price > 0 ? t.price : 0;
+    } catch { exitPrice = 0; }
+    if (!(exitPrice > 0)) {
+      logger.warn(
+        { tag: "MANUAL_EXIT_NO_PRICE", correlationId: opts.correlationId, positionId: opts.rowId, symbol: opts.symbol, triggerReason: opts.reason },
+        "[MANUAL_EXIT_NO_PRICE] no broker fill price and ticker unavailable — finalize aborted, reservation held for retry",
+      );
+      return "noop";
+    }
+  }
   const fillQty   = closedQty > 0 ? closedQty : opts.trackedQty;
   const pnl    = isBuy ? (exitPrice - opts.entryPrice) * fillQty : (opts.entryPrice - exitPrice) * fillQty;
   const pnlPct = opts.entryPrice > 0
@@ -2970,7 +2988,7 @@ async function settleManualClose(opts: {
   const finalized = await db.update(tradesTable)
     .set({
       status:         "closed",
-      exitPrice:      parseFloat(exitPrice.toFixed(2)),
+      exitPrice:      exitPrice,
       pnl:            parseFloat(pnl.toFixed(2)),
       pnlPercent:     parseFloat(pnlPct.toFixed(2)),
       closedAt:       new Date(),

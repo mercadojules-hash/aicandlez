@@ -317,6 +317,11 @@ export interface LiveUserCloseResult {
   exchange?:            string;
   exchangeCloseOrderId?: string;
   fillPrice?:           number;
+  /** Source of `fillPrice`: "broker" = the exchange's settled average fill
+   *  price; "ticker" = a live market price used only when the broker never
+   *  populated avgFillPrice (the close was still broker-verified as
+   *  liquidated). NEVER the entry price — a zeroed break-even is never booked. */
+  fillPriceSource?:     "broker" | "ticker";
   quantity?:            number;
   /** True when the close was clamped to the broker's actual free base balance
    *  (free < recorded qty) — i.e. we liquidated the ENTIRE real holding. The
@@ -2108,7 +2113,10 @@ export async function placeLiveAutoOrderForUser(
       userId,
       exchange:        row.exchange,
       exchangeOrderId: order.exchangeOrderId || order.id,
-      fillPrice:       parseFloat(fill.toFixed(2)),
+      // Full-precision fill price. The old parseFloat(toFixed(2)) collapsed
+      // sub-$1 coin prices (XLM, FET, MATIC) to 2 decimals, which on close
+      // could round exit == entry and zero realized PnL.
+      fillPrice:       fill,
       quantity:        order.filledQty > 0 ? order.filledQty : qtyBase,
       sizeUSD,
       brokerFee:         brokerFeeOpen?.amount,
@@ -2445,7 +2453,12 @@ export async function placeLiveCloseOrderForUser(
       brokerFilledQty > 0 &&
       brokerFilledQty >= requestedQty - Math.max(1e-12, requestedQty * 1e-6);
 
-    const fill = order.avgFillPrice > 0 ? order.avgFillPrice : 0;
+    // Broker-reported average fill price for the close leg. The poll above
+    // waits for a terminal order state so avgFillPrice has had time to settle.
+    // When the broker still hasn't populated it (0), we DO NOT collapse the
+    // exit to 0 / the entry price — the dust-reference ticker below supplies a
+    // real market price so realized PnL always reflects an actual price.
+    const brokerFillPrice = order.avgFillPrice > 0 ? order.avgFillPrice : 0;
     // See open-side path: only forward broker-sourced fees.
     const brokerFeeClose =
       order.fee && order.fee.source === "broker" && Number.isFinite(order.fee.amount)
@@ -2476,8 +2489,9 @@ export async function placeLiveCloseOrderForUser(
       }
     }
 
-    // Reference price for the dust USD valuation: broker fill → ticker.
-    let dustRefPrice = fill;
+    // Reference price for the dust USD valuation AND the exit-price fallback:
+    // broker fill → live ticker. Never the entry price.
+    let dustRefPrice = brokerFillPrice;
     if (!(dustRefPrice > 0)) {
       try { dustRefPrice = (await getTicker(symbol)).price; } catch { dustRefPrice = 0; }
     }
@@ -2528,7 +2542,11 @@ export async function placeLiveCloseOrderForUser(
       userId,
       exchange:             row.exchange,
       exchangeCloseOrderId: realOrderId ?? ackId,
-      fillPrice:            parseFloat(fill.toFixed(2)),
+      // Full-precision exit price: settled broker avg fill, else a live ticker
+      // (dustRefPrice). NEVER the entry price, and no toFixed(2) collapse — the
+      // old 2-dp store rounded sub-$1 coins to break-even and zeroed PnL.
+      fillPrice:            (brokerFillPrice > 0 ? brokerFillPrice : dustRefPrice) || undefined,
+      fillPriceSource:      brokerFillPrice > 0 ? "broker" : "ticker",
       quantity:             soldQty > 0 ? soldQty : sellQty,
       // FULL-close signal to the caller ONLY on a verified liquidation. A
       // confirmed partial leaves residual exposure → caller keeps it open.
