@@ -1,0 +1,95 @@
+The current dashboard still does not answer the most important customer question:
+
+"How much money has AICandlez made me?"
+
+The current implementation is still displaying exchange portfolio metrics as the primary telemetry, which is causing confusion.
+
+Examples observed:
+
+* My Account displayed approximately $2,218
+* Seconds later it displayed approximately $735
+* Then it returned to approximately $2,218
+
+This proves the panel is switching between different exchange/account values rather than displaying true AICandlez-managed performance.
+
+I do NOT care about:
+
+* Total Coinbase Portfolio Value
+* Staked Asset Value
+* Market Appreciation of assets I already owned
+* Holdings not traded by AICandlez
+* Exchange account fluctuations
+
+Those are exchange metrics, not AICandlez performance metrics.
+
+The primary dashboard must answer:
+
+"How much money have I invested into AICandlez and how much has AICandlez made me?"
+
+Replace the primary My Account panel with:
+
+AICANDLEZ MANAGED PERFORMANCE
+
+Starting AI Capital
+(Amount allocated to AICandlez trading)
+
+Current AI Capital
+(Starting Capital + Realized P&L + Unrealized P&L)
+
+Net AI Profit/Loss ($)
+
+ROI (%)
+
+Today's AI Profit/Loss
+
+Winning Trades
+
+Losing Trades
+
+Win Rate
+
+Profit Factor
+
+Open Trades
+
+Average Winner
+
+Average Loser
+
+Largest Winner
+
+Largest Loser
+
+The dashboard should immediately show whether AICandlez is profitable without requiring reports, investigations, or manual calculations.
+
+Move the following into a secondary Exchange Information section:
+
+* Coinbase Portfolio Value
+* Available Cash
+* Buying Power
+* Staked Assets
+* Crypto Holdings
+* Exchange Balances
+
+These are useful but should NOT be the primary performance telemetry.
+
+Additionally:
+
+The "AICandlez Managed Performance" section currently shows:
+
+"Managed performance unavailable — retrying."
+
+Fix this endpoint and populate it with real production data.
+
+I want the dashboard to become the authoritative source of truth for AICandlez profitability so that future accounting investigations and performance reports are unnecessary.
+
+Success Criteria:
+
+A user should be able to log in and immediately answer:
+
+1. How much capital have I allocated to AICandlez?
+2. How much profit has AICandlez generated?
+3. What is my ROI?
+4. Is the AI making money or losing money?
+
+without needing to look at exchange portfolio values.

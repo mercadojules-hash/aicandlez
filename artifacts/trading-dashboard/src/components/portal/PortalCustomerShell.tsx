@@ -7331,14 +7331,42 @@ export function PortalCustomerShell({ operatorPreview = false }: { operatorPrevi
           </div>
 
           <aside className="cd-customer-battlefield-aside" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {/* 2026-05 unification — when runtime resolves to LIVE,
-                hydrate realized/unrealized/today PnL from `serverAccount`
-                (single source of truth shared with `blotterOpenCount` +
-                `blotterOpenRows`). Previously these props always read
-                from `paperStats`, causing the divergence symptom: OPEN
-                count > 0 from `blotterOpenRows` while UNREALIZED/REALIZED
-                stuck at $0 because `usePaperTrades()` only tracks the
-                local paper store. Paper runtime is unchanged. */}
+            {/* Customer follow-up (2026-06) — the MY ACCOUNT equity card AND the
+                raw exchange equity / account breakdown / connected-exchanges
+                blocks (driven by useRuntimeState — totalEquityUSD,
+                connectedExchanges, usdBreakdown) are ALL relocated under this
+                default-collapsed "EXCHANGE PORTFOLIO INFORMATION" <details> so
+                the AICandlez Managed Performance panel (mounted at the top of
+                <main>) is the SOLE primary account surface. The MY ACCOUNT
+                headline equity is exchange/paper account value — it flips
+                between live broker equity and paper equity — and is NOT
+                AICandlez-managed performance, so it must not read as the
+                primary telemetry. Content is unchanged — only relocated. Still
+                visible to all roles. */}
+            <details
+              style={{
+                background: T.BG_TERMINAL,
+                border: `1px solid rgba(124,255,0,0.10)`,
+                fontFamily: T.FONT_MONO,
+              }}
+            >
+              <summary
+                style={{
+                  cursor: "pointer", listStyle: "none",
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: "8px 10px",
+                  fontSize: 9.5, fontWeight: 700, letterSpacing: T.TRACK_LABEL, color: T.TEXT_3,
+                }}
+              >
+                <span>EXCHANGE PORTFOLIO INFORMATION</span>
+                <span style={{ opacity: 0.6 }}>DETAILS</span>
+              </summary>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "0 0 0 0" }}>
+            {/* MY ACCOUNT equity card — demoted from the primary rail into this
+                secondary section. Headline equity = exchange/paper account value
+                (live broker equity in LIVE runtime, paper equity otherwise),
+                hydrated from `serverAccount` when LIVE so realized/unrealized/
+                today PnL stay consistent with `blotterOpenCount`/`blotterOpenRows`. */}
             <MyAccountRailPaper
               equityUsd={displayEquity}
               todayPnl={serverAccountReady
@@ -7362,32 +7390,6 @@ export function PortalCustomerShell({ operatorPreview = false }: { operatorPrevi
               strictRuntime={strictRuntime}
               runtimePending={runtimePending || runtimeResyncing}
             />
-            {/* T004 — EXCHANGE PORTFOLIO INFORMATION collapsible. The raw
-                exchange equity / account breakdown / connected-exchanges
-                blocks (driven by useRuntimeState — totalEquityUSD,
-                connectedExchanges, usdBreakdown) are relocated under a
-                default-collapsed <details> so the AICandlez Managed
-                Performance panel is the primary surface. Content is
-                unchanged — only wrapped. Still visible to all roles. */}
-            <details
-              style={{
-                background: T.BG_TERMINAL,
-                border: `1px solid rgba(124,255,0,0.10)`,
-                fontFamily: T.FONT_MONO,
-              }}
-            >
-              <summary
-                style={{
-                  cursor: "pointer", listStyle: "none",
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "8px 10px",
-                  fontSize: 9.5, fontWeight: 700, letterSpacing: T.TRACK_LABEL, color: T.TEXT_3,
-                }}
-              >
-                <span>EXCHANGE PORTFOLIO INFORMATION</span>
-                <span style={{ opacity: 0.6 }}>DETAILS</span>
-              </summary>
-              <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "0 0 0 0" }}>
             {/* ACCOUNT BREAKDOWN (display-only) — staked-inclusive total account
                 value + deployable buying power + per-exchange live position
                 economics for the ACTIVE live venue (currently Coinbase, the only
