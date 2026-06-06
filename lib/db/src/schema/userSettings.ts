@@ -147,6 +147,19 @@ export const userSettingsTable = pgTable("user_settings", {
   // mutes sync across devices and the server actually honors them.
   alertPrefs: jsonb("alert_prefs").$type<AlertPrefs>().notNull().default({}),
 
+  // ── AICandlez Managed Performance baseline (Managed-Performance initiative) ─
+  // Authoritative "capital allocated to AICandlez" baseline used for ALL
+  // AICandlez performance analytics (Starting AI Capital → Current AI Capital →
+  // Net Trading Profit → ROI%). USER-SET (PUT /api/user/ai-capital) with an
+  // admin override (PUT /api/admin/users/:id/ai-capital). NULLABLE on purpose:
+  //   - NULL → the customer has not declared an allocation. The
+  //     managed-performance endpoint falls back to `sim_accounts.starting_balance`
+  //     (the paper $100k baseline) and reports `baselineSource:"paper-default"`.
+  //   - concrete value → THE baseline for every AICandlez metric, intentionally
+  //     INDEPENDENT of exchange total account value, staked assets, manual crypto
+  //     purchases, deposits/withdrawals, and passive appreciation.
+  aiAllocatedCapital: real("ai_allocated_capital"),
+
   timezone: varchar("timezone", { length: 100 }).notNull().default("UTC"),
   currency: varchar("currency", { length: 10 }).notNull().default("USD"),
 

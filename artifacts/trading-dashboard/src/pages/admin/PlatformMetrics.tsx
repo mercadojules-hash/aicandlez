@@ -12,6 +12,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Activity, DollarSign, Loader2, RefreshCw, Users, TrendingUp, Brain, Shield, Zap, AlertTriangle } from "lucide-react";
 import { authFetch } from "@/lib/authFetch";
+import SystemTelemetryPanel from "@/components/admin/SystemTelemetryPanel";
 
 interface TopTelemetry {
   activeUsersNow:           number | null;
@@ -180,6 +181,10 @@ export default function AdminPlatformMetrics() {
         <Zap className="w-2.5 h-2.5" />
         REAL-TIME · AUTO-REFRESH 10S · NO PLACEHOLDER DATA
       </footer>
+
+      {/* ADMIN-ONLY Platform Resource & Billing Telemetry (Category B).
+          Self-gates on useUserRole(); renders null for non-admins. */}
+      <SystemTelemetryPanel />
     </div>
   );
 }

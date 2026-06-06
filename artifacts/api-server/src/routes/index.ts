@@ -69,8 +69,22 @@ import aiDisclaimerRouter from "./aiDisclaimer.js";
 import userAiLiquidityRouter from "./userAiLiquidity.js";
 import exitConfigRouter from "./exitConfig.js";
 import adminExitConfigRouter from "./adminExitConfig.js";
+import managedPerformanceRouter from "./managedPerformance.js";
+import aiCapitalRouter from "./aiCapital.js";
+import systemResourcesRouter from "./systemResources.js";
+import costConfigRouter from "./costConfig.js";
+import usageHistoryRouter from "./usageHistory.js";
+import { recordApiRequest, ensureUsageFlusher } from "../lib/usageCounters.js";
 
 const router: IRouter = Router();
+
+// Lightweight platform usage accounting (feeds usage_daily → admin telemetry).
+// Cheap in-memory increment on the hot path; periodic flusher upserts.
+router.use((_req, _res, next) => {
+  recordApiRequest();
+  ensureUsageFlusher();
+  next();
+});
 
 router.use(healthRouter);
 router.use(downloadRouter);
@@ -85,6 +99,11 @@ router.use(userNotificationsRouter);
 router.use(userExchangesRouter);
 router.use(exitConfigRouter);
 router.use(adminExitConfigRouter);
+router.use(managedPerformanceRouter);
+router.use(aiCapitalRouter);
+router.use(systemResourcesRouter);
+router.use(costConfigRouter);
+router.use(usageHistoryRouter);
 router.use(runtimeStateRouter);
 router.use(userLiveOrderRouter);
 router.use(userExecutionFunnelRouter);

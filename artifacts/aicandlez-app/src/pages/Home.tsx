@@ -18,6 +18,7 @@ import {
 } from "@/lib/api";
 import { CryptoIcon } from "@/components/CryptoIcon";
 import { useRuntimeState } from "@/hooks/useRuntimeState";
+import { useManagedPerformance } from "@/hooks/useManagedPerformance";
 import { OnboardingPanel } from "@/components/OnboardingPanel";
 import { TradeDetailSheet } from "@/components/TradeDetailSheet";
 
@@ -552,6 +553,105 @@ function QuickAction({ icon, label, onClick, accent = BRAND }: {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// T004 — AICandlez Managed Performance (compact mirror)
+// Customer-facing AI-trading-only KPIs scoped to the authoritative
+// `ai_allocated_capital` baseline. This is a CONCISE mirror of the full
+// trading-dashboard portal panel — Current AI Capital, Net Trading Profit
+// (+ROI%), and today/week windows. Visible to all roles. authFetch only.
+// ═══════════════════════════════════════════════════════════════════════════
+function ManagedPerformanceMirror() {
+  const { data, isLoading, isError } = useManagedPerformance();
+  if (isLoading || isError || !data) return null;
+
+  const signed$ = (v: number) =>
+    `${v >= 0 ? "+" : "−"}${fmt$(Math.abs(v))}`;
+  const signedPct = (v: number) =>
+    `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(2)}%`;
+
+  const stats: { l: string; v: string; c?: string }[] = [
+    { l: "Current AI Capital", v: fmt$(data.currentAiCapital) },
+    {
+      l: "Net Trading P&L",
+      v: signed$(data.netTradingProfit),
+      c: data.netTradingProfit >= 0 ? POS : NEG,
+    },
+    {
+      l: "Net ROI",
+      v: signedPct(data.netTradingRoiPct),
+      c: data.netTradingRoiPct >= 0 ? POS : NEG,
+    },
+    {
+      l: "Today",
+      v: signed$(data.windows.today),
+      c: data.windows.today >= 0 ? POS : NEG,
+    },
+    {
+      l: "This Week",
+      v: signed$(data.windows.week),
+      c: data.windows.week >= 0 ? POS : NEG,
+    },
+    {
+      l: "Win Rate",
+      v: `${data.winRatePct.toFixed(0)}%`,
+      c: data.winRatePct >= 55 ? POS : WARN,
+    },
+  ];
+
+  return (
+    <div style={{
+      margin: "0 16px",
+      padding: "16px 16px 14px",
+      borderRadius: 20,
+      background: `linear-gradient(160deg, rgba(102,255,102,0.05), rgba(10,20,16,0.85) 70%)`,
+      border: `1px solid ${BORDER_HI}`,
+      boxShadow: `0 16px 40px rgba(0,0,0,0.33), inset 0 0 30px rgba(102,255,102,0.03)`,
+      fontFamily: SANS,
+    }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+        <span style={{
+          fontSize: 10, fontWeight: 700, color: BRAND,
+          letterSpacing: 2, textTransform: "uppercase",
+        }}>
+          AICandlez Managed Performance
+        </span>
+        <span style={{
+          fontSize: 9, fontWeight: 700, color: TEXT_DIM,
+          letterSpacing: 1, textTransform: "uppercase",
+        }}>
+          AI Trading Only
+        </span>
+      </div>
+
+      {data.baseline.source === "paper-default" && (
+        <div style={{
+          fontSize: 10, color: WARN, marginBottom: 12, lineHeight: 1.4,
+        }}>
+          No AI allocation declared — using paper baseline.
+        </div>
+      )}
+
+      <div style={{
+        display: "grid", gridTemplateColumns: "1fr 1fr 1fr",
+        rowGap: 14, columnGap: 10,
+      }}>
+        {stats.map((s, i) => (
+          <div key={i}>
+            <div style={{
+              fontSize: 9, fontWeight: 700, color: TEXT_DIM,
+              letterSpacing: 1, textTransform: "uppercase",
+            }}>{s.l}</div>
+            <div style={{
+              fontSize: 16, fontWeight: 700, color: s.c ?? TEXT,
+              marginTop: 4, letterSpacing: -0.2, fontVariantNumeric: "tabular-nums",
+            }}>{s.v}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // MAIN HOME COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════
 export default function Home() {
@@ -1017,6 +1117,15 @@ export default function Home() {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* T004 — AICandlez Managed Performance (compact mirror)             */}
+        {/* AI-trading-only KPIs from /api/user/managed-performance via       */}
+        {/* authFetch. Concise headline mirror of the full portal panel.     */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        <div style={{ marginTop: 18 }}>
+          <ManagedPerformanceMirror />
         </div>
 
         {/* ════════════════════════════════════════════════════════════════ */}

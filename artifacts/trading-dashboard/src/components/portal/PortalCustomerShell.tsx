@@ -64,6 +64,7 @@ import type { EngineStatus as InstitutionalEngineStatus } from "../command/types
 import { Area, AreaChart, ResponsiveContainer, YAxis } from "recharts";
 import { PortalExchangeConnectModal } from "../PortalExchangeConnectModal";
 import { AIRiskControlsPanel } from "./AIRiskControlsPanel";
+import { AiManagedPerformancePanel } from "./AiManagedPerformancePanel";
 import { AIDisclaimerModal } from "../AIDisclaimerModal";
 // Pass 7V — brand logo used above search bar (replaces ticker chips row).
 import aiCandlezLogoHorizontal from "@assets/aicandlez-logo-horizontal-master_1779691403317.png";
@@ -7063,6 +7064,14 @@ export function PortalCustomerShell({ operatorPreview = false }: { operatorPrevi
             safe-execution gate ships. */}
         <RuntimeSwitcher />
 
+        {/* T004 — AICandlez Managed Performance (Category A). Headline
+            AI-trading-only KPIs scoped to the authoritative
+            `ai_allocated_capital` baseline. Visible to ALL roles (NOT
+            admin-gated); includes the inline AI Allocated Capital
+            set/edit control. Mounted near the top so it is the primary
+            performance surface above the battlefield matrix. */}
+        <AiManagedPerformancePanel />
+
         {/* Task #219 — AI allocation weights + per-exchange trade sizing.
             Customer-only (paid tiers; server gates the PUTs). Self-contained
             collapsible strip mounted here so the locked LiveControlBar
@@ -7353,6 +7362,32 @@ export function PortalCustomerShell({ operatorPreview = false }: { operatorPrevi
               strictRuntime={strictRuntime}
               runtimePending={runtimePending || runtimeResyncing}
             />
+            {/* T004 — EXCHANGE PORTFOLIO INFORMATION collapsible. The raw
+                exchange equity / account breakdown / connected-exchanges
+                blocks (driven by useRuntimeState — totalEquityUSD,
+                connectedExchanges, usdBreakdown) are relocated under a
+                default-collapsed <details> so the AICandlez Managed
+                Performance panel is the primary surface. Content is
+                unchanged — only wrapped. Still visible to all roles. */}
+            <details
+              style={{
+                background: T.BG_TERMINAL,
+                border: `1px solid rgba(124,255,0,0.10)`,
+                fontFamily: T.FONT_MONO,
+              }}
+            >
+              <summary
+                style={{
+                  cursor: "pointer", listStyle: "none",
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: "8px 10px",
+                  fontSize: 9.5, fontWeight: 700, letterSpacing: T.TRACK_LABEL, color: T.TEXT_3,
+                }}
+              >
+                <span>EXCHANGE PORTFOLIO INFORMATION</span>
+                <span style={{ opacity: 0.6 }}>DETAILS</span>
+              </summary>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "0 0 0 0" }}>
             {/* ACCOUNT BREAKDOWN (display-only) — staked-inclusive total account
                 value + deployable buying power + per-exchange live position
                 economics for the ACTIVE live venue (currently Coinbase, the only
@@ -7510,6 +7545,8 @@ export function PortalCustomerShell({ operatorPreview = false }: { operatorPrevi
                 })}
               </section>
             )}
+              </div>
+            </details>
             <CustomerBlotterPanelOpen rows={blotterOpenRows} entitled={entitled} />
             {/* Task #217 — DB-backed closed-trade feed (paper + live,
                 mode-tagged) instead of the in-memory session-only paper

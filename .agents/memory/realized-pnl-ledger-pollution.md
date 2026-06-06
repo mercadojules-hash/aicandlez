@@ -58,3 +58,15 @@ idempotence guard (skip the write + audit insert when there's nothing new to tag
 the recompute already matches) so repeated applies are true no-ops. Recompute excludes
 only the incident signature, so paper-only customers (no backlog rows) are untouched —
 fail-safe by construction.
+
+## New realized-aggregation surfaces: filter on reconciliation_tag, not exchange
+Any NEW read-side surface that sums `sim_trades.realized_pnl` for a trust-sensitive KPI
+(e.g. the customer-facing managed-performance panel) must scope to
+`reconciliation_tag IS NULL`, NOT `exchange IS NOT NULL`. `reconciliation_tag IS NULL`
+= ordinary trusted row; it keeps paper trades (`exchange IS NULL`, tag NULL) while
+dropping every reconciliation artifact in one predicate. Summing all user rows
+unscoped lets RECONCILED_BACKLOG pollution distort headline P&L / ROI / win-rate /
+profit-factor on a real-money surface.
+**Also:** initialize best/worst-trade extrema to `null` (not `0`) and emit `null` for
+an empty trusted set, or an all-loss / all-win / zero-trade cohort shows a misleading
+`$0.00` "best trade".

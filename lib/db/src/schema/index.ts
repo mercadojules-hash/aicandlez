@@ -25,4 +25,6 @@ export * from "./creditTransactions";
 export * from "./processedStripeEvents";
 export * from "./userRiskSettings";
 export * from "./riskThrottleEvents";
+export * from "./platformCostConfig";
+export * from "./usageDaily";
 export * from "../constants/alertKeys";
