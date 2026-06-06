@@ -253,9 +253,12 @@ soft-cap (`DEFAULT_CATEGORY_ALLOCATION` fallback) · 0CASH buying-power probe
 here. Full prose + SELL-filter + stop-stabilization detail:
 `docs/replit-history.md`.
 
-**Exit config** (`lib/exitConfig.ts`): SL **2%** / max-hold **1h** (universal,
-0 per-account/exchange overrides in prod) / TP **10%** / trailing **5%**
-(`EXIT_DEFAULTS`; ACTIVE live test — revert target TP4/trail2 in-file). LIVE
+**Exit config** (`lib/exitConfig.ts`): SL **2%** / max-hold **6h** (default;
+restored 1h→6h after a prod exit audit showed the 1h ceiling force-closing ~55%
+of trades before they could reach TP) / TP **10%** / trailing **5%**
+(`EXIT_DEFAULTS`). Prod accounts now carry **explicit** per-account exit config
+(TP10/SL2/trail5/maxHold6) written to `user_settings` so the live values are
+env-proof and uniform — NOT relying on code defaults. LIVE
 stop trigger de-noised (stabilization + catastrophic fast-path) via
 `runHardStopMonitor`; level still 2%. Precedence (TP-side + trailing): per-
 exchange → account → env (`LIVE_TRAILING_STOP_PERCENT`) → default; `0` =

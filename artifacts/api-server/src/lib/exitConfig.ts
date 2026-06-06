@@ -46,11 +46,14 @@ export const EXIT_DEFAULTS = {
   // restore takeProfitPercent: 4 / trailingStopPercent: 2.
   takeProfitPercent:   10,
   trailingStopPercent: 5,
-  // Universal max-hold lowered 24h → 6h → 1h (approved, applies to ALL users).
-  // Every user's LIVE sim_positions now time-exit at 1h when neither SL/TP nor
-  // the trailing stop has fired. Per-account / per-exchange overrides (if a user
-  // has one) still win over this default. To revert, restore 6 (prior) or 24.
-  maxHoldHours:        1,
+  // Universal max-hold: 24h → 6h → 1h → restored to 6h (approved, applies to ALL
+  // users). A production exit audit of live Coinbase trades showed the 1h ceiling
+  // was the dominant exit (~55% MAX_HOLD) and was force-closing positions long
+  // before they could develop toward the 10% take-profit — including some of the
+  // largest winners. 6h gives trades room to reach TP while still capping
+  // open-position hold time. Per-account / per-exchange overrides still win over
+  // this default. To revert, restore 1 (prior) or 24.
+  maxHoldHours:        6,
 } as const;
 
 // Safe clamp ranges, centralized so every write path (customer + admin) reuses

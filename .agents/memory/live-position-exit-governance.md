@@ -56,3 +56,14 @@ and stored as absolute prices on the row. Editing those settings later does NOT 
 already-open position (check `user_settings.updated_at` vs the position's open time before inferring
 the % from current settings). The LIVE trailing distance, when not env-overridden, is derived from
 that same stored SL band — so it inherits the at-open risk, not current settings.
+
+**Changing prod exit values (operational):** max-hold is resolved LIVE each tick via
+`resolveExit(userId, exchange)` reading `user_settings.max_hold_hours` (NOT snapshotted on the
+position) and compared to position age — so writing `user_settings` takes effect on the next engine
+tick for BOTH new AND already-open positions, deploy-independent. Contrast with TP/SL (locked at open,
+above) which only change for NEW positions. To change a live value immediately + env-proof, write
+EXPLICIT per-account `user_settings` columns (they win over `LIVE_*` env defaults and `EXIT_DEFAULTS`);
+editing `EXIT_DEFAULTS` in code only affects accounts with NULL overrides and needs a Render deploy.
+**Why:** an exit audit (1h MAX_HOLD was ~55% of exits, force-closing winners before the 10% TP) led to
+restoring max-hold 1h→6h; applied as explicit per-account writes for immediate live effect, with the
+code default bumped 1→6 for durability/new accounts.
