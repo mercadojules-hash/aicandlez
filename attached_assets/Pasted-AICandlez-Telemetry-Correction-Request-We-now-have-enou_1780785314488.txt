@@ -1,0 +1,119 @@
+AICandlez Telemetry Correction Request
+
+We now have enough information to establish a realistic live baseline.
+
+The current dashboard still contains assumptions that distort profitability reporting.
+
+Current Findings
+
+The production audit identified that:
+
+55.5% of exits were caused by MAX_HOLD.
+MAX_HOLD was incorrectly set to 1 hour.
+TP=10% was rarely reachable under the 1-hour configuration.
+Production has now been updated to:
+TP = 10%
+SL = 2%
+Trailing = 5%
+Max Hold = 6 Hours
+
+This effectively creates a new operational era for performance measurement.
+
+Telemetry Corrections Requested
+1. Remove Paper Trading References
+
+The following values should not be displayed to live users:
+
+AI Allocated Capital = $100,000
+Current AI Capital = $100,096
+Cash Available = $98,210
+
+These are paper/synthetic values and do not represent live Coinbase capital.
+
+2. Establish Live Baseline Tracking
+
+The dashboard should allow:
+
+Starting Live Capital
+Current Live Cash Balance
+Open Trade Value
+Current Live Account Value
+Net Lifetime Profit
+Live ROI %
+
+The system should calculate:
+
+Current Live Account Value
+
+Live Cash Balance
++
+Open Trade Value
+
+Net Lifetime Profit
+Current Live Account Value
+
+Starting Live Capital
+
+3. Record New Baseline
+
+For audit purposes:
+
+Operational baseline date:
+
+June 6, 2026
+
+Reason:
+
+Major production exit-engine correction.
+
+Previous performance was heavily influenced by the 1-hour MAX_HOLD bottleneck.
+
+Future profitability analysis should be capable of separating:
+
+Pre-fix performance
+Post-fix performance
+4. Add Strategy Era Segmentation
+
+Performance should be grouped into:
+
+Legacy Configuration
+
+TP = historical values
+Max Hold = 1 hour
+
+Current Configuration
+
+TP = 10%
+SL = 2%
+Trailing = 5%
+Max Hold = 6 hours
+
+This will allow accurate comparison of performance before and after the production fix.
+
+5. Verify True Starting Capital
+
+User history indicates:
+
+Original live account approximately $643.
+Additional XLM holdings were liquidated and moved into the trading pool.
+XLM liquidation approximately $1,945.
+Effective capital available to the AI system approximately $2,500-$2,600.
+
+Please determine the exact amount from Coinbase transaction history and use that value as the official Starting Live Capital.
+
+Do not use:
+
+$100,000 paper baseline
+Synthetic AI Capital values
+
+Use actual exchange capital only.
+
+The goal is simple:
+
+When a user logs in, they should immediately know:
+
+How much real money they started with.
+How much real money they have now.
+How much profit or loss AICandlez has generated.
+
+Everything else is secondary.
