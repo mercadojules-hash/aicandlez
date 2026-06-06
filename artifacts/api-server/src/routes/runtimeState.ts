@@ -55,6 +55,46 @@ type AuthReq = Request & { clerkUserId: string };
 
 type RuntimeMode = "paper" | "live";
 
+// ── Venue-health hysteresis (transient-blip tolerance) ────────────────────────
+// A SINGLE failed balance poll (Coinbase 429 rate-limit / transient 5xx /
+// network timeout / credential-refresh hiccup) must NOT tear down a live
+// runtime. Without this, one bad poll empties `healthyLive` → the aggregator
+// resolves `mode="paper"`, which cascades into:
+//   (a) the parallel-cohort writeback DEMOTING the venue to tradingMode="paper"
+//       → the engine's live OPEN fan-out (`listLiveExecutionUsers`) drops the
+//       user → NEW live entries stop on that venue (open positions keep
+//       exiting, since exits resolve by userId+exchange+status, not tradingMode);
+//   (b) the client `RuntimeSwitcher` effect firing `setArmedForLive(false)` and
+//       the headline equity flipping from the live balance to the paper-sim
+//       account balance (the "$2,427 → $122,774" symptom).
+//
+// We keep a venue "effectively healthy" for a grace window after its last
+// successful poll, so a brief broker blip is ridden through and last-known-good
+// equity is retained. A SUSTAINED outage (failures spanning longer than the
+// grace window) still demotes correctly — the safe fallback is preserved.
+//
+// Keyed by connection id; in-memory (resets on deploy — fail-safe: a venue with
+// no recorded success is never graced, matching the pre-existing strict
+// behavior). Execution / sizing NEVER read this map — order-time getAccount()
+// and the live cash probe still re-verify the broker before any real order
+// ships, so grace can never route money to a genuinely-down venue.
+interface VenueHealth {
+  lastHealthyAt:       number;
+  consecutiveFailures: number;
+  lastEquityUSD:       number;
+}
+const venueHealth = new Map<string, VenueHealth>();
+
+function parseGraceMs(): number {
+  const raw = process.env["RUNTIME_HEALTH_GRACE_MS"];
+  const n = raw == null || raw.trim() === "" ? NaN : Number(raw);
+  // Fail-safe (real-money knob): require finite + sane range, else fall back to
+  // a safe default. 180_000ms ≈ 6 consecutive 30s poll cycles.
+  if (!Number.isFinite(n) || n < 0 || n > 900_000) return 180_000;
+  return n;
+}
+const RUNTIME_HEALTH_GRACE_MS = parseGraceMs();
+
 interface ExchangeConnectionState {
   exchange:               string;
   label:                  string | null;
@@ -214,17 +254,80 @@ router.get("/user/runtime-state", requireAuth, async (req, res): Promise<void> =
     }));
     const connectedExchanges = rows.map((r, i) => shapeConnection(r, snapshots[i]!));
 
+    // ── Apply venue-health hysteresis ─────────────────────────────────────────
+    // `snapshots[i].ok` is the RAW poll result. `effectivelyHealthy` rides a
+    // transient failure through the grace window so the runtime mode + parallel
+    // cohort writeback don't tear down on a single bad poll, and last-known-good
+    // equity is retained on the shaped connection so the headline equity holds
+    // steady instead of flashing $0 / flipping to the paper-sim balance.
+    // `connectedExchanges[i].ok` is left at the raw value so the "balances last
+    // synced / sync retrying" telemetry stays honest while the runtime survives.
+    //
+    // INVARIANT: hysteresis state is keyed by connection `row.id` (stable), but
+    // `effectivelyHealthy` is a Set of exchange NAMES because the downstream
+    // filters (`healthyLive`, `totalEquityUSD`) operate on `connectedExchanges`
+    // which carries `.exchange`. This is safe ONLY because the schema enforces
+    // `unique(user_id, exchange)` (uec_user_exchange_uidx) — one row per
+    // (user, exchange). If that index is ever dropped, switch these filters to
+    // key by id (e.g. include the id on the shaped connection) to avoid two
+    // rows of the same exchange aliasing each other's health.
+    const nowHealth = Date.now();
+    const effectivelyHealthy = new Set<string>();
+    rows.forEach((r, i) => {
+      const snap = snapshots[i]!;
+      const tracker = venueHealth.get(r.id) ?? { lastHealthyAt: 0, consecutiveFailures: 0, lastEquityUSD: 0 };
+      if (snap.ok) {
+        tracker.lastHealthyAt = nowHealth;
+        tracker.consecutiveFailures = 0;
+        tracker.lastEquityUSD = Number.isFinite(snap.totalEquityUSD) ? snap.totalEquityUSD : 0;
+        venueHealth.set(r.id, tracker);
+        effectivelyHealthy.add(r.exchange);
+        return;
+      }
+      tracker.consecutiveFailures += 1;
+      venueHealth.set(r.id, tracker);
+      const msSinceHealthy = tracker.lastHealthyAt > 0 ? nowHealth - tracker.lastHealthyAt : Infinity;
+      const withinGrace = msSinceHealthy <= RUNTIME_HEALTH_GRACE_MS;
+      if (withinGrace) {
+        effectivelyHealthy.add(r.exchange);
+        // Retain last-known-good equity so the SUM + headline don't collapse.
+        connectedExchanges[i] = { ...connectedExchanges[i]!, totalEquityUSD: tracker.lastEquityUSD };
+        logger.warn({
+          tag:                 "RUNTIME_HEALTH_GRACE",
+          userId,
+          exchange:            r.exchange,
+          adapter:             r.exchange,
+          consecutiveFailures: tracker.consecutiveFailures,
+          msSinceHealthy:      Number.isFinite(msSinceHealthy) ? msSinceHealthy : null,
+          graceMs:             RUNTIME_HEALTH_GRACE_MS,
+          error:               snap.error ?? null,
+        }, "[RUNTIME_HEALTH_GRACE] balance poll failed — keeping venue live through transient blip");
+      } else {
+        logger.warn({
+          tag:                 "RUNTIME_HEALTH_DEMOTED",
+          userId,
+          exchange:            r.exchange,
+          adapter:             r.exchange,
+          consecutiveFailures: tracker.consecutiveFailures,
+          msSinceHealthy:      Number.isFinite(msSinceHealthy) ? msSinceHealthy : null,
+          graceMs:             RUNTIME_HEALTH_GRACE_MS,
+          error:               snap.error ?? null,
+        }, "[RUNTIME_HEALTH_DEMOTED] balance poll failing beyond grace window — venue dropped from live runtime");
+      }
+    });
+
     const totalEquityUSD = connectedExchanges
-      .filter(c => c.ok)
+      .filter(c => effectivelyHealthy.has(c.exchange))
       .reduce((sum, c) => sum + (Number.isFinite(c.totalEquityUSD) ? c.totalEquityUSD : 0), 0);
 
-    // "Healthy + live-eligible" = active connection, balance poll ok, AND the
-    // API key is authorized for trading. The `canTrade` term keeps runtime
-    // resolution (and the cohort writeback that promotes the active exchange
-    // to isDefault/live for the execution engine) from ever pinning a
-    // trade-unauthorized venue — the server-side companion to the switcher's
-    // selectability gate and the PUT /user/settings authorization check.
-    const healthyLive = connectedExchanges.filter(c => c.status === "active" && c.ok && c.canTrade);
+    // "Healthy + live-eligible" = active connection, EFFECTIVELY healthy (raw
+    // poll ok OR within the transient-blip grace window), AND the API key is
+    // authorized for trading. The `canTrade` term keeps runtime resolution (and
+    // the cohort writeback that promotes the active exchange to isDefault/live
+    // for the execution engine) from ever pinning a trade-unauthorized venue —
+    // the server-side companion to the switcher's selectability gate and the
+    // PUT /user/settings authorization check.
+    const healthyLive = connectedExchanges.filter(c => c.status === "active" && effectivelyHealthy.has(c.exchange) && c.canTrade);
 
     let mode: RuntimeMode      = "paper";
     let activeExchange: string | null = null;

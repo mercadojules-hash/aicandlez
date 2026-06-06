@@ -51,8 +51,24 @@ export function RuntimeSwitcher() {
   // reset still matters for the SignalRow customer LIVE BUY path and
   // any flag set by a prior ACTIVATE in this session.
   useEffect(() => {
-    if (state?.mode === "paper") setArmedForLive(false);
-  }, [state?.mode]);
+    if (state?.mode === "paper") {
+      // Diagnostic: surface every auto-disarm with timestamp + cause so a
+      // phantom "DISARMED AFTER REFRESH" can be traced to a runtime→paper
+      // transition (vs a real page reload). With the server-side venue-health
+      // hysteresis (runtimeState.ts), a transient balance-poll blip no longer
+      // resolves mode="paper", so this should only fire on a genuine, sustained
+      // paper fallback or an explicit user opt-out.
+      // eslint-disable-next-line no-console
+      console.warn("[ARM_AUTO_DISARM]", {
+        at:             new Date().toISOString(),
+        reason:         "runtime_mode_resolved_paper",
+        source:         "RuntimeSwitcher.autoDisarmEffect",
+        activeExchange: state?.activeExchange ?? null,
+        liveReady:      state?.liveReady ?? null,
+      });
+      setArmedForLive(false);
+    }
+  }, [state?.mode, state?.activeExchange, state?.liveReady]);
 
   if (isLoading || !state) {
     return (
