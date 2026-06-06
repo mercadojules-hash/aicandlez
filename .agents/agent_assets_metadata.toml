@@ -149,3 +149,9 @@ id = "AbCsaww2sh9UP64uRo91u"
 uri = "file://.local/audit-output/teedelgado_last50_live_closes.csv"
 type = "table"
 title = "Last 50 Closed Live Positions"
+
+[[outputs]]
+id = "YyPrliPOtSGeLAVfj2IsP"
+uri = "file://exports/zero-pnl-trades.csv"
+type = "table"
+title = "Zero-P&L trade forensics (241 prod rows)"
