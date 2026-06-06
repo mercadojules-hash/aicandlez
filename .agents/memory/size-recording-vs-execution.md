@@ -7,9 +7,10 @@ description: Every live fill records size_usd=$20 but the broker actually receiv
 
 **Proof method (no telemetry/deploy needed):** compare `quantity × entry_price`
 (the real broker notional) against the recorded `size_usd` in `sim_positions`/
-`sim_trades`. In prod: teedelgado Coinbase notional ≈ $49.5–50 (override $50),
-teedelgado Kraken ≈ $20 (global $20), mixtapepsd Kraken ≈ $10 (global $10) — yet
-EVERY row's `size_usd` column = $20. ⟹ broker gets the right size; only the
+`sim_trades`. In prod: one QA account's Coinbase notional ≈ $49.5–50 (its $50
+per-exchange override) and Kraken ≈ $20 (its $20 global); a second QA account's
+Kraken ≈ $10 (its $10 global) — yet EVERY row's `size_usd` column = $20. ⟹ broker
+gets the right size; only the
 recorded field is wrong. `qty×price` is stronger evidence than a log line.
 
 **Root cause (exact path):**

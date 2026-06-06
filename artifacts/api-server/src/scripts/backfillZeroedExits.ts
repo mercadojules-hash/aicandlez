@@ -15,8 +15,27 @@
 import { createRequire } from "node:module";
 import { vault } from "../services/vault/CredentialVault.js";
 
+// Minimal local typing for the `pg` surface this one-off script uses, so it
+// typechecks without adding `pg` to api-server's dependency graph (it is only an
+// ops script, resolved at runtime from lib/db's install).
+interface PgQueryResult<T> {
+  rows: T[];
+  rowCount: number | null;
+}
+interface PgClient {
+  query<T = unknown>(text: string, params?: unknown[]): Promise<PgQueryResult<T>>;
+  release(): void;
+}
+interface PgPool {
+  query<T = unknown>(text: string, params?: unknown[]): Promise<PgQueryResult<T>>;
+  connect(): Promise<PgClient>;
+  end(): Promise<void>;
+}
+interface PgModule {
+  Pool: new (config: unknown) => PgPool;
+}
 const require = createRequire("/home/runner/workspace/lib/db/package.json");
-const pg = require("pg") as typeof import("pg");
+const pg = require("pg") as PgModule;
 import { makeAdapter } from "../services/exchanges/adapterFactory.js";
 import type { BaseExchangeAdapter } from "../services/exchanges/BaseExchangeAdapter.js";
 
@@ -231,9 +250,27 @@ async function main() {
         [u.id, UNRECOVERABLE_TAG, USER],
       );
     }
+    // Reconcile the account realized ledger by the exact net delta so the
+    // per-trade truth and the stored total stay consistent. Old realized was 0
+    // for every corrected row, so delta == sum(newPnl). Idempotent on re-run:
+    // already-corrected rows carry BACKFILL_REAL_FILL and drop out of the
+    // candidate query, so a second run selects nothing and adds 0.
+    const ledgerDelta = parseFloat(corrected.reduce((s, c) => s + (c.newPnl - c.oldPnl), 0).toFixed(2));
+    const acctRes = await client.query<{ total_realized: number }>(
+      `UPDATE sim_accounts
+          SET total_realized = total_realized + $2, updated_at = now()
+        WHERE user_id = $1
+      RETURNING total_realized`,
+      [USER, ledgerDelta],
+    );
+    if (acctRes.rowCount !== 1) {
+      throw new Error(
+        `ledger reconcile expected exactly 1 sim_accounts row for ${USER}, updated ${acctRes.rowCount} — rolling back`,
+      );
+    }
     await client.query("COMMIT");
     console.log(`[APPLY] committed: ${corrected.length} corrected, ${unrecoverable.length} tagged unrecoverable.`);
-    console.log(`[APPLY] NOTE: sim_accounts.total_realized NOT mutated by this script (ledger-total decision pending).`);
+    console.log(`[APPLY] sim_accounts.total_realized reconciled by ${ledgerDelta >= 0 ? "+" : ""}${ledgerDelta} -> new total_realized = ${acctRes.rows[0]?.total_realized}`);
   } catch (e) {
     await client.query("ROLLBACK");
     console.error("[APPLY] ROLLED BACK:", (e as Error).message);

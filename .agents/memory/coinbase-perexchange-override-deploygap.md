@@ -6,8 +6,9 @@ description: Every live fill records the same flat size regardless of per-user g
 # Live fill size ignores per-user config (override + global)
 
 Symptom: live fills record one flat size for everyone — a per-exchange override
-(teedelgado Coinbase $50) AND a sub-preset global (mixtapepsd global $10) are
-BOTH ignored; every fill records $20 (teedelgado Kraken global=$20; coincidence).
+(one QA account, Coinbase, $50) AND a sub-preset global (a second QA account,
+$10) are BOTH ignored; every fill records $20 (the first account's Kraken
+global=$20; coincidence).
 
 **DISPROVEN earlier theory:** this was first called a deploy/version gap (prod
 running a build that predates the per-exchange-size code). That is WRONG.
@@ -30,7 +31,7 @@ of the gate-resolved size (recording bug — broker may actually fill the right
 size); (b) a later clamp (buying-power/risk) resets it; (c) `coerceTradeSizeToPreset`
 maps non-preset globals to `DEFAULT_TRADE_SIZE_USD` (=10) — note ALLOWED sizes
 are [10,20,50,100], so $10 global is a VALID preset and should NOT coerce to $20,
-which rules out coercion as the cause of mixtapepsd's $10→$20.
+which rules out coercion as the cause of the second account's $10→$20.
 
 **Verification limit (durable):** there is NO build-SHA endpoint — `/api/healthz`
 returns a hardcoded `version:"0.0.0"`. Render's deployed SHA cannot be read from

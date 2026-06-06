@@ -27,21 +27,19 @@ must be driven by a broker-confirmed fill or a balance-verified residual — nev
 order-submit ACK.** Pre-fix orphans still need a separate sweep; this only stops new
 ones.
 
-**Evidence (teedelgado QA acct, Coinbase, 2026-06-06):** AICandlez books showed
-the account flat (only 1e-8 dust "open" rows), but Coinbase held ~$570 of
-bot-traded crypto across 10 assets (NEAR $250, ALGO, SUI, AXS, AVAX, FIL, ICP,
-COMP, INJ, BTC) for positions booked closed. Crucially this was NOT limited to the
-50 `ZOMBIE_INSUFFICIENT_FUNDS` reconciled closes — FIL (19/19 clean) and INJ
-(13/13 clean) had zero reconciles/partials yet still left whole positions
-un-sold. Fully-liquidated symbols leave only sub-$1 dust (the "good" signature);
-orphans leave whole-position-sized balances.
+**Evidence (a QA account, Coinbase, 2026-06-06):** AICandlez books showed
+the account flat (only 1e-8 dust "open" rows), but the exchange still held
+material bot-traded crypto across ~10 assets for positions booked closed.
+Crucially this was NOT limited to the `ZOMBIE_INSUFFICIENT_FUNDS` reconciled
+closes — some symbols with 100%-clean closes (zero reconciles/partials) still
+left whole positions un-sold. Fully-liquidated symbols leave only sub-$1 dust
+(the "good" signature); orphans leave whole-position-sized balances.
 
 **Dry-run orphan-sweep preview refinement (2026-06-06):** after excluding the
 protected never-sell set (QNT/SHIB/GRT/JASMY/ALEO/NU/MLN), still-tracked open
-positions (NEAR ~125 held ≈ tracked), cash (USD ~$1.75k + USDC), and sub-min-notional
-dust, the genuinely bot-orphaned + SELL-eligible (≥ Coinbase $1 min_market_funds,
-tradable) set was **9 assets ≈ $318.50**: ALGO, SUI, AXS, AVAX, FIL, ICP, COMP, INJ,
-BTC. 8 more bot-orphaned but sub-$1 → leave as dust. Pricing must use Coinbase PUBLIC
+positions, cash (USD + USDC), and sub-min-notional dust, the genuinely
+bot-orphaned + SELL-eligible (≥ Coinbase $1 min_market_funds, tradable) set was a
+handful of assets; sub-$1 orphans → leave as dust. Pricing must use Coinbase PUBLIC
 endpoints (`api.coinbase.com/v2/prices/{A}-USD/spot`, `api.exchange.coinbase.com/
 products/{A}-USD` min_market_funds) — the authenticated per-asset getTicker 429s hard
 under prod polling on the shared key.
@@ -52,7 +50,7 @@ under prod polling on the shared key.
   material balance (bot-traded, books flat) = ORPHANED un-liquidated; never-traded
   = MANUAL/user deposit; map symbol→base, RNDR↔RENDER alias.
 - Staked balances appear in `getAccountValueUSD` but NOT in deployable
-  `getAccount().balances` (≈$1.26k locked in this acct) — don't count as orphan.
+  `getAccount().balances` (locked, e.g. staked) — don't count as orphan.
 - Real fix surface (if asked): persist real broker close-order id+status+filled
   qty + post-close balance probe; add an orphan-sweep market-sell job; reconcile
   phantom 1e-8 open rows out of sim_positions.
