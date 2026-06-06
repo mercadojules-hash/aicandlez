@@ -131,3 +131,21 @@ id = "pyThhL5J6AXfEYV46HNnO"
 uri = "file://docs/aicandlez-file-reference.md"
 type = "text"
 title = "AICandlez — File & Route Technical Reference"
+
+[[outputs]]
+id = "Tz2VFeSK_x-tqP6OWDbWs"
+uri = "file://.local/audit-output/teedelgado_live_liquidation_audit.md"
+type = "text"
+title = "Live Liquidation Forensic Audit — teedelgado"
+
+[[outputs]]
+id = "NC8qK_GyeUDff1ySRR09N"
+uri = "file://.local/audit-output/teedelgado_coinbase_holdings_classified.csv"
+type = "table"
+title = "Coinbase Holdings — Classified (ACTIVE/STALE/ORPHANED/MANUAL)"
+
+[[outputs]]
+id = "AbCsaww2sh9UP64uRo91u"
+uri = "file://.local/audit-output/teedelgado_last50_live_closes.csv"
+type = "table"
+title = "Last 50 Closed Live Positions"
