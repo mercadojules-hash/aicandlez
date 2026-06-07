@@ -4,7 +4,7 @@ import {
   useQueryClient,
   type UseQueryResult,
 } from "@tanstack/react-query";
-import { authFetchJson } from "@/lib/authFetch";
+import { authFetch, authFetchJson } from "@/lib/authFetch";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Typed react-query hooks for the Jarvis `/api/jarvis/*` surface. Every call
@@ -235,6 +235,9 @@ export const jarvisKeys = {
   cognitionRun: (id: string) => ["jarvis", "cognition-run", id] as const,
   cognitionOverview: ["jarvis", "cognition-overview"] as const,
   semanticStatus: ["jarvis", "semantic-status"] as const,
+  voiceSettings: ["jarvis", "voice-settings"] as const,
+  voiceSessions: ["jarvis", "voice-sessions"] as const,
+  voiceTurns: (id: string) => ["jarvis", "voice-turns", id] as const,
 };
 
 // ── dashboard ────────────────────────────────────────────────────────────────
@@ -2690,5 +2693,193 @@ export function useGovernanceOverview(): UseQueryResult<JarvisGovernanceOverview
     queryFn: () =>
       authFetchJson<JarvisGovernanceOverview>(`${API}/governance/overview`),
     refetchInterval: 5000,
+  });
+}
+
+// ── voice (Voice v1 — executive voice interface) ─────────────────────────────
+// Admin-gated. Transcripts-only (no audio is ever persisted). The turn upload
+// sends a raw audio Blob through authFetch (locked transport invariant) — never
+// bare fetch — and receives the readback as base64 in a JSON envelope.
+
+export interface JarvisVoiceLink {
+  type: string;
+  id: string;
+}
+
+export interface JarvisVoiceSession {
+  id: string;
+  status: string;
+  businessId: string | null;
+  createdBy: string | null;
+  userEmail: string | null;
+  turnCount: number;
+  startedAt: string;
+  lastTurnAt: string | null;
+  endedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JarvisVoiceTurn {
+  id: string;
+  sessionId: string | null;
+  turnIndex: number;
+  transcript: string | null;
+  transcriptConfidence: number | null;
+  intent: string | null;
+  intentConfidence: number | null;
+  capability: string | null;
+  replyText: string | null;
+  ttsOk: boolean;
+  status: string;
+  error: string | null;
+  cognitionRunId: string | null;
+  links: JarvisVoiceLink[] | null;
+  costMicros: number;
+  latencyMs: number | null;
+  createdBy: string | null;
+  createdAt: string;
+}
+
+export interface JarvisVoiceTurnResult {
+  turnId: string | null;
+  sessionId: string;
+  intent: string;
+  capability: string | null;
+  transcript: string;
+  transcriptConfidence: number | null;
+  replyText: string;
+  ttsOk: boolean;
+  audioBase64: string | null;
+  audioContentType: string | null;
+  links: JarvisVoiceLink[];
+  cognitionRunId: string | null;
+  status: string;
+  latencyMs: number;
+}
+
+export function useVoiceSettings(): UseQueryResult<{ enabled: boolean }> {
+  return useQuery({
+    queryKey: jarvisKeys.voiceSettings,
+    queryFn: () => authFetchJson<{ enabled: boolean }>(`${API}/voice/settings`),
+  });
+}
+
+export function useSetVoiceSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (enabled: boolean) =>
+      authFetchJson<{ enabled: boolean }>(`${API}/voice/settings`, {
+        method: "POST",
+        body: JSON.stringify({ enabled }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: jarvisKeys.voiceSettings });
+    },
+  });
+}
+
+export function useVoiceSessions(): UseQueryResult<JarvisVoiceSession[]> {
+  return useQuery({
+    queryKey: jarvisKeys.voiceSessions,
+    queryFn: async () => {
+      const data = await authFetchJson<{ sessions: JarvisVoiceSession[] }>(
+        `${API}/voice/sessions`,
+      );
+      return data.sessions ?? [];
+    },
+  });
+}
+
+export function useSessionTurns(
+  sessionId: string | null,
+): UseQueryResult<{ session: JarvisVoiceSession; turns: JarvisVoiceTurn[] }> {
+  return useQuery({
+    queryKey: jarvisKeys.voiceTurns(sessionId ?? "none"),
+    enabled: Boolean(sessionId),
+    queryFn: () =>
+      authFetchJson<{ session: JarvisVoiceSession; turns: JarvisVoiceTurn[] }>(
+        `${API}/voice/sessions/${sessionId}/turns`,
+      ),
+  });
+}
+
+export function useStartVoiceSession() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (businessId?: string | null) =>
+      authFetchJson<{ session: JarvisVoiceSession }>(`${API}/voice/sessions`, {
+        method: "POST",
+        body: JSON.stringify({ businessId: businessId ?? null }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: jarvisKeys.voiceSessions });
+    },
+  });
+}
+
+export function useEndVoiceSession() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (sessionId: string) =>
+      authFetchJson<{ session: JarvisVoiceSession }>(
+        `${API}/voice/sessions/${sessionId}/end`,
+        { method: "POST" },
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: jarvisKeys.voiceSessions });
+    },
+  });
+}
+
+export function usePurgeVoiceSession() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (sessionId: string) =>
+      authFetchJson<{ purged: boolean; turnsDeleted: number }>(
+        `${API}/voice/sessions/${sessionId}`,
+        { method: "DELETE" },
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: jarvisKeys.voiceSessions });
+    },
+  });
+}
+
+// Binary PTT upload. Sends the recorded audio Blob with its native mime type as
+// the request body; the server runs STT → intent → capability → TTS and returns
+// the readback envelope. Routed through authFetch (NOT bare fetch).
+export function useVoiceTurn() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (args: {
+      sessionId: string;
+      audio: Blob;
+    }): Promise<JarvisVoiceTurnResult> => {
+      const mimeType = args.audio.type || "audio/webm";
+      const qs = new URLSearchParams({
+        sessionId: args.sessionId,
+        mimeType,
+      }).toString();
+      const res = await authFetch(`${API}/voice/turn?${qs}`, {
+        method: "POST",
+        body: args.audio,
+        headers: { "Content-Type": mimeType },
+      });
+      if (!res.ok) {
+        let detail = "";
+        try {
+          detail = await res.clone().text();
+        } catch {
+          /* ignore */
+        }
+        throw new Error(`Voice turn failed (${res.status}): ${detail.slice(0, 200)}`);
+      }
+      return (await res.json()) as JarvisVoiceTurnResult;
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: jarvisKeys.voiceTurns(vars.sessionId) });
+      qc.invalidateQueries({ queryKey: jarvisKeys.voiceSessions });
+    },
   });
 }

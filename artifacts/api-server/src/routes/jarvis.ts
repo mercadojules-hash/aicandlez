@@ -75,6 +75,20 @@ import {
   setSemanticRetrievalEnabled,
   setIndexerTickEnabled,
 } from "../lib/jarvis/cognition/index.js";
+import { raw } from "express";
+import {
+  getVoiceEnabled,
+  setVoiceEnabled,
+} from "../lib/jarvis/cognition/voice/config.js";
+import { runVoiceTurn } from "../lib/jarvis/cognition/voice/orchestrator.js";
+import {
+  startSession,
+  getSession,
+  listSessions,
+  endSession,
+  getSessionTurns,
+  purgeSession,
+} from "../lib/jarvis/cognition/voice/sessions.js";
 
 type AuthReq = Request & { clerkUserId: string };
 
@@ -5565,6 +5579,224 @@ router.get(
     } catch (err) {
       req.log.error({ err }, "GET /jarvis/governance/overview failed");
       res.status(500).json({ error: "jarvis_governance_overview_failed" });
+    }
+  },
+);
+
+// ── voice (Voice v1) ─────────────────────────────────────────────────────────
+//
+// Admin-gated executive voice interface. OFF by default; transcripts-only (no
+// audio is ever persisted). Every route is `requireAuth` + `requireRole`. The
+// turn route ingests a raw audio body; all others are JSON. Two-plane discipline
+// lives in the orchestrator — routes are thin and audited.
+
+const ADMIN_ROLES = ["admin", "super-admin"];
+
+const voiceSettingsSchema = z.object({ enabled: z.boolean() });
+const voiceSessionStartSchema = z.object({
+  businessId: z.string().uuid().optional().nullable(),
+});
+const voiceTurnQuerySchema = z.object({
+  sessionId: z.string().uuid(),
+  mimeType: z.string().trim().min(1).max(128).optional(),
+});
+
+router.get(
+  "/jarvis/voice/settings",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      res.json({ enabled: await getVoiceEnabled() });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/voice/settings failed");
+      res.status(500).json({ error: "jarvis_voice_settings_read_failed" });
+    }
+  },
+);
+
+router.post(
+  "/jarvis/voice/settings",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = voiceSettingsSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_voice_settings" });
+      return;
+    }
+    try {
+      await setVoiceEnabled(parsed.data.enabled, actor.userId);
+      await audit(req, actor, "update", "voice_settings", null, {
+        key: "cognition.voice.enabled",
+        enabled: parsed.data.enabled,
+      });
+      res.json({ enabled: parsed.data.enabled });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/voice/settings failed");
+      res.status(500).json({ error: "jarvis_voice_settings_write_failed" });
+    }
+  },
+);
+
+router.get(
+  "/jarvis/voice/sessions",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      res.json({ sessions: await listSessions() });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/voice/sessions failed");
+      res.status(500).json({ error: "jarvis_voice_sessions_read_failed" });
+    }
+  },
+);
+
+router.post(
+  "/jarvis/voice/sessions",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = voiceSessionStartSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_voice_session" });
+      return;
+    }
+    try {
+      const session = await startSession({
+        createdBy: actor.userId,
+        userEmail: actor.email,
+        businessId: parsed.data.businessId ?? null,
+      });
+      await audit(req, actor, "create", "voice_session", session.id);
+      res.status(201).json({ session });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/voice/sessions failed");
+      res.status(500).json({ error: "jarvis_voice_session_create_failed" });
+    }
+  },
+);
+
+router.get(
+  "/jarvis/voice/sessions/:id/turns",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const session = await getSession(String(req.params.id));
+      if (!session) {
+        res.status(404).json({ error: "voice_session_not_found" });
+        return;
+      }
+      res.json({ session, turns: await getSessionTurns(String(req.params.id)) });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/voice/sessions/:id/turns failed");
+      res.status(500).json({ error: "jarvis_voice_turns_read_failed" });
+    }
+  },
+);
+
+router.post(
+  "/jarvis/voice/sessions/:id/end",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    try {
+      const session = await endSession(String(req.params.id));
+      if (!session) {
+        res.status(404).json({ error: "voice_session_not_found" });
+        return;
+      }
+      await audit(req, actor, "update", "voice_session", session.id, {
+        status: "ended",
+      });
+      res.json({ session });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/voice/sessions/:id/end failed");
+      res.status(500).json({ error: "jarvis_voice_session_end_failed" });
+    }
+  },
+);
+
+router.delete(
+  "/jarvis/voice/sessions/:id",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    try {
+      const turnsDeleted = await purgeSession(String(req.params.id));
+      await audit(req, actor, "delete", "voice_session", String(req.params.id), {
+        turnsDeleted,
+      });
+      res.json({ purged: true, turnsDeleted });
+    } catch (err) {
+      req.log.error({ err }, "DELETE /jarvis/voice/sessions/:id failed");
+      res.status(500).json({ error: "jarvis_voice_session_purge_failed" });
+    }
+  },
+);
+
+router.post(
+  "/jarvis/voice/turn",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  raw({ type: () => true, limit: "25mb" }),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = voiceTurnQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_voice_turn" });
+      return;
+    }
+    const audio = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+    if (audio.length === 0) {
+      res.status(400).json({ error: "empty_audio" });
+      return;
+    }
+    try {
+      const session = await getSession(parsed.data.sessionId);
+      if (!session) {
+        res.status(404).json({ error: "voice_session_not_found" });
+        return;
+      }
+      const outcome = await runVoiceTurn({
+        sessionId: parsed.data.sessionId,
+        audio,
+        mimeType: parsed.data.mimeType || req.headers["content-type"] || "audio/webm",
+        createdBy: actor.userId,
+        executiveUserId: actor.userId,
+        businessId: session.businessId ?? null,
+      });
+      await audit(req, actor, "voice_turn", "voice_turn", outcome.turnId, {
+        sessionId: outcome.sessionId,
+        intent: outcome.intent,
+        capability: outcome.capability,
+        status: outcome.status,
+      });
+      res.json({
+        turnId: outcome.turnId,
+        sessionId: outcome.sessionId,
+        intent: outcome.intent,
+        capability: outcome.capability,
+        transcript: outcome.transcript,
+        transcriptConfidence: outcome.transcriptConfidence,
+        replyText: outcome.replyText,
+        ttsOk: outcome.ttsOk,
+        audioBase64: outcome.audio ? outcome.audio.toString("base64") : null,
+        audioContentType: outcome.audioContentType,
+        links: outcome.links,
+        cognitionRunId: outcome.cognitionRunId,
+        status: outcome.status,
+        latencyMs: outcome.latencyMs,
+      });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/voice/turn failed");
+      res.status(500).json({ error: "jarvis_voice_turn_failed" });
     }
   },
 );

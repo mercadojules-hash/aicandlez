@@ -892,3 +892,94 @@ export const jarvisEmbeddingsTable = pgTable(
 
 export type JarvisEmbedding = typeof jarvisEmbeddingsTable.$inferSelect;
 export type InsertJarvisEmbedding = typeof jarvisEmbeddingsTable.$inferInsert;
+
+// ── Voice Interface (Voice v1) ───────────────────────────────────────────────
+// Voice is an I/O modality, NOT an authority layer: STT/TTS are side-effect-free
+// transducers on the content plane; the deterministic control plane owns intent
+// routing and every read/draft call; the model only PROPOSES; PUBLISH stays
+// governed (unchanged S8 path). These two tables are the ONLY persistence voice
+// adds. PRIVACY INVARIANT: transcripts are stored as text; raw audio is NEVER
+// persisted (no audio columns). History-safe: FKs detach (set null) on parent
+// delete + denormalized identity snapshots, so deleting a session/run never
+// destroys turn history. OFF by default + admin-gated upstream
+// (`cognition.voice.enabled`). Spec: `.local/docs/jarvis-voice-architecture.md`
+// §5; plan: `.local/docs/jarvis-voice-plan.md` (V1).
+
+// A push-to-talk, turn-based conversation. Working memory for multi-turn context
+// is assembled from this session's recent turns (S9 token-budget assembly);
+// nothing here is promoted to the durable corpus (that is deferred to S11/S12).
+export const jarvisVoiceSessionsTable = pgTable(
+  "jarvis_voice_sessions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    status: varchar("status", { length: 32 }).notNull().default("active"),
+    businessId: uuid("business_id").references(() => jarvisBusinessesTable.id, {
+      onDelete: "set null",
+    }),
+    // Identity snapshot (Clerk user id + email at session start) — denormalized so
+    // history survives even if the user record changes. Voice is admin-gated.
+    createdBy: varchar("created_by", { length: 255 }),
+    userEmail: varchar("user_email", { length: 320 }),
+    turnCount: integer("turn_count").notNull().default(0),
+    startedAt: timestamp("started_at").defaultNow().notNull(),
+    lastTurnAt: timestamp("last_turn_at"),
+    endedAt: timestamp("ended_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("jarvis_voice_sessions_created_by_idx").on(table.createdBy),
+    index("jarvis_voice_sessions_status_idx").on(table.status),
+  ],
+);
+
+// One PTT exchange: spoken request (transcript) → resolved intent/capability →
+// advisory readback text. `intent` is one of the 7 v1 capabilities or a control
+// outcome (`clarify`/`reject`/`unknown`) — voice issues NO state-changing
+// command in v1. `cognitionRunId` links a reasoned draft (briefing/report) back
+// to the immutable cognition ledger. `links` cites the read entities surfaced to
+// the executive. NO audio columns by design.
+export const jarvisVoiceTurnsTable = pgTable(
+  "jarvis_voice_turns",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sessionId: uuid("session_id").references(
+      () => jarvisVoiceSessionsTable.id,
+      { onDelete: "set null" },
+    ),
+    turnIndex: integer("turn_index").notNull().default(0),
+    // STT output. transcriptConfidence is a 0–100 integer (null when unknown).
+    transcript: text("transcript"),
+    transcriptConfidence: integer("transcript_confidence"),
+    // Deterministic routing outcome.
+    intent: varchar("intent", { length: 64 }),
+    intentConfidence: integer("intent_confidence"),
+    capability: varchar("capability", { length: 64 }),
+    // Advisory spoken-back text (the model PROPOSES; never acts).
+    replyText: text("reply_text"),
+    // Whether TTS audio was produced for this turn — the audio itself is NOT
+    // stored (privacy invariant); false ⇒ text-only fallback was served.
+    ttsOk: boolean("tts_ok").notNull().default(false),
+    status: varchar("status", { length: 32 }).notNull().default("ok"),
+    error: text("error"),
+    cognitionRunId: uuid("cognition_run_id").references(
+      () => jarvisCognitionRunsTable.id,
+      { onDelete: "set null" },
+    ),
+    links: jsonb("links").$type<{ type: string; id: string }[]>(),
+    costMicros: integer("cost_micros").notNull().default(0),
+    latencyMs: integer("latency_ms"),
+    createdBy: varchar("created_by", { length: 255 }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("jarvis_voice_turns_session_idx").on(table.sessionId),
+    index("jarvis_voice_turns_created_at_idx").on(table.createdAt),
+  ],
+);
+
+export type JarvisVoiceSession = typeof jarvisVoiceSessionsTable.$inferSelect;
+export type InsertJarvisVoiceSession =
+  typeof jarvisVoiceSessionsTable.$inferInsert;
+export type JarvisVoiceTurn = typeof jarvisVoiceTurnsTable.$inferSelect;
+export type InsertJarvisVoiceTurn = typeof jarvisVoiceTurnsTable.$inferInsert;

@@ -30,6 +30,7 @@ import {
   Telescope,
   ShieldCheck,
   Scale,
+  Radio,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -61,6 +62,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Insights", path: "/insights", icon: Sparkles },
   { label: "Briefings", path: "/briefings", icon: FileText },
   { label: "Cognition", path: "/cognition", icon: Brain },
+  { label: "Voice", path: "/voice", icon: Radio },
   { label: "Governance", path: "/governance", icon: ShieldCheck },
   { label: "Policies", path: "/policies", icon: Scale },
   { label: "Budgets", path: "/budgets", icon: Gauge },
