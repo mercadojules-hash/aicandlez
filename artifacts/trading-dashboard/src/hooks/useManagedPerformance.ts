@@ -55,6 +55,41 @@ export interface ManagedPerformanceLive {
   balanceError:        string | null;
 }
 
+/** One bucket of the exit-reason distribution within a strategy era. */
+export interface EraExitReason {
+  reason: string;
+  count:  number;
+  netPnl: number;
+}
+
+/**
+ * Performance stats for one strategy era (legacy vs current), split on the
+ * June 6, 2026 production exit-engine correction. The 1h-max-hold era and the
+ * TP10/SL2/Trail5/6h era are materially different and reported separately so
+ * pre/post-fix performance is never blended.
+ */
+export interface EraStats {
+  netProfit:    number;
+  roiPct:       number | null;
+  winRatePct:   number | null;
+  profitFactor: number | null;
+  avgWinner:    number | null;
+  avgLoser:     number | null;
+  closedTrades: number;
+  wins:         number;
+  losses:       number;
+  bestTrade:    number | null;
+  worstTrade:   number | null;
+  exitReasons:  EraExitReason[];
+}
+
+export interface ManagedPerformanceEras {
+  boundaryMs:    number;
+  boundaryLabel: string;
+  legacy:        EraStats;
+  current:       EraStats;
+}
+
 export interface ManagedPerformance {
   baseline:         ManagedPerformanceBaseline;
   currentAiCapital: number;
@@ -76,6 +111,7 @@ export interface ManagedPerformance {
   profitFactor:     number | null;
   bestTrade:        number | null;
   worstTrade:       number | null;
+  eras:             ManagedPerformanceEras;
   live:             ManagedPerformanceLive;
   generatedAt:      number;
 }

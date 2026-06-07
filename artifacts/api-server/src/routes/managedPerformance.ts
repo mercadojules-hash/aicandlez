@@ -56,6 +56,93 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+// ── Strategy-era segmentation ───────────────────────────────────────────────
+// June 6, 2026 production exit-engine correction (1h MAX_HOLD era → TP10/SL2/
+// Trail5/6h era). A prod audit showed the 1h max-hold force-closed ~55% of
+// trades before they could develop, so pre/post-fix performance is materially
+// different and MUST NOT be blended. We split closed trades on this boundary
+// (exit time) into a "legacy" and "current" era and report each independently
+// plus a side-by-side comparison.
+const STRATEGY_ERA_BOUNDARY_MS = Date.UTC(2026, 5, 6, 0, 0, 0, 0); // 2026-06-06 00:00 UTC
+const STRATEGY_ERA_BOUNDARY_LABEL = "June 6, 2026";
+
+interface EraAccumulator {
+  net: number;
+  wins: number;
+  losses: number;
+  grossWin: number;
+  grossLoss: number;
+  best: number | null;
+  worst: number | null;
+  count: number;
+  reasons: Map<string, { count: number; net: number }>;
+}
+function newEraAcc(): EraAccumulator {
+  return {
+    net: 0, wins: 0, losses: 0, grossWin: 0, grossLoss: 0,
+    best: null, worst: null, count: 0, reasons: new Map(),
+  };
+}
+function accEra(a: EraAccumulator, pnl: number, reason: string): void {
+  a.count++;
+  a.net += pnl;
+  if (pnl > 0) {
+    a.wins++;
+    a.grossWin += pnl;
+  } else if (pnl < 0) {
+    a.losses++;
+    a.grossLoss += Math.abs(pnl);
+  }
+  if (a.best === null || pnl > a.best) a.best = pnl;
+  if (a.worst === null || pnl < a.worst) a.worst = pnl;
+  const r = a.reasons.get(reason) ?? { count: 0, net: 0 };
+  r.count++;
+  r.net += pnl;
+  a.reasons.set(reason, r);
+}
+// ROI per era uses the SAME authoritative baseline as the headline AI-trading
+// ROI (allocated ?? paper). There is no per-era capital snapshot, so this is a
+// "net relative to current baseline" figure — the truly comparable era metrics
+// are net P&L, profit factor, win rate and the avg winner/loser ratios.
+// Undefined metrics (no trades, or no winners/losers to average, or PF with no
+// losses) return `null` so the client renders a dash — never a fabricated 0,
+// per the null=dash invariant. Net P&L of an empty era is a legitimate $0.
+function finalizeEra(a: EraAccumulator, baseline: number) {
+  const hasTrades = a.count > 0;
+  const winRatePct = hasTrades ? (a.wins / a.count) * 100 : null;
+  const avgWinner = a.wins > 0 ? a.grossWin / a.wins : null;
+  const avgLoser = a.losses > 0 ? a.grossLoss / a.losses : null;
+  // grossLoss>0 → real ratio; all winners (no losses) → undefined (dash);
+  // all losers (no winners) → 0 (legitimate); no trades → undefined (dash).
+  const profitFactor =
+    a.grossLoss > 0
+      ? a.grossWin / a.grossLoss
+      : a.grossWin > 0 || !hasTrades
+        ? null
+        : 0;
+  const roiPct = hasTrades && baseline !== 0 ? (a.net / baseline) * 100 : null;
+  const exitReasons = [...a.reasons.entries()]
+    .map(([reason, v]) => ({ reason, count: v.count, netPnl: round2(v.net) }))
+    .sort((x, y) => y.count - x.count);
+  return {
+    netProfit: round2(a.net),
+    roiPct: roiPct != null ? round2(roiPct) : null,
+    winRatePct: winRatePct != null ? round2(winRatePct) : null,
+    profitFactor:
+      profitFactor != null && Number.isFinite(profitFactor)
+        ? round2(profitFactor)
+        : null,
+    avgWinner: avgWinner != null ? round2(avgWinner) : null,
+    avgLoser: avgLoser != null ? round2(avgLoser) : null,
+    closedTrades: a.count,
+    wins: a.wins,
+    losses: a.losses,
+    bestTrade: a.best != null ? round2(a.best) : null,
+    worstTrade: a.worst != null ? round2(a.worst) : null,
+    exitReasons,
+  };
+}
+
 // Short TTL cache for the live-balance aggregation. The portal mounts this
 // panel AND runtime-state simultaneously (both poll ~30s) and the PWA mirrors
 // it too, so without a cache a live customer would trigger 2-3 broker
@@ -176,6 +263,7 @@ router.get(
         .select({
           realizedPnL: simTradesTable.realizedPnL,
           exitTime: simTradesTable.exitTime,
+          closeReason: simTradesTable.closeReason,
         })
         .from(simTradesTable)
         .where(
@@ -205,6 +293,9 @@ router.get(
       let weekPnL = 0;
       let monthPnL = 0;
 
+      const legacyAcc = newEraAcc();
+      const currentAcc = newEraAcc();
+
       for (const r of rows) {
         const pnl = r.realizedPnL ?? 0;
         realizedProfit += pnl;
@@ -221,6 +312,12 @@ router.get(
         if (t >= startToday) todayPnL += pnl;
         if (t >= weekAgo) weekPnL += pnl;
         if (t >= monthAgo) monthPnL += pnl;
+
+        // Strategy-era bucket: exit before the June 6, 2026 boundary = legacy
+        // (1h max-hold era); on/after = current (TP10/SL2/Trail5/6h era).
+        const reason = (r.closeReason ?? "UNKNOWN").toUpperCase();
+        if (t < STRATEGY_ERA_BOUNDARY_MS) accEra(legacyAcc, pnl, reason);
+        else accEra(currentAcc, pnl, reason);
       }
 
       const closedTrades = rows.length;
@@ -309,6 +406,12 @@ router.get(
           : null,
         bestTrade: bestTrade != null ? round2(bestTrade) : null,
         worstTrade: worstTrade != null ? round2(worstTrade) : null,
+        eras: {
+          boundaryMs: STRATEGY_ERA_BOUNDARY_MS,
+          boundaryLabel: STRATEGY_ERA_BOUNDARY_LABEL,
+          legacy: finalizeEra(legacyAcc, startingAiCapital),
+          current: finalizeEra(currentAcc, startingAiCapital),
+        },
         live: {
           hasLiveExchange,
           exchanges: liveAgg.exchanges,

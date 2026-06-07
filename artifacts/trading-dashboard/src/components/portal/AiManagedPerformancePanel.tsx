@@ -22,6 +22,8 @@ import {
   useManagedPerformance,
   useAiCapital,
   useSetAiCapital,
+  type EraStats,
+  type ManagedPerformanceEras,
 } from "../../hooks/useManagedPerformance";
 
 // Token mirror of PortalCustomerShell's `T` — kept local so this panel
@@ -93,6 +95,243 @@ function Kpi({
       {hint && (
         <span style={{ fontSize: 8, color: T.TEXT_3, opacity: 0.7 }}>{hint}</span>
       )}
+    </div>
+  );
+}
+
+// ── Strategy-era comparison ──────────────────────────────────────────────────
+// Legacy (pre June 6, 2026 · 1h max-hold) vs Current (June 6, 2026+ ·
+// TP10/SL2/Trail5/6h). Pre/post-fix performance is materially different and is
+// reported side-by-side so the impact of the exit-engine correction is
+// measurable. All figures null-safe — a dash never a fabricated number.
+function netTone(v: number): "pos" | "neg" | undefined {
+  return v > 0 ? "pos" : v < 0 ? "neg" : undefined;
+}
+function netToneN(v: number | null): "pos" | "neg" | undefined {
+  return v == null ? undefined : v > 0 ? "pos" : v < 0 ? "neg" : undefined;
+}
+
+function EraCell({
+  value, tone, head,
+}: {
+  value: string;
+  tone?: "pos" | "neg";
+  head?: boolean;
+}) {
+  const color = head
+    ? T.NEON
+    : tone === "pos" ? T.NEON : tone === "neg" ? T.RED : T.TEXT_0;
+  return (
+    <span style={{
+      padding: "7px 10px",
+      fontSize: head ? 8.5 : 11.5,
+      fontWeight: 700,
+      letterSpacing: head ? T.TRACK_LABEL : undefined,
+      fontVariantNumeric: "tabular-nums",
+      color,
+      borderLeft: `1px solid ${T.BORDER}`,
+      whiteSpace: "nowrap",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+    }}>
+      {value}
+    </span>
+  );
+}
+
+function EraMetricRow({
+  label, legacy, current, legacyTone, currentTone,
+}: {
+  label: string;
+  legacy: string;
+  current: string;
+  legacyTone?: "pos" | "neg";
+  currentTone?: "pos" | "neg";
+}) {
+  return (
+    <div style={{
+      display: "grid",
+      gridTemplateColumns: "1.2fr 1fr 1fr",
+      borderTop: `1px solid ${T.BORDER}`,
+    }}>
+      <span style={{
+        padding: "7px 10px",
+        fontSize: 8.5, fontWeight: 700, letterSpacing: T.TRACK_LABEL,
+        color: T.TEXT_3, whiteSpace: "nowrap",
+        overflow: "hidden", textOverflow: "ellipsis",
+      }}>
+        {label}
+      </span>
+      <EraCell value={legacy} tone={legacyTone} />
+      <EraCell value={current} tone={currentTone} />
+    </div>
+  );
+}
+
+function EraExitReasons({ era }: { era: EraStats }) {
+  if (era.exitReasons.length === 0) {
+    return (
+      <span style={{ fontSize: 9, color: T.TEXT_3, opacity: 0.7 }}>
+        No closed trades in this era.
+      </span>
+    );
+  }
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      {era.exitReasons.map((r) => (
+        <div key={r.reason} style={{
+          display: "flex", alignItems: "baseline", justifyContent: "space-between",
+          gap: 8, fontSize: 9.5,
+        }}>
+          <span style={{ color: T.TEXT_2, letterSpacing: T.TRACK_LABEL }}>
+            {r.reason}
+          </span>
+          <span style={{ color: T.TEXT_3, fontVariantNumeric: "tabular-nums" }}>
+            {r.count} · {signedUsd(r.netPnl)}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function EraComparison({ eras }: { eras: ManagedPerformanceEras }) {
+  const { legacy, current } = eras;
+  const pf = (v: number | null) => (v != null ? v.toFixed(2) : "—");
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{
+        display: "flex", alignItems: "baseline", justifyContent: "space-between",
+        gap: 8, flexWrap: "wrap",
+      }}>
+        <span style={{
+          fontSize: 9, fontWeight: 700, letterSpacing: T.TRACK_LABEL, color: T.NEON,
+        }}>
+          STRATEGY ERA COMPARISON
+        </span>
+        <span style={{ fontSize: 8, color: T.TEXT_3, letterSpacing: T.TRACK_LABEL }}>
+          SPLIT ON {eras.boundaryLabel.toUpperCase()}
+        </span>
+      </div>
+
+      <div style={{ border: `1px solid ${T.BORDER}`, background: "rgba(0,0,0,0.30)" }}>
+        {/* Column headers */}
+        <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr" }}>
+          <span style={{ padding: "7px 10px" }} />
+          <EraCell head value="LEGACY" />
+          <EraCell head value="CURRENT" />
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr" }}>
+          <span style={{ padding: "0 10px 7px" }} />
+          <span style={{
+            padding: "0 10px 7px", fontSize: 7.5, color: T.TEXT_3,
+            borderLeft: `1px solid ${T.BORDER}`, lineHeight: 1.3,
+          }}>
+            PRE · 1H MAX-HOLD
+          </span>
+          <span style={{
+            padding: "0 10px 7px", fontSize: 7.5, color: T.TEXT_3,
+            borderLeft: `1px solid ${T.BORDER}`, lineHeight: 1.3,
+          }}>
+            TP10 · SL2 · TRAIL5 · 6H
+          </span>
+        </div>
+
+        <EraMetricRow
+          label="NET P&L"
+          legacy={signedUsd(legacy.netProfit)}
+          current={signedUsd(current.netProfit)}
+          legacyTone={netTone(legacy.netProfit)}
+          currentTone={netTone(current.netProfit)}
+        />
+        <EraMetricRow
+          label="ROI"
+          legacy={signedPctOrDash(legacy.roiPct)}
+          current={signedPctOrDash(current.roiPct)}
+          legacyTone={netToneN(legacy.roiPct)}
+          currentTone={netToneN(current.roiPct)}
+        />
+        <EraMetricRow
+          label="WIN RATE"
+          legacy={legacy.winRatePct != null ? `${legacy.winRatePct.toFixed(1)}%` : "—"}
+          current={current.winRatePct != null ? `${current.winRatePct.toFixed(1)}%` : "—"}
+        />
+        <EraMetricRow
+          label="PROFIT FACTOR"
+          legacy={pf(legacy.profitFactor)}
+          current={pf(current.profitFactor)}
+        />
+        <EraMetricRow
+          label="AVG WINNER"
+          legacy={usdOrDash(legacy.avgWinner)}
+          current={usdOrDash(current.avgWinner)}
+          legacyTone={legacy.avgWinner != null ? "pos" : undefined}
+          currentTone={current.avgWinner != null ? "pos" : undefined}
+        />
+        <EraMetricRow
+          label="AVG LOSER"
+          legacy={usdOrDash(legacy.avgLoser)}
+          current={usdOrDash(current.avgLoser)}
+          legacyTone={legacy.avgLoser != null ? "neg" : undefined}
+          currentTone={current.avgLoser != null ? "neg" : undefined}
+        />
+        <EraMetricRow
+          label="BEST TRADE"
+          legacy={signedUsdOrDash(legacy.bestTrade)}
+          current={signedUsdOrDash(current.bestTrade)}
+          legacyTone={netToneN(legacy.bestTrade)}
+          currentTone={netToneN(current.bestTrade)}
+        />
+        <EraMetricRow
+          label="WORST TRADE"
+          legacy={signedUsdOrDash(legacy.worstTrade)}
+          current={signedUsdOrDash(current.worstTrade)}
+          legacyTone={netToneN(legacy.worstTrade)}
+          currentTone={netToneN(current.worstTrade)}
+        />
+        <EraMetricRow
+          label="CLOSED TRADES"
+          legacy={`${legacy.closedTrades} (${legacy.wins}W·${legacy.losses}L)`}
+          current={`${current.closedTrades} (${current.wins}W·${current.losses}L)`}
+        />
+      </div>
+
+      {/* Exit-reason distribution per era */}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+        gap: 8,
+      }}>
+        <div style={{
+          padding: "8px 10px", border: `1px solid ${T.BORDER}`,
+          background: "rgba(0,0,0,0.30)", display: "flex",
+          flexDirection: "column", gap: 6,
+        }}>
+          <span style={{
+            fontSize: 8, fontWeight: 700, letterSpacing: T.TRACK_LABEL, color: T.TEXT_3,
+          }}>
+            LEGACY EXIT REASONS
+          </span>
+          <EraExitReasons era={legacy} />
+        </div>
+        <div style={{
+          padding: "8px 10px", border: `1px solid ${T.BORDER}`,
+          background: "rgba(0,0,0,0.30)", display: "flex",
+          flexDirection: "column", gap: 6,
+        }}>
+          <span style={{
+            fontSize: 8, fontWeight: 700, letterSpacing: T.TRACK_LABEL, color: T.TEXT_3,
+          }}>
+            CURRENT EXIT REASONS
+          </span>
+          <EraExitReasons era={current} />
+        </div>
+      </div>
+
+      <span style={{ fontSize: 7.5, color: T.TEXT_3, opacity: 0.7, lineHeight: 1.4 }}>
+        ROI shown relative to the current AI capital baseline. Net P&amp;L, profit
+        factor, win rate and avg winner/loser are the directly comparable era metrics.
+      </span>
     </div>
   );
 }
@@ -191,6 +430,12 @@ export const AiManagedPerformancePanel = memo(function AiManagedPerformancePanel
               {data.baseline.source === "paper-default" && (
                 <span style={{ fontSize: 8, color: T.AMBER, opacity: 0.85 }}>
                   No allocation declared — using paper baseline.
+                </span>
+              )}
+              {data.live.hasLiveExchange && (
+                <span style={{ fontSize: 8, color: T.TEXT_3, opacity: 0.75 }}>
+                  This is your Starting Live Capital baseline — enter your
+                  verified amount.
                 </span>
               )}
             </div>
@@ -467,6 +712,9 @@ export const AiManagedPerformancePanel = memo(function AiManagedPerformancePanel
               tone={data.worstTrade != null && data.worstTrade >= 0 ? "pos" : "neg"}
             />
           </div>
+
+          {/* Legacy vs Current strategy-era comparison */}
+          <EraComparison eras={data.eras} />
         </div>
       )}
     </section>
