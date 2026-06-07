@@ -1,0 +1,143 @@
+JARVIS SOVEREIGNTY READINESS ASSESSMENT
+
+We are approaching the point where Jarvis will eventually be exported to an external Jarvis Vault and must be capable of operating independently of Replit.
+
+Do not build new features yet.
+
+Instead, perform a complete Sovereignty Readiness Assessment.
+
+Objective:
+
+Determine everything still missing before Jarvis can operate, maintain, understand, and assist with all managed businesses without requiring ongoing Replit involvement.
+
+Please assess the following areas.
+
+1. KNOWLEDGE READINESS
+
+Can Jarvis currently explain:
+
+* AICandlez architecture
+* AICandlez infrastructure
+* AICandlez deployment process
+* AICandlez recovery process
+* AICandlez historical performance
+* Jarvis architecture
+* GitHub repositories
+* Render services
+
+What knowledge is still missing?
+
+2. OPERATIONAL READINESS
+
+Can Jarvis currently explain:
+
+* How AICandlez is deployed
+* How AICandlez is updated
+* How AICandlez is rolled back
+* How AICandlez is recovered after failure
+
+What operational knowledge is still missing?
+
+3. INFRASTRUCTURE READINESS
+
+For every managed business, determine whether Jarvis knows:
+
+* Domains
+* DNS
+* Hosting
+* Databases
+* APIs
+* External services
+* Environment variables
+* Secret locations
+* Deployment workflows
+
+Important:
+
+Do not expose secret values.
+
+Only identify:
+
+* existence
+* purpose
+* storage location
+* dependency relationships
+
+4. CREDENTIAL READINESS
+
+Determine:
+
+* What credentials are required to fully operate AICandlez
+* Where those credentials currently reside
+* Which systems depend on them
+* Whether Jarvis is aware of them
+
+Again:
+
+Do not expose secret values.
+
+I only want awareness and dependency mapping.
+
+5. ENGINEERING READINESS
+
+Determine whether Jarvis can currently:
+
+* Read source code
+* Explain source code
+* Locate source code
+* Understand repository relationships
+* Understand build processes
+* Understand deployment workflows
+
+If not, identify the gaps.
+
+6. RENDER READINESS
+
+Determine whether Jarvis currently knows:
+
+* Render services
+* Render databases
+* Deployment status
+* Health status
+* Deployment history
+* Runtime dependencies
+
+If not, identify the missing pieces.
+
+7. EXPORT READINESS
+
+If Replit disappeared tomorrow:
+
+Could Jarvis still help operate AICandlez?
+
+Could Jarvis still explain how AICandlez works?
+
+Could Jarvis still explain how AICandlez is deployed?
+
+Could Jarvis still assist with maintenance and recovery?
+
+Provide a candid assessment.
+
+8. FINAL DELIVERABLE
+
+Provide:
+
+* Current Sovereignty Readiness %
+* Current Export Readiness %
+* Current Operational Readiness %
+* Current Engineering Readiness %
+
+Then provide:
+
+A. What is complete
+B. What is partially complete
+C. What is missing
+D. Recommended final implementation order
+
+Most importantly:
+
+Identify the minimum remaining work required before Jarvis can realistically operate without dependence on Replit as the primary source of knowledge.
+
+Do not create new architecture documents.
+
+Focus on gaps, dependencies, operational knowledge, infrastructure awareness, and export readiness.
