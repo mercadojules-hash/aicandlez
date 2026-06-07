@@ -373,6 +373,18 @@ export const jarvisBriefingsTable = pgTable("jarvis_briefings", {
   publishedAt: timestamp("published_at"),
   tags: jsonb("tags").$type<string[]>(),
   status: varchar("status", { length: 32 }).notNull().default("draft"),
+  // ── Sprint 8 cognition (additive, nullable) ──
+  // sourceMode: "manual" (today's CRUD) vs "cognition" (LLM-synthesized draft).
+  // cognitionRunId / citations / groundingScore link a reasoned draft back to the
+  // immutable cognition run that produced it. Drafts are advisory; publish is the
+  // governed action (D1). Weak/zero grounding → publish requires approval (D2).
+  sourceMode: varchar("source_mode", { length: 32 }).notNull().default("manual"),
+  cognitionRunId: uuid("cognition_run_id").references(
+    () => jarvisCognitionRunsTable.id,
+    { onDelete: "set null" },
+  ),
+  citations: jsonb("citations").$type<{ type: string; id: string }[]>(),
+  groundingScore: integer("grounding_score"),
   createdBy: varchar("created_by", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -795,3 +807,36 @@ export type JarvisAgentTrust = typeof jarvisAgentTrustTable.$inferSelect;
 export type InsertJarvisAgentTrust = typeof jarvisAgentTrustTable.$inferInsert;
 export type JarvisBudget = typeof jarvisBudgetsTable.$inferSelect;
 export type InsertJarvisBudget = typeof jarvisBudgetsTable.$inferInsert;
+
+// ── Cognition Layer (Sprint 8) ───────────────────────────────────────────────
+// jarvis_cognition_runs is the IMMUTABLE audit ledger of every LLM advisory call.
+// The model lives on the content plane: it PROPOSES, it never acts. Each row
+// captures exactly what the model saw (promptHash + retrievedRefs), what it
+// returned (rawOutput + parsedProposal), cost/latency, and a status. This is the
+// reproducibility + observability backbone. No updatedAt — rows are never edited.
+// Agent linkage is a denormalized snapshot (no FK) like jarvis_policy_evaluations.
+export const jarvisCognitionRunsTable = pgTable("jarvis_cognition_runs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  kind: varchar("kind", { length: 48 }).notNull(),
+  agentId: uuid("agent_id"),
+  agentType: varchar("agent_type", { length: 48 }),
+  model: varchar("model", { length: 120 }),
+  params: jsonb("params").$type<Record<string, unknown>>(),
+  promptHash: varchar("prompt_hash", { length: 64 }),
+  retrievedRefs: jsonb("retrieved_refs").$type<{ type: string; id: string }[]>(),
+  inputTokens: integer("input_tokens").notNull().default(0),
+  outputTokens: integer("output_tokens").notNull().default(0),
+  costMicros: integer("cost_micros").notNull().default(0),
+  latencyMs: integer("latency_ms"),
+  status: varchar("status", { length: 32 }).notNull().default("ok"),
+  groundingScore: integer("grounding_score"),
+  rawOutput: text("raw_output"),
+  parsedProposal: jsonb("parsed_proposal").$type<Record<string, unknown>>(),
+  error: text("error"),
+  createdBy: varchar("created_by", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type JarvisCognitionRun = typeof jarvisCognitionRunsTable.$inferSelect;
+export type InsertJarvisCognitionRun =
+  typeof jarvisCognitionRunsTable.$inferInsert;

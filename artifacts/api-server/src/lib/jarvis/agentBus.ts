@@ -35,7 +35,12 @@ export type AgentEventType =
   | "governance_held"
   | "governance_resumed"
   | "trust_recomputed"
-  | "budget_reset";
+  | "budget_reset"
+  // ── Sprint 8 — cognition events ───────────────────────────────────────────
+  | "cognition_started"
+  | "cognition_finished"
+  | "cognition_degraded"
+  | "cognition_proposal";
 
 export type AgentEventSeverity = "info" | "success" | "warn" | "error";
 

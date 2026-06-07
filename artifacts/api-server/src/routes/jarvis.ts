@@ -53,6 +53,7 @@ import {
   jarvisPolicyEvaluationsTable,
   jarvisAgentTrustTable,
   jarvisBudgetsTable,
+  jarvisCognitionRunsTable,
 } from "@workspace/db";
 import { requireAuth, requireRole } from "../middlewares/requireAuth.js";
 import { agentRuntime } from "../lib/jarvis/runtime.js";
@@ -65,6 +66,9 @@ import {
   VERB_REGISTRY,
 } from "../lib/jarvis/orchestrator/index.js";
 import { evaluateGovernance } from "../lib/jarvis/governance/index.js";
+import { synthesizeBriefing } from "../lib/jarvis/cognition/briefingCognition.js";
+import { publishBriefing } from "../lib/jarvis/cognition/publishGate.js";
+import { checkCognitionBudget } from "../lib/jarvis/cognition/index.js";
 
 type AuthReq = Request & { clerkUserId: string };
 
@@ -3632,6 +3636,271 @@ router.delete(
     } catch (err) {
       req.log.error({ err }, "DELETE /jarvis/briefings/:id failed");
       res.status(500).json({ error: "jarvis_briefing_delete_failed" });
+    }
+  },
+);
+
+// ── Sprint 8: cognition (advisory-only LLM plane) ────────────────────────────
+// OFF by default + admin-gated. The advisory plane PROPOSES briefing drafts; the
+// deterministic control plane is untouched. PUBLISH is the governed action (D1):
+// weak/ungrounded cognition drafts require approval (D2), but stay visible.
+
+const COGNITION_ENABLED_KEY = "cognition.enabled";
+
+async function isCognitionEnabled(): Promise<boolean> {
+  const [row] = await db
+    .select()
+    .from(jarvisSettingsTable)
+    .where(eq(jarvisSettingsTable.key, COGNITION_ENABLED_KEY))
+    .limit(1);
+  return row?.value === true;
+}
+
+const cognitionEnabledSchema = z.object({ enabled: z.boolean() });
+
+router.get(
+  "/jarvis/cognition/enabled",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      res.json({ enabled: await isCognitionEnabled() });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/cognition/enabled failed");
+      res.status(500).json({ error: "jarvis_cognition_enabled_read_failed" });
+    }
+  },
+);
+
+router.post(
+  "/jarvis/cognition/enabled",
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = cognitionEnabledSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_cognition_toggle" });
+      return;
+    }
+    try {
+      await db
+        .insert(jarvisSettingsTable)
+        .values({
+          key: COGNITION_ENABLED_KEY,
+          value: parsed.data.enabled,
+          updatedBy: actor.userId,
+        })
+        .onConflictDoUpdate({
+          target: jarvisSettingsTable.key,
+          set: {
+            value: parsed.data.enabled,
+            updatedBy: actor.userId,
+            updatedAt: new Date(),
+          },
+        });
+      await audit(req, actor, "update", "settings", null, {
+        key: COGNITION_ENABLED_KEY,
+        enabled: parsed.data.enabled,
+      });
+      res.json({ enabled: parsed.data.enabled });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/cognition/enabled failed");
+      res.status(500).json({ error: "jarvis_cognition_enabled_write_failed" });
+    }
+  },
+);
+
+const generateBriefingSchema = z.object({
+  query: z.string().trim().min(1).max(2000),
+  instructions: z.string().trim().max(4000).optional().nullable(),
+  period: z.string().trim().min(1).max(32).optional(),
+  audience: z.string().trim().min(1).max(64).optional(),
+  businessId: z.string().uuid().optional().nullable(),
+});
+
+// Synthesize a DRAFT briefing via cognition. Admin-gated + globally toggled OFF
+// by default. Degraded outcomes return 200 with ok=false and write NO draft.
+router.post(
+  "/jarvis/briefings/generate",
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = generateBriefingSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_generate_request" });
+      return;
+    }
+    if (!(await isCognitionEnabled())) {
+      res.status(409).json({ error: "cognition_disabled" });
+      return;
+    }
+    if (parsed.data.businessId && !(await businessExists(parsed.data.businessId))) {
+      res.status(400).json({ error: "unknown_business" });
+      return;
+    }
+    try {
+      const result = await synthesizeBriefing({
+        query: parsed.data.query,
+        instructions: parsed.data.instructions ?? null,
+        period: parsed.data.period ?? null,
+        audience: parsed.data.audience ?? null,
+        businessId: parsed.data.businessId ?? null,
+        createdBy: actor.email ?? actor.userId,
+      });
+      if (result.ok && result.briefing) {
+        await audit(req, actor, "create", "briefing", result.briefing.id, {
+          title: result.briefing.title,
+          sourceMode: "cognition",
+          runId: result.runId,
+          groundingScore: result.groundingScore,
+        });
+      }
+      res.status(result.ok ? 201 : 200).json({
+        ok: result.ok,
+        status: result.status,
+        briefing: result.briefing,
+        runId: result.runId,
+        groundingScore: result.groundingScore,
+        citations: result.citations,
+        reason: result.reason,
+      });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/briefings/generate failed");
+      res.status(500).json({ error: "jarvis_briefing_generate_failed" });
+    }
+  },
+);
+
+// Governed publish. Reuses approvals + policy_evaluations; weak/ungrounded
+// cognition drafts route to require_approval and stay visible as drafts (D2).
+router.post(
+  "/jarvis/briefings/:id/publish",
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    try {
+      const [briefing] = await db
+        .select()
+        .from(jarvisBriefingsTable)
+        .where(eq(jarvisBriefingsTable.id, String(req.params.id)))
+        .limit(1);
+      if (!briefing) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      const outcome = await publishBriefing(briefing, actor.email ?? actor.userId);
+      await audit(req, actor, "update", "briefing", briefing.id, {
+        action: "publish",
+        decision: outcome.decision,
+        reason: outcome.reason,
+        approvalId: outcome.approvalId,
+      });
+      res.json({
+        decision: outcome.decision,
+        reason: outcome.reason,
+        groundingScore: outcome.groundingScore,
+        threshold: outcome.threshold,
+        approvalId: outcome.approvalId,
+        briefing: outcome.briefing,
+      });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/briefings/:id/publish failed");
+      res.status(500).json({ error: "jarvis_briefing_publish_failed" });
+    }
+  },
+);
+
+router.get(
+  "/jarvis/cognition/runs",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const rows = await db
+        .select()
+        .from(jarvisCognitionRunsTable)
+        .orderBy(desc(jarvisCognitionRunsTable.createdAt))
+        .limit(100);
+      res.json({ runs: rows });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/cognition/runs failed");
+      res.status(500).json({ error: "jarvis_cognition_runs_read_failed" });
+    }
+  },
+);
+
+router.get(
+  "/jarvis/cognition/runs/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const [row] = await db
+        .select()
+        .from(jarvisCognitionRunsTable)
+        .where(eq(jarvisCognitionRunsTable.id, String(req.params.id)))
+        .limit(1);
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      res.json({ run: row });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/cognition/runs/:id failed");
+      res.status(500).json({ error: "jarvis_cognition_run_read_failed" });
+    }
+  },
+);
+
+router.get(
+  "/jarvis/cognition/overview",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const [enabled, runs, budget] = await Promise.all([
+        isCognitionEnabled(),
+        db
+          .select()
+          .from(jarvisCognitionRunsTable)
+          .orderBy(desc(jarvisCognitionRunsTable.createdAt)),
+        checkCognitionBudget(),
+      ]);
+
+      const byStatus: Record<string, number> = {};
+      const byKind: Record<string, number> = {};
+      let totalCostMicros = 0;
+      let groundedRuns = 0;
+      let groundingSum = 0;
+      for (const r of runs) {
+        byStatus[r.status] = (byStatus[r.status] ?? 0) + 1;
+        byKind[r.kind] = (byKind[r.kind] ?? 0) + 1;
+        totalCostMicros += r.costMicros ?? 0;
+        if (r.groundingScore != null) {
+          groundedRuns += 1;
+          groundingSum += r.groundingScore;
+        }
+      }
+
+      res.json({
+        enabled,
+        counts: {
+          totalRuns: runs.length,
+          byStatus,
+          byKind,
+        },
+        totalCostMicros,
+        avgGroundingScore:
+          groundedRuns > 0 ? Math.round(groundingSum / groundedRuns) : null,
+        budget: budget
+          ? {
+              name: budget.name,
+              consumedMicros: budget.consumedMicros,
+              limitMicros: budget.limitMicros,
+              exceeded: budget.exceeded,
+            }
+          : null,
+        recentRuns: runs.slice(0, 10),
+      });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/cognition/overview failed");
+      res.status(500).json({ error: "jarvis_cognition_overview_read_failed" });
     }
   },
 );

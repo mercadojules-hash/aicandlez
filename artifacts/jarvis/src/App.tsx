@@ -42,6 +42,7 @@ import Findings from "@/pages/Findings";
 import Recommendations from "@/pages/Recommendations";
 import Insights from "@/pages/Insights";
 import Briefings from "@/pages/Briefings";
+import Cognition from "@/pages/Cognition";
 import Governance from "@/pages/Governance";
 import Policies from "@/pages/Policies";
 import Budgets from "@/pages/Budgets";
@@ -251,6 +252,11 @@ function AppRoutes() {
       <Route path="/briefings">
         <Protected>
           <Briefings />
+        </Protected>
+      </Route>
+      <Route path="/cognition">
+        <Protected>
+          <Cognition />
         </Protected>
       </Route>
       <Route path="/governance">

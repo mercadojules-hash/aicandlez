@@ -60,6 +60,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Recommendations", path: "/recommendations", icon: Lightbulb },
   { label: "Insights", path: "/insights", icon: Sparkles },
   { label: "Briefings", path: "/briefings", icon: FileText },
+  { label: "Cognition", path: "/cognition", icon: Brain },
   { label: "Governance", path: "/governance", icon: ShieldCheck },
   { label: "Policies", path: "/policies", icon: Scale },
   { label: "Budgets", path: "/budgets", icon: Gauge },

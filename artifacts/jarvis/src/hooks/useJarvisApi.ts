@@ -230,6 +230,10 @@ export const jarvisKeys = {
   policyEvaluations: ["jarvis", "policy-evaluations"] as const,
   agentTrust: ["jarvis", "agent-trust"] as const,
   governanceOverview: ["jarvis", "governance-overview"] as const,
+  cognitionEnabled: ["jarvis", "cognition-enabled"] as const,
+  cognitionRuns: ["jarvis", "cognition-runs"] as const,
+  cognitionRun: (id: string) => ["jarvis", "cognition-run", id] as const,
+  cognitionOverview: ["jarvis", "cognition-overview"] as const,
 };
 
 // ── dashboard ────────────────────────────────────────────────────────────────
@@ -1153,6 +1157,10 @@ export interface JarvisBriefing {
   publishedAt: string | null;
   tags: string[] | null;
   status: string;
+  sourceMode: string;
+  cognitionRunId: string | null;
+  citations: { type: string; id: string }[] | null;
+  groundingScore: number | null;
   createdBy: string | null;
   createdAt: string;
   updatedAt: string;
@@ -1375,6 +1383,165 @@ export function useDeleteBriefing() {
     mutationFn: (id: string) =>
       authFetchJson<{ ok: boolean }>(`${API}/briefings/${id}`, { method: "DELETE" }),
     onSuccess: invalidate,
+  });
+}
+
+// ── Sprint 8: cognition (advisory-only LLM plane) ────────────────────────────
+
+export type CognitionRunStatus =
+  | "ok"
+  | "degraded"
+  | "error"
+  | "budget_exceeded"
+  | "disabled";
+
+export interface JarvisCognitionRun {
+  id: string;
+  kind: string;
+  agentId: string | null;
+  agentType: string | null;
+  model: string | null;
+  params: Record<string, unknown> | null;
+  promptHash: string | null;
+  retrievedRefs: { type: string; id: string }[] | null;
+  inputTokens: number;
+  outputTokens: number;
+  costMicros: number;
+  latencyMs: number | null;
+  status: CognitionRunStatus;
+  groundingScore: number | null;
+  rawOutput: string | null;
+  parsedProposal: Record<string, unknown> | null;
+  error: string | null;
+  createdBy: string | null;
+  createdAt: string;
+}
+
+export interface GenerateBriefingInput {
+  query: string;
+  instructions?: string | null;
+  period?: string;
+  audience?: string;
+  businessId?: string | null;
+}
+
+export interface GenerateBriefingResult {
+  ok: boolean;
+  status: CognitionRunStatus;
+  briefing: JarvisBriefing | null;
+  runId: string | null;
+  groundingScore: number | null;
+  citations: { type: string; id: string }[];
+  reason: string | null;
+}
+
+export interface PublishBriefingResult {
+  decision: "allow" | "require_approval";
+  reason: string;
+  groundingScore: number | null;
+  threshold: number;
+  approvalId: string | null;
+  briefing: JarvisBriefing | null;
+}
+
+export interface JarvisCognitionOverview {
+  enabled: boolean;
+  counts: {
+    totalRuns: number;
+    byStatus: Record<string, number>;
+    byKind: Record<string, number>;
+  };
+  totalCostMicros: number;
+  avgGroundingScore: number | null;
+  budget: {
+    name: string;
+    consumedMicros: number;
+    limitMicros: number;
+    exceeded: boolean;
+  } | null;
+  recentRuns: JarvisCognitionRun[];
+}
+
+export function useCognitionEnabled(): UseQueryResult<boolean> {
+  return useQuery({
+    queryKey: jarvisKeys.cognitionEnabled,
+    queryFn: async () => {
+      const data = await authFetchJson<{ enabled: boolean }>(
+        `${API}/cognition/enabled`,
+      );
+      return data.enabled;
+    },
+  });
+}
+
+export function useSetCognitionEnabled() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (enabled: boolean) =>
+      authFetchJson<{ enabled: boolean }>(`${API}/cognition/enabled`, {
+        method: "POST",
+        body: JSON.stringify({ enabled }),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useGenerateBriefing() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (input: GenerateBriefingInput) =>
+      authFetchJson<GenerateBriefingResult>(`${API}/briefings/generate`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function usePublishBriefing() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (id: string) =>
+      authFetchJson<PublishBriefingResult>(`${API}/briefings/${id}/publish`, {
+        method: "POST",
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useCognitionRuns(): UseQueryResult<JarvisCognitionRun[]> {
+  return useQuery({
+    queryKey: jarvisKeys.cognitionRuns,
+    queryFn: async () => {
+      const data = await authFetchJson<{ runs: JarvisCognitionRun[] }>(
+        `${API}/cognition/runs`,
+      );
+      return data.runs ?? [];
+    },
+  });
+}
+
+export function useCognitionRun(
+  id: string | null,
+): UseQueryResult<JarvisCognitionRun> {
+  return useQuery({
+    queryKey: jarvisKeys.cognitionRun(id ?? ""),
+    enabled: Boolean(id),
+    queryFn: async () => {
+      const data = await authFetchJson<{ run: JarvisCognitionRun }>(
+        `${API}/cognition/runs/${id}`,
+      );
+      return data.run;
+    },
+  });
+}
+
+export function useCognitionOverview(): UseQueryResult<JarvisCognitionOverview> {
+  return useQuery({
+    queryKey: jarvisKeys.cognitionOverview,
+    queryFn: () =>
+      authFetchJson<JarvisCognitionOverview>(`${API}/cognition/overview`),
+    refetchInterval: 15000,
   });
 }
 
