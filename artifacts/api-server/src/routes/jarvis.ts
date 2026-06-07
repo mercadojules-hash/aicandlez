@@ -65,6 +65,9 @@ import {
   jarvisSystemsTable,
   jarvisRepositoriesTable,
   jarvisRunbooksTable,
+  // ── Minimum Sovereignty Layer (read-only awareness registries) ─────────────
+  jarvisInfraResourcesTable,
+  jarvisCredentialsTable,
 } from "@workspace/db";
 import { requireAuth, requireRole } from "../middlewares/requireAuth.js";
 import { agentRuntime } from "../lib/jarvis/runtime.js";
@@ -124,6 +127,24 @@ import {
   getSessionTurns,
   purgeSession,
 } from "../lib/jarvis/cognition/voice/sessions.js";
+import {
+  ingestDocuments,
+  listIngestedDocs,
+} from "../lib/jarvis/sovereignty/docIngestion.js";
+import {
+  detectEnvNames,
+  refreshCredentialPresence,
+} from "../lib/jarvis/sovereignty/envAwareness.js";
+import {
+  isRenderConfigured,
+  syncRenderServices,
+  listRenderServices,
+} from "../lib/jarvis/sovereignty/renderClient.js";
+import {
+  reindexCode,
+  searchCode,
+  getCodeIndexStats,
+} from "../lib/jarvis/sovereignty/codeIndex.js";
 
 type AuthReq = Request & { clerkUserId: string };
 
@@ -7172,6 +7193,515 @@ router.delete(
       req.log.error({ err }, "DELETE /jarvis/runbooks/:id failed");
       res.status(500).json({ error: "jarvis_runbook_delete_failed" });
     }
+  },
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Minimum Sovereignty Layer — read-only self-grounding across 4 pillars.
+// All endpoints admin-gated + audited. Writes confined to jarvis_ tables.
+// NO plaintext secret values are ever stored or returned. Fail-safe.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── Pillar 1: Document & Runbook ingestion ───────────────────────────────────
+
+router.post(
+  "/jarvis/sovereignty/docs/ingest",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    try {
+      const summary = await ingestDocuments(actor.userId);
+      await audit(req, actor, "sovereignty.docs.ingest", "sovereignty-doc", null, {
+        processed: summary.processed,
+        created: summary.created,
+        updated: summary.updated,
+      });
+      res.json(summary);
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/sovereignty/docs/ingest failed");
+      res.status(500).json({ error: "jarvis_doc_ingest_failed" });
+    }
+  },
+);
+
+router.get(
+  "/jarvis/sovereignty/docs",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const docs = await listIngestedDocs();
+    await audit(req, actor, "sovereignty.docs.list", "sovereignty-doc", null, {
+      count: docs.length,
+    });
+    res.json({ docs, generatedAt: Date.now() });
+  },
+);
+
+// ── Pillar 2: Infrastructure & Credential awareness registries ───────────────
+
+const infraCreateSchema = z.object({
+  resourceType: z
+    .enum([
+      "domain",
+      "dns",
+      "database",
+      "hosting",
+      "api",
+      "external_service",
+      "other",
+    ])
+    .default("other"),
+  name: z.string().min(1).max(320),
+  provider: z.string().max(160).nullish(),
+  purpose: z.string().nullish(),
+  location: z.string().nullish(),
+  dependsOn: z.array(z.string()).nullish(),
+  status: z.string().max(32).default("active"),
+  metadata: z.record(z.string(), z.unknown()).nullish(),
+  businessId: z.string().uuid().nullish(),
+  systemId: z.string().uuid().nullish(),
+});
+
+router.get(
+  "/jarvis/sovereignty/infra",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const actor = await resolveActor((req as AuthReq).clerkUserId);
+      const rows = await db
+        .select()
+        .from(jarvisInfraResourcesTable)
+        .orderBy(
+          asc(jarvisInfraResourcesTable.resourceType),
+          asc(jarvisInfraResourcesTable.name),
+        );
+      await audit(req, actor, "sovereignty.infra.list", "infra-resource", null, {
+        count: rows.length,
+      });
+      res.json({ resources: rows, generatedAt: Date.now() });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/sovereignty/infra failed");
+      res.json({ resources: [], generatedAt: Date.now() });
+    }
+  },
+);
+
+router.post(
+  "/jarvis/sovereignty/infra",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    const parsed = infraCreateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_body", details: parsed.error.issues });
+      return;
+    }
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const v = parsed.data;
+    try {
+      const [row] = await db
+        .insert(jarvisInfraResourcesTable)
+        .values({
+          resourceType: v.resourceType,
+          name: v.name,
+          provider: v.provider ?? null,
+          purpose: v.purpose ?? null,
+          location: v.location ?? null,
+          dependsOn: v.dependsOn ?? null,
+          status: v.status,
+          metadata: v.metadata ?? null,
+          businessId: v.businessId ?? null,
+          systemId: v.systemId ?? null,
+          createdBy: actor.userId,
+        })
+        .onConflictDoUpdate({
+          target: [
+            jarvisInfraResourcesTable.resourceType,
+            jarvisInfraResourcesTable.name,
+          ],
+          set: {
+            provider: v.provider ?? null,
+            purpose: v.purpose ?? null,
+            location: v.location ?? null,
+            dependsOn: v.dependsOn ?? null,
+            status: v.status,
+            metadata: v.metadata ?? null,
+            businessId: v.businessId ?? null,
+            systemId: v.systemId ?? null,
+            updatedAt: new Date(),
+          },
+        })
+        .returning();
+      await audit(req, actor, "sovereignty.infra.upsert", "infra-resource", row.id, {
+        resourceType: row.resourceType,
+        name: row.name,
+      });
+      res.json(row);
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/sovereignty/infra failed");
+      res.status(500).json({ error: "jarvis_infra_upsert_failed" });
+    }
+  },
+);
+
+router.put(
+  "/jarvis/sovereignty/infra/:id",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    const parsed = infraCreateSchema.partial().safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_body", details: parsed.error.issues });
+      return;
+    }
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const v = parsed.data;
+    try {
+      const [row] = await db
+        .update(jarvisInfraResourcesTable)
+        .set({
+          ...(v.resourceType !== undefined ? { resourceType: v.resourceType } : {}),
+          ...(v.name !== undefined ? { name: v.name } : {}),
+          ...(v.provider !== undefined ? { provider: v.provider ?? null } : {}),
+          ...(v.purpose !== undefined ? { purpose: v.purpose ?? null } : {}),
+          ...(v.location !== undefined ? { location: v.location ?? null } : {}),
+          ...(v.dependsOn !== undefined ? { dependsOn: v.dependsOn ?? null } : {}),
+          ...(v.status !== undefined ? { status: v.status } : {}),
+          ...(v.metadata !== undefined ? { metadata: v.metadata ?? null } : {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(jarvisInfraResourcesTable.id, String(req.params.id)))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await audit(req, actor, "sovereignty.infra.update", "infra-resource", row.id);
+      res.json(row);
+    } catch (err) {
+      req.log.error({ err }, "PUT /jarvis/sovereignty/infra/:id failed");
+      res.status(500).json({ error: "jarvis_infra_update_failed" });
+    }
+  },
+);
+
+router.delete(
+  "/jarvis/sovereignty/infra/:id",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    try {
+      const [row] = await db
+        .delete(jarvisInfraResourcesTable)
+        .where(eq(jarvisInfraResourcesTable.id, String(req.params.id)))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await audit(req, actor, "sovereignty.infra.delete", "infra-resource", row.id, {
+        name: row.name,
+      });
+      res.json({ ok: true, id: row.id });
+    } catch (err) {
+      req.log.error({ err }, "DELETE /jarvis/sovereignty/infra/:id failed");
+      res.status(500).json({ error: "jarvis_infra_delete_failed" });
+    }
+  },
+);
+
+const credentialCreateSchema = z.object({
+  name: z.string().min(1).max(200),
+  category: z
+    .enum(["api_key", "secret", "db_url", "oauth", "webhook", "vault_key", "other"])
+    .default("other"),
+  purpose: z.string().nullish(),
+  storageLocation: z.string().max(200).nullish(),
+  dependentSystems: z.array(z.string()).nullish(),
+  status: z.string().max(32).default("active"),
+  businessId: z.string().uuid().nullish(),
+  systemId: z.string().uuid().nullish(),
+});
+
+router.get(
+  "/jarvis/sovereignty/credentials",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const actor = await resolveActor((req as AuthReq).clerkUserId);
+      const rows = await db
+        .select()
+        .from(jarvisCredentialsTable)
+        .orderBy(asc(jarvisCredentialsTable.name));
+      await audit(
+        req,
+        actor,
+        "sovereignty.credential.list",
+        "credential",
+        null,
+        { count: rows.length },
+      );
+      res.json({
+        credentials: rows,
+        detectedEnvNames: detectEnvNames(),
+        generatedAt: Date.now(),
+      });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/sovereignty/credentials failed");
+      res.json({
+        credentials: [],
+        detectedEnvNames: detectEnvNames(),
+        generatedAt: Date.now(),
+      });
+    }
+  },
+);
+
+router.post(
+  "/jarvis/sovereignty/credentials",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    const parsed = credentialCreateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_body", details: parsed.error.issues });
+      return;
+    }
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const v = parsed.data;
+    try {
+      const [row] = await db
+        .insert(jarvisCredentialsTable)
+        .values({
+          name: v.name,
+          category: v.category,
+          purpose: v.purpose ?? null,
+          storageLocation: v.storageLocation ?? null,
+          dependentSystems: v.dependentSystems ?? null,
+          status: v.status,
+          businessId: v.businessId ?? null,
+          systemId: v.systemId ?? null,
+          present: Object.prototype.hasOwnProperty.call(process.env, v.name),
+          lastVerifiedAt: new Date(),
+          createdBy: actor.userId,
+        })
+        .onConflictDoUpdate({
+          target: jarvisCredentialsTable.name,
+          set: {
+            category: v.category,
+            purpose: v.purpose ?? null,
+            storageLocation: v.storageLocation ?? null,
+            dependentSystems: v.dependentSystems ?? null,
+            status: v.status,
+            present: Object.prototype.hasOwnProperty.call(process.env, v.name),
+            lastVerifiedAt: new Date(),
+            updatedAt: new Date(),
+          },
+        })
+        .returning();
+      await audit(req, actor, "sovereignty.credential.upsert", "credential", row.id, {
+        name: row.name,
+        category: row.category,
+      });
+      res.json(row);
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/sovereignty/credentials failed");
+      res.status(500).json({ error: "jarvis_credential_upsert_failed" });
+    }
+  },
+);
+
+router.put(
+  "/jarvis/sovereignty/credentials/:id",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    const parsed = credentialCreateSchema.partial().safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_body", details: parsed.error.issues });
+      return;
+    }
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const v = parsed.data;
+    try {
+      const [row] = await db
+        .update(jarvisCredentialsTable)
+        .set({
+          ...(v.category !== undefined ? { category: v.category } : {}),
+          ...(v.purpose !== undefined ? { purpose: v.purpose ?? null } : {}),
+          ...(v.storageLocation !== undefined
+            ? { storageLocation: v.storageLocation ?? null }
+            : {}),
+          ...(v.dependentSystems !== undefined
+            ? { dependentSystems: v.dependentSystems ?? null }
+            : {}),
+          ...(v.status !== undefined ? { status: v.status } : {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(jarvisCredentialsTable.id, String(req.params.id)))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await audit(req, actor, "sovereignty.credential.update", "credential", row.id);
+      res.json(row);
+    } catch (err) {
+      req.log.error({ err }, "PUT /jarvis/sovereignty/credentials/:id failed");
+      res.status(500).json({ error: "jarvis_credential_update_failed" });
+    }
+  },
+);
+
+router.delete(
+  "/jarvis/sovereignty/credentials/:id",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    try {
+      const [row] = await db
+        .delete(jarvisCredentialsTable)
+        .where(eq(jarvisCredentialsTable.id, String(req.params.id)))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await audit(req, actor, "sovereignty.credential.delete", "credential", row.id, {
+        name: row.name,
+      });
+      res.json({ ok: true, id: row.id });
+    } catch (err) {
+      req.log.error({ err }, "DELETE /jarvis/sovereignty/credentials/:id failed");
+      res.status(500).json({ error: "jarvis_credential_delete_failed" });
+    }
+  },
+);
+
+router.post(
+  "/jarvis/sovereignty/credentials/refresh-presence",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const result = await refreshCredentialPresence();
+    await audit(
+      req,
+      actor,
+      "sovereignty.credential.refresh-presence",
+      "credential",
+      null,
+      result,
+    );
+    res.json({ ...result, generatedAt: Date.now() });
+  },
+);
+
+// ── Pillar 3: Render read-only awareness ─────────────────────────────────────
+
+router.get(
+  "/jarvis/sovereignty/render",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const services = await listRenderServices();
+    await audit(req, actor, "sovereignty.render.list", "render-service", null, {
+      count: services.length,
+      configured: isRenderConfigured(),
+    });
+    res.json({
+      configured: isRenderConfigured(),
+      services,
+      generatedAt: Date.now(),
+    });
+  },
+);
+
+router.post(
+  "/jarvis/sovereignty/render/sync",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const result = await syncRenderServices();
+    await audit(req, actor, "sovereignty.render.sync", "render-service", null, {
+      configured: result.configured,
+      synced: result.synced,
+    });
+    res.json(result);
+  },
+);
+
+// ── Pillar 4: Code content indexing ──────────────────────────────────────────
+
+router.post(
+  "/jarvis/sovereignty/code/reindex",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    try {
+      const result = await reindexCode();
+      await audit(req, actor, "sovereignty.code.reindex", "code-file", null, {
+        scanned: result.scanned,
+        upserted: result.upserted,
+      });
+      res.json(result);
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/sovereignty/code/reindex failed");
+      res.status(500).json({ error: "jarvis_code_reindex_failed" });
+    }
+  },
+);
+
+router.get(
+  "/jarvis/sovereignty/code/search",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    const q = typeof req.query.q === "string" ? req.query.q : "";
+    const artifact =
+      typeof req.query.artifact === "string" && req.query.artifact.length > 0
+        ? req.query.artifact
+        : null;
+    const kind =
+      typeof req.query.kind === "string" && req.query.kind.length > 0
+        ? req.query.kind
+        : null;
+    const limit =
+      typeof req.query.limit === "string" ? Number(req.query.limit) : undefined;
+    const results = await searchCode(q, {
+      artifact,
+      kind,
+      limit: Number.isFinite(limit) ? limit : undefined,
+    });
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    await audit(req, actor, "sovereignty.code.search", "code-file", null, {
+      query: q,
+      count: results.length,
+    });
+    res.json({ query: q, results, generatedAt: Date.now() });
+  },
+);
+
+router.get(
+  "/jarvis/sovereignty/code/stats",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const stats = await getCodeIndexStats();
+    await audit(req, actor, "sovereignty.code.stats", "code-file", null, {
+      totalFiles: stats.totalFiles,
+    });
+    res.json({ ...stats, generatedAt: Date.now() });
   },
 );
 

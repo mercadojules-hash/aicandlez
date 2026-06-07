@@ -53,6 +53,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Agents", path: "/agents", icon: Bot },
   { label: "Knowledge Graph", path: "/knowledge-graph", icon: Network },
   { label: "Historical Intelligence", path: "/historical", icon: History },
+  { label: "Sovereignty Layer", path: "/sovereignty", icon: ShieldCheck },
   { label: "Knowledge", path: "/knowledge", icon: BookOpen },
   { label: "Voice", path: "/voice", icon: Radio },
   { label: "Settings", path: "/settings", icon: SettingsIcon },

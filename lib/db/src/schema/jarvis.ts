@@ -254,6 +254,10 @@ export const jarvisKnowledgeAssetsTable = pgTable("jarvis_knowledge_assets", {
   content: text("content"),
   assetType: varchar("asset_type", { length: 32 }).notNull().default("document"),
   sourceUrl: varchar("source_url", { length: 2048 }),
+  // Repo-relative path when this asset was ingested from a source file (doc /
+  // runbook ingestion). UNIQUE so re-ingestion upserts instead of duplicating;
+  // Postgres permits many NULLs, so manual/free-form assets stay unconstrained.
+  sourcePath: varchar("source_path", { length: 1024 }).unique(),
   categoryId: uuid("category_id").references(() => jarvisKnowledgeCategoriesTable.id, {
     onDelete: "set null",
   }),
@@ -1085,6 +1089,9 @@ export const jarvisRunbooksTable = pgTable(
     // disaster_recovery | other
     kind: varchar("kind", { length: 32 }).notNull().default("operational"),
     content: text("content"),
+    // Repo-relative path when mirrored from an ingested source file. UNIQUE so
+    // re-ingestion upserts; NULL for manually authored runbooks (many allowed).
+    sourcePath: varchar("source_path", { length: 1024 }).unique(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -1198,3 +1205,165 @@ export type InsertJarvisAicandlezDailySnapshot =
   typeof jarvisAicandlezDailySnapshotsTable.$inferInsert;
 export type JarvisReport = typeof jarvisReportsTable.$inferSelect;
 export type InsertJarvisReport = typeof jarvisReportsTable.$inferInsert;
+
+// ── Minimum Sovereignty Layer (read-only operational awareness) ──────────────
+// jarvis-owned registries so Jarvis can understand the infrastructure,
+// credentials (METADATA ONLY — never a value), hosting, and source code that
+// run the managed businesses, without depending on Replit as the primary source
+// of knowledge. Every table is advisory + read-mirror; Jarvis NEVER acts on the
+// underlying systems from here. NULL → dash; nothing is fabricated.
+
+// `jarvis_infra_resources`: domains, DNS, databases, hosting, APIs, and external
+// services. Free-form, manual-or-mirror-populated. `dependsOn` is a list of
+// human-readable dependency labels (other resources / systems).
+export const jarvisInfraResourcesTable = pgTable(
+  "jarvis_infra_resources",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    businessId: uuid("business_id").references(() => jarvisBusinessesTable.id, {
+      onDelete: "set null",
+    }),
+    systemId: uuid("system_id").references(() => jarvisSystemsTable.id, {
+      onDelete: "set null",
+    }),
+    // domain | dns | database | hosting | api | external_service | other
+    resourceType: varchar("resource_type", { length: 32 })
+      .notNull()
+      .default("other"),
+    name: varchar("name", { length: 320 }).notNull(),
+    provider: varchar("provider", { length: 160 }),
+    purpose: text("purpose"),
+    // Where it lives / dashboard or endpoint URL (NOT a secret).
+    location: text("location"),
+    dependsOn: jsonb("depends_on").$type<string[]>(),
+    status: varchar("status", { length: 32 }).notNull().default("active"),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    createdBy: varchar("created_by", { length: 255 }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    // One row per (type, name) → upsert-safe idempotent registration.
+    uniqueIndex("jarvis_infra_resources_type_name_uq").on(
+      table.resourceType,
+      table.name,
+    ),
+    index("jarvis_infra_resources_business_idx").on(table.businessId),
+  ],
+);
+
+// `jarvis_credentials`: awareness + dependency map for credentials.
+// CRITICAL: there is NO value/secret column here, by design. We only track the
+// NAME, purpose, storage location, and what depends on it. `present` is a
+// read-only signal of whether an env var of this NAME currently exists in the
+// process environment (keys only — values are never read into this table).
+export const jarvisCredentialsTable = pgTable(
+  "jarvis_credentials",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    businessId: uuid("business_id").references(() => jarvisBusinessesTable.id, {
+      onDelete: "set null",
+    }),
+    systemId: uuid("system_id").references(() => jarvisSystemsTable.id, {
+      onDelete: "set null",
+    }),
+    // Env var name / credential identifier (e.g. "STRIPE_SECRET_KEY").
+    name: varchar("name", { length: 200 }).notNull().unique(),
+    // api_key | secret | db_url | oauth | webhook | vault_key | other
+    category: varchar("category", { length: 32 }).notNull().default("other"),
+    purpose: text("purpose"),
+    // e.g. "Replit Secrets", "Render env group", "CredentialVault (encrypted)".
+    storageLocation: varchar("storage_location", { length: 200 }),
+    dependentSystems: jsonb("dependent_systems").$type<string[]>(),
+    // Read-only presence flag (NULL = unknown/never checked → dash). Never a value.
+    present: boolean("present"),
+    lastVerifiedAt: timestamp("last_verified_at"),
+    status: varchar("status", { length: 32 }).notNull().default("active"),
+    createdBy: varchar("created_by", { length: 255 }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("jarvis_credentials_business_idx").on(table.businessId),
+  ],
+);
+
+// `jarvis_render_services`: read-only cache of Render service + latest deploy
+// awareness. Written by a GET-only sync (no deploy/restart/rollback). NULL until
+// synced → dash. `raw` holds a sanitized projection (no env values).
+export const jarvisRenderServicesTable = pgTable(
+  "jarvis_render_services",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    // Render's stable service id (srv-...). Unique → upsert-safe.
+    renderServiceId: varchar("render_service_id", { length: 120 })
+      .notNull()
+      .unique(),
+    name: varchar("name", { length: 240 }),
+    // web_service | static_site | private_service | background_worker | cron | pserv
+    serviceType: varchar("service_type", { length: 48 }),
+    env: varchar("env", { length: 48 }),
+    region: varchar("region", { length: 48 }),
+    repo: text("repo"),
+    branch: varchar("branch", { length: 160 }),
+    autoDeploy: boolean("auto_deploy"),
+    suspended: varchar("suspended", { length: 32 }),
+    dashboardUrl: text("dashboard_url"),
+    serviceUrl: text("service_url"),
+    // Latest deploy awareness.
+    lastDeployId: varchar("last_deploy_id", { length: 120 }),
+    lastDeployStatus: varchar("last_deploy_status", { length: 48 }),
+    lastDeployCommit: varchar("last_deploy_commit", { length: 120 }),
+    lastDeployCreatedAt: timestamp("last_deploy_created_at"),
+    lastDeployFinishedAt: timestamp("last_deploy_finished_at"),
+    raw: jsonb("raw").$type<Record<string, unknown>>(),
+    lastSyncedAt: timestamp("last_synced_at"),
+    syncError: text("sync_error"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("jarvis_render_services_name_idx").on(table.name),
+  ],
+);
+
+// `jarvis_code_files`: lexical index of repo source/build/config/doc files so
+// Jarvis can explain where important code lives with file references. Mirror of
+// the filesystem at index time (idempotent on `path` via content hash). No file
+// contents are stored — only a short summary + exported symbol names.
+export const jarvisCodeFilesTable = pgTable(
+  "jarvis_code_files",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    // Repo-relative path. Unique → upsert-safe.
+    path: varchar("path", { length: 1024 }).notNull().unique(),
+    // Top-level artifact / lib (e.g. "api-server", "lib/db", "root").
+    artifact: varchar("artifact", { length: 160 }),
+    language: varchar("language", { length: 32 }),
+    // source | build | config | doc | schema | style | other
+    kind: varchar("kind", { length: 32 }).notNull().default("source"),
+    sizeBytes: integer("size_bytes"),
+    lineCount: integer("line_count"),
+    summary: text("summary"),
+    symbols: jsonb("symbols").$type<string[]>(),
+    contentHash: varchar("content_hash", { length: 64 }),
+    indexedAt: timestamp("indexed_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("jarvis_code_files_artifact_idx").on(table.artifact),
+    index("jarvis_code_files_kind_idx").on(table.kind),
+  ],
+);
+
+export type JarvisInfraResource = typeof jarvisInfraResourcesTable.$inferSelect;
+export type InsertJarvisInfraResource =
+  typeof jarvisInfraResourcesTable.$inferInsert;
+export type JarvisCredential = typeof jarvisCredentialsTable.$inferSelect;
+export type InsertJarvisCredential = typeof jarvisCredentialsTable.$inferInsert;
+export type JarvisRenderService = typeof jarvisRenderServicesTable.$inferSelect;
+export type InsertJarvisRenderService =
+  typeof jarvisRenderServicesTable.$inferInsert;
+export type JarvisCodeFile = typeof jarvisCodeFilesTable.$inferSelect;
+export type InsertJarvisCodeFile = typeof jarvisCodeFilesTable.$inferInsert;

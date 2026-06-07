@@ -259,6 +259,13 @@ export const jarvisKeys = {
   historicalSubscriptions: ["jarvis", "historical-subscriptions"] as const,
   reports: ["jarvis", "reports"] as const,
   reportDetail: (id: string) => ["jarvis", "report-detail", id] as const,
+  sovereigntyDocs: ["jarvis", "sovereignty-docs"] as const,
+  sovereigntyInfra: ["jarvis", "sovereignty-infra"] as const,
+  sovereigntyCredentials: ["jarvis", "sovereignty-credentials"] as const,
+  sovereigntyRender: ["jarvis", "sovereignty-render"] as const,
+  sovereigntyCodeStats: ["jarvis", "sovereignty-code-stats"] as const,
+  sovereigntyCodeSearch: (q: string, artifact: string, kind: string) =>
+    ["jarvis", "sovereignty-code-search", q, artifact, kind] as const,
 };
 
 // ── dashboard ────────────────────────────────────────────────────────────────
@@ -3574,5 +3581,320 @@ export function useDeleteReport() {
     mutationFn: (id: string) =>
       authFetch(`${API}/reports/${id}`, { method: "DELETE" }),
     onSuccess: invalidate,
+  });
+}
+
+// ── Minimum Sovereignty Layer ────────────────────────────────────────────────
+
+export interface SovereigntyDoc {
+  id: string;
+  title: string;
+  assetType: string;
+  sourcePath: string | null;
+  summary: string | null;
+  updatedAt: string | null;
+}
+
+export interface SovereigntyDocIngestSummary {
+  generatedAt: number;
+  repoRoot: string;
+  processed: number;
+  created: number;
+  updated: number;
+  unchanged: number;
+  missing: number;
+  errors: number;
+  indexed: boolean;
+  files: {
+    path: string;
+    title: string | null;
+    assetType: string;
+    status: string;
+    bytes: number | null;
+    mirroredRunbook: boolean;
+  }[];
+}
+
+export function useSovereigntyDocs(): UseQueryResult<{
+  docs: SovereigntyDoc[];
+  generatedAt: number;
+}> {
+  return useQuery({
+    queryKey: jarvisKeys.sovereigntyDocs,
+    queryFn: () =>
+      authFetchJson<{ docs: SovereigntyDoc[]; generatedAt: number }>(
+        `${API}/sovereignty/docs`,
+      ),
+  });
+}
+
+export function useIngestDocs() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      authFetchJson<SovereigntyDocIngestSummary>(
+        `${API}/sovereignty/docs/ingest`,
+        { method: "POST" },
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: jarvisKeys.sovereigntyDocs });
+    },
+  });
+}
+
+export interface SovereigntyInfraResource {
+  id: string;
+  resourceType: string;
+  name: string;
+  provider: string | null;
+  purpose: string | null;
+  location: string | null;
+  dependsOn: string[] | null;
+  status: string;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InfraResourceInput {
+  resourceType: string;
+  name: string;
+  provider?: string | null;
+  purpose?: string | null;
+  location?: string | null;
+  dependsOn?: string[] | null;
+  status?: string;
+}
+
+export function useSovereigntyInfra(): UseQueryResult<{
+  resources: SovereigntyInfraResource[];
+  generatedAt: number;
+}> {
+  return useQuery({
+    queryKey: jarvisKeys.sovereigntyInfra,
+    queryFn: () =>
+      authFetchJson<{
+        resources: SovereigntyInfraResource[];
+        generatedAt: number;
+      }>(`${API}/sovereignty/infra`),
+  });
+}
+
+export function useUpsertInfra() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: InfraResourceInput) =>
+      authFetchJson<SovereigntyInfraResource>(`${API}/sovereignty/infra`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: jarvisKeys.sovereigntyInfra });
+    },
+  });
+}
+
+export function useDeleteInfra() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      authFetch(`${API}/sovereignty/infra/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: jarvisKeys.sovereigntyInfra });
+    },
+  });
+}
+
+export interface SovereigntyCredential {
+  id: string;
+  name: string;
+  category: string;
+  purpose: string | null;
+  storageLocation: string | null;
+  dependentSystems: string[] | null;
+  present: boolean | null;
+  lastVerifiedAt: string | null;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CredentialInput {
+  name: string;
+  category: string;
+  purpose?: string | null;
+  storageLocation?: string | null;
+  dependentSystems?: string[] | null;
+  status?: string;
+}
+
+export function useSovereigntyCredentials(): UseQueryResult<{
+  credentials: SovereigntyCredential[];
+  detectedEnvNames: string[];
+  generatedAt: number;
+}> {
+  return useQuery({
+    queryKey: jarvisKeys.sovereigntyCredentials,
+    queryFn: () =>
+      authFetchJson<{
+        credentials: SovereigntyCredential[];
+        detectedEnvNames: string[];
+        generatedAt: number;
+      }>(`${API}/sovereignty/credentials`),
+  });
+}
+
+export function useUpsertCredential() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CredentialInput) =>
+      authFetchJson<SovereigntyCredential>(`${API}/sovereignty/credentials`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: jarvisKeys.sovereigntyCredentials });
+    },
+  });
+}
+
+export function useDeleteCredential() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      authFetch(`${API}/sovereignty/credentials/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: jarvisKeys.sovereigntyCredentials });
+    },
+  });
+}
+
+export function useRefreshCredentialPresence() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      authFetchJson<{ checked: number; present: number; generatedAt: number }>(
+        `${API}/sovereignty/credentials/refresh-presence`,
+        { method: "POST" },
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: jarvisKeys.sovereigntyCredentials });
+    },
+  });
+}
+
+export interface SovereigntyRenderService {
+  id: string;
+  renderServiceId: string;
+  name: string | null;
+  serviceType: string | null;
+  env: string | null;
+  region: string | null;
+  repo: string | null;
+  branch: string | null;
+  autoDeploy: boolean | null;
+  suspended: string | null;
+  dashboardUrl: string | null;
+  serviceUrl: string | null;
+  lastDeployId: string | null;
+  lastDeployStatus: string | null;
+  lastDeployCommit: string | null;
+  lastDeployCreatedAt: string | null;
+  lastDeployFinishedAt: string | null;
+  lastSyncedAt: string | null;
+  syncError: string | null;
+}
+
+export function useSovereigntyRender(): UseQueryResult<{
+  configured: boolean;
+  services: SovereigntyRenderService[];
+  generatedAt: number;
+}> {
+  return useQuery({
+    queryKey: jarvisKeys.sovereigntyRender,
+    queryFn: () =>
+      authFetchJson<{
+        configured: boolean;
+        services: SovereigntyRenderService[];
+        generatedAt: number;
+      }>(`${API}/sovereignty/render`),
+  });
+}
+
+export function useSyncRender() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      authFetchJson<{
+        configured: boolean;
+        synced: number;
+        error: string | null;
+        syncedAt: number;
+      }>(`${API}/sovereignty/render/sync`, { method: "POST" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: jarvisKeys.sovereigntyRender });
+    },
+  });
+}
+
+export interface SovereigntyCodeStats {
+  totalFiles: number;
+  byArtifact: { artifact: string; files: number }[];
+  byKind: { kind: string; files: number }[];
+  lastIndexedAt: number | null;
+  generatedAt: number;
+}
+
+export interface SovereigntyCodeRow {
+  path: string;
+  artifact: string | null;
+  language: string | null;
+  kind: string;
+  summary: string | null;
+  symbols: string[] | null;
+  lineCount: number | null;
+}
+
+export function useSovereigntyCodeStats(): UseQueryResult<SovereigntyCodeStats> {
+  return useQuery({
+    queryKey: jarvisKeys.sovereigntyCodeStats,
+    queryFn: () =>
+      authFetchJson<SovereigntyCodeStats>(`${API}/sovereignty/code/stats`),
+  });
+}
+
+export function useSovereigntyCodeSearch(
+  q: string,
+  artifact: string,
+  kind: string,
+): UseQueryResult<{ query: string; results: SovereigntyCodeRow[] }> {
+  return useQuery({
+    queryKey: jarvisKeys.sovereigntyCodeSearch(q, artifact, kind),
+    queryFn: () => {
+      const params = new URLSearchParams({ q });
+      if (artifact) params.set("artifact", artifact);
+      if (kind) params.set("kind", kind);
+      return authFetchJson<{ query: string; results: SovereigntyCodeRow[] }>(
+        `${API}/sovereignty/code/search?${params.toString()}`,
+      );
+    },
+    enabled: q.trim().length > 0,
+  });
+}
+
+export function useReindexCode() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      authFetchJson<{
+        scanned: number;
+        upserted: number;
+        unchanged: number;
+        errors: number;
+        truncated: boolean;
+      }>(`${API}/sovereignty/code/reindex`, { method: "POST" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: jarvisKeys.sovereigntyCodeStats });
+    },
   });
 }
