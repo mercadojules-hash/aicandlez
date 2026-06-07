@@ -647,6 +647,18 @@ export function useDeleteRepository() {
   });
 }
 
+export function useSyncRepository() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (id: string) =>
+      authFetchJson<{ repository: JarvisRepository }>(
+        `${API}/repositories/${id}/sync`,
+        { method: "POST" },
+      ),
+    onSuccess: invalidate,
+  });
+}
+
 export function useCreateRunbook() {
   const invalidate = useInvalidateAll();
   return useMutation({

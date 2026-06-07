@@ -55,6 +55,7 @@ import {
   useDeleteSystem,
   useCreateRepository,
   useDeleteRepository,
+  useSyncRepository,
   useCreateRunbook,
   useDeleteRunbook,
   type JarvisSystem,
@@ -590,6 +591,7 @@ function RepositoriesTab({
 }) {
   const create = useCreateRepository();
   const remove = useDeleteRepository();
+  const sync = useSyncRepository();
   const [open, setOpen] = useState(false);
   const [fullName, setFullName] = useState("");
   const [url, setUrl] = useState("");
@@ -639,14 +641,37 @@ function RepositoriesTab({
                       Default branch: {dash(r.defaultBranch)}
                     </p>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-destructive hover:text-destructive"
-                    onClick={() => setDeleting(r)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <div className="flex shrink-0 gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      disabled={r.provider !== "github" || sync.isPending}
+                      title={
+                        r.provider === "github"
+                          ? "Sync GitHub awareness"
+                          : "Sync only available for GitHub repositories"
+                      }
+                      onClick={() => sync.mutate(r.id)}
+                    >
+                      <RefreshCw
+                        className={cn(
+                          "h-4 w-4",
+                          sync.isPending &&
+                            sync.variables === r.id &&
+                            "animate-spin",
+                        )}
+                      />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive hover:text-destructive"
+                      onClick={() => setDeleting(r)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

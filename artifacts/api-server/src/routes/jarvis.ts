@@ -70,6 +70,10 @@ import { requireAuth, requireRole } from "../middlewares/requireAuth.js";
 import { agentRuntime } from "../lib/jarvis/runtime.js";
 import { agentBus } from "../lib/jarvis/agentBus.js";
 import { recordBusinessMemory } from "../lib/jarvis/memory.js";
+import {
+  fetchRepoAwareness,
+  parseRepoFullName,
+} from "../lib/jarvis/githubClient.js";
 import { AGENT_CATALOG, getHandler } from "../lib/jarvis/registry.js";
 import {
   startWorkflowRun,
@@ -6723,6 +6727,96 @@ router.delete(
     } catch (err) {
       req.log.error({ err }, "DELETE /jarvis/repositories/:id failed");
       res.status(500).json({ error: "jarvis_repository_delete_failed" });
+    }
+  },
+);
+
+// Live read-only GitHub awareness sync. Pulls last commit, open PR count, and
+// the latest workflow run into the repository's cache columns. Fail-safe: a
+// GitHub/connector error is recorded in syncError + lastSyncedAt and the repo is
+// returned (UI degrades to dashes), never a 5xx for an expected outage.
+router.post(
+  "/jarvis/repositories/:id/sync",
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    try {
+      const [repo] = await db
+        .select()
+        .from(jarvisRepositoriesTable)
+        .where(eq(jarvisRepositoriesTable.id, String(req.params.id)))
+        .limit(1);
+      if (!repo) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      if (repo.provider !== "github") {
+        res.status(400).json({ error: "unsupported_provider" });
+        return;
+      }
+
+      const now = new Date();
+      const parsedName = parseRepoFullName(repo.fullName);
+      if (!parsedName) {
+        const [row] = await db
+          .update(jarvisRepositoriesTable)
+          .set({
+            syncError: "invalid_full_name",
+            lastSyncedAt: now,
+            updatedAt: now,
+          })
+          .where(eq(jarvisRepositoriesTable.id, repo.id))
+          .returning();
+        res.json({ repository: row });
+        return;
+      }
+
+      try {
+        const a = await fetchRepoAwareness(parsedName.owner, parsedName.repo);
+        const [row] = await db
+          .update(jarvisRepositoriesTable)
+          .set({
+            defaultBranch: a.defaultBranch ?? repo.defaultBranch,
+            url: a.url ?? repo.url,
+            description: a.description ?? repo.description,
+            lastCommitSha: a.lastCommitSha,
+            lastCommitMessage: a.lastCommitMessage,
+            lastCommitAuthor: a.lastCommitAuthor,
+            lastCommitAt: a.lastCommitAt,
+            openPrCount: a.openPrCount,
+            lastWorkflowStatus: a.lastWorkflowStatus,
+            lastWorkflowConclusion: a.lastWorkflowConclusion,
+            syncError: null,
+            lastSyncedAt: now,
+            updatedAt: now,
+          })
+          .where(eq(jarvisRepositoriesTable.id, repo.id))
+          .returning();
+        await audit(req, actor, "sync", "repository", repo.id, {
+          fullName: repo.fullName,
+        });
+        res.json({ repository: row });
+      } catch (syncErr) {
+        const message =
+          syncErr instanceof Error ? syncErr.message : "sync_failed";
+        req.log.warn(
+          { err: syncErr, repoId: repo.id },
+          "jarvis github sync failed",
+        );
+        const [row] = await db
+          .update(jarvisRepositoriesTable)
+          .set({
+            syncError: message.slice(0, 480),
+            lastSyncedAt: now,
+            updatedAt: now,
+          })
+          .where(eq(jarvisRepositoriesTable.id, repo.id))
+          .returning();
+        res.json({ repository: row });
+      }
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/repositories/:id/sync failed");
+      res.status(500).json({ error: "jarvis_repository_sync_failed" });
     }
   },
 );
