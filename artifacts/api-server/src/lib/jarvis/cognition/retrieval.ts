@@ -7,9 +7,11 @@ import {
   jarvisKnowledgeCategoriesTable,
   jarvisKnowledgeRelationshipsTable,
   jarvisEmbeddingsTable,
+  jarvisCodeFilesTable,
 } from "@workspace/db";
 import { and, desc, eq, inArray, ilike, or, sql, type SQL } from "drizzle-orm";
 import type {
+  CitationNodeType,
   GraphNodeType,
   RetrievalResult,
   RetrievedDoc,
@@ -45,6 +47,15 @@ const MAX_TEXT_CHARS = 1200;
 /** Query-focused snippet window (chars) + lead context before the first match. */
 const SNIPPET_MAX_CHARS = 500;
 const SNIPPET_LEAD_CHARS = 120;
+/**
+ * Code docs get a LARGER query-focused window than knowledge docs so cognition
+ * sees enough surrounding source to reason (a 500-char window is too small for a
+ * function body). The total prompt is still bounded by `MAX_CONTEXT_CHARS`.
+ */
+const CODE_SNIPPET_MAX_CHARS = 1600;
+const CODE_SNIPPET_LEAD_CHARS = 240;
+/** Bound on code candidates pulled into the lexical pool per query. */
+const CODE_CANDIDATE_LIMIT = 12;
 /** RRF dampening constant (Cormack et al. 2009). Higher = flatter rank weight. */
 const RRF_K = 60;
 
@@ -89,7 +100,7 @@ function lexicalScore(terms: string[], haystack: string): number {
 }
 
 interface RawDoc {
-  type: GraphNodeType;
+  type: CitationNodeType;
   id: string;
   title: string;
   text: string;
@@ -218,9 +229,58 @@ async function fetchTasks(terms: string[]): Promise<RawDoc[]> {
   }));
 }
 
+/**
+ * LEXICAL code candidates (Phase 1 code grounding). Matches the query terms over
+ * path / summary / symbols / raw content of `jarvis_code_files`. Returns code
+ * RawDocs whose text is the stored file content (windowed downstream by the code
+ * snippet). `"code"` is a citation-only ref type — never graph-expanded or
+ * embedded. Fail-safe to [] (a code-index miss must never break cognition).
+ */
+async function fetchCode(terms: string[]): Promise<RawDoc[]> {
+  if (terms.length === 0) return [];
+  const t = jarvisCodeFilesTable;
+  try {
+    const where = lexFilter(
+      terms,
+      terms.flatMap((term) => {
+        const like = `%${escapeLike(term)}%`;
+        return [
+          ilike(t.path, like),
+          ilike(t.summary, like),
+          ilike(t.content, like),
+          sql`${t.symbols}::text ILIKE ${like}`,
+        ];
+      }),
+    );
+    const rows = await db
+      .select({
+        id: t.id,
+        path: t.path,
+        summary: t.summary,
+        content: t.content,
+        updatedAt: t.updatedAt,
+      })
+      .from(t)
+      .where(where)
+      .orderBy(desc(t.updatedAt))
+      .limit(CODE_CANDIDATE_LIMIT);
+    return rows.map((r) => ({
+      type: "code" as const,
+      id: r.id,
+      title: r.path,
+      // Prefer raw content; fall back to summary for metadata-only files. NOT
+      // pre-truncated — the code snippet window keeps the matched region intact.
+      text: (r.content ?? r.summary ?? "").trim(),
+      updatedAt: r.updatedAt,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 /** Resolve refs back into docs (one batched query per type), with boost meta. */
 async function resolveRefs(refs: RetrievedRef[]): Promise<RawDoc[]> {
-  const byType = new Map<GraphNodeType, string[]>();
+  const byType = new Map<CitationNodeType, string[]>();
   for (const r of refs) {
     const list = byType.get(r.type) ?? [];
     list.push(r.id);
@@ -312,6 +372,30 @@ async function resolveRefs(refs: RetrievedRef[]): Promise<RawDoc[]> {
             id: r.id,
             title: r.name,
             text: truncate(r.description ?? ""),
+            updatedAt: r.updatedAt,
+          });
+        break;
+      }
+      case "code": {
+        // Code refs never arrive via semantic/hop (code is neither embedded nor
+        // graph-linked), but resolve them for completeness so a re-resolved code
+        // citation stays consistent. Content windowed downstream by the snippet.
+        const rows = await db
+          .select({
+            id: jarvisCodeFilesTable.id,
+            path: jarvisCodeFilesTable.path,
+            summary: jarvisCodeFilesTable.summary,
+            content: jarvisCodeFilesTable.content,
+            updatedAt: jarvisCodeFilesTable.updatedAt,
+          })
+          .from(jarvisCodeFilesTable)
+          .where(inArray(jarvisCodeFilesTable.id, ids));
+        for (const r of rows)
+          out.push({
+            type,
+            id: r.id,
+            title: r.path,
+            text: (r.content ?? r.summary ?? "").trim(),
             updatedAt: r.updatedAt,
           });
         break;
@@ -459,11 +543,16 @@ function fuse(
  * the context block carries the relevant passage instead of an arbitrary head.
  * Falls back to a head slice when no term matches.
  */
-function snippet(text: string, terms: string[]): string {
+function snippet(
+  text: string,
+  terms: string[],
+  maxChars: number = SNIPPET_MAX_CHARS,
+  leadChars: number = SNIPPET_LEAD_CHARS,
+): string {
   const body = (text ?? "").trim();
   if (!body) return "";
-  if (body.length <= SNIPPET_MAX_CHARS) return body;
-  if (terms.length === 0) return `${body.slice(0, SNIPPET_MAX_CHARS)}…`;
+  if (body.length <= maxChars) return body;
+  if (terms.length === 0) return `${body.slice(0, maxChars)}…`;
 
   const lower = body.toLowerCase();
   let firstIdx = -1;
@@ -471,10 +560,10 @@ function snippet(text: string, terms: string[]): string {
     const i = lower.indexOf(t);
     if (i >= 0 && (firstIdx === -1 || i < firstIdx)) firstIdx = i;
   }
-  if (firstIdx === -1) return `${body.slice(0, SNIPPET_MAX_CHARS)}…`;
+  if (firstIdx === -1) return `${body.slice(0, maxChars)}…`;
 
-  const start = Math.max(0, firstIdx - SNIPPET_LEAD_CHARS);
-  const end = Math.min(body.length, start + SNIPPET_MAX_CHARS);
+  const start = Math.max(0, firstIdx - leadChars);
+  const end = Math.min(body.length, start + maxChars);
   const pre = start > 0 ? "…" : "";
   const post = end < body.length ? "…" : "";
   return `${pre}${body.slice(start, end).trim()}${post}`;
@@ -542,6 +631,7 @@ export async function retrieve(input: ThinkInput): Promise<RetrievalResult> {
           fetchMemories(terms),
           fetchDecisions(terms),
           fetchTasks(terms),
+          fetchCode(terms),
         ])
       ).flat()
     : [];
@@ -597,10 +687,14 @@ export async function retrieve(input: ThinkInput): Promise<RetrievalResult> {
     }));
 
   // Query-focused snippets keep the context block tight + relevant (dedup is
-  // already enforced by key across the fused + hop sets).
+  // already enforced by key across the fused + hop sets). Code docs get a wider
+  // window so a function body survives; the total prompt stays bounded.
   const docs = [...directDocs, ...hopDocs].map((d) => ({
     ...d,
-    text: snippet(d.text, terms),
+    text:
+      d.type === "code"
+        ? snippet(d.text, terms, CODE_SNIPPET_MAX_CHARS, CODE_SNIPPET_LEAD_CHARS)
+        : snippet(d.text, terms),
   }));
   const refs: RetrievedRef[] = docs.map((d) => ({ type: d.type, id: d.id }));
   return { docs, refs };

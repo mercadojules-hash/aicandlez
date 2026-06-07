@@ -1328,9 +1328,12 @@ export const jarvisRenderServicesTable = pgTable(
 );
 
 // `jarvis_code_files`: lexical index of repo source/build/config/doc files so
-// Jarvis can explain where important code lives with file references. Mirror of
-// the filesystem at index time (idempotent on `path` via content hash). No file
-// contents are stored — only a short summary + exported symbol names.
+// Jarvis can explain where important code lives with file references AND reason
+// from the actual source. Mirror of the filesystem at index time (idempotent on
+// `path` via content hash). Stores a short summary + exported symbol names AND
+// (Phase 1 code grounding) the file's raw text content (capped) so cognition can
+// ground lexically on code. Files larger than the read cap remain metadata-only
+// (`content` null). No secret VALUES are stored — real env files are never indexed.
 export const jarvisCodeFilesTable = pgTable(
   "jarvis_code_files",
   {
@@ -1346,6 +1349,8 @@ export const jarvisCodeFilesTable = pgTable(
     lineCount: integer("line_count"),
     summary: text("summary"),
     symbols: jsonb("symbols").$type<string[]>(),
+    // Raw file text (capped at index time). Null for files over the read cap.
+    content: text("content"),
     contentHash: varchar("content_hash", { length: 64 }),
     indexedAt: timestamp("indexed_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),

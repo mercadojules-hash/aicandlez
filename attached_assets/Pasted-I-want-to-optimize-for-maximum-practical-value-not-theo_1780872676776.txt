@@ -1,0 +1,67 @@
+I want to optimize for maximum practical value, not theoretical perfection.
+
+Based on the latest Sovereignty Assessment:
+
+* Sovereignty ~85%
+* Export Readiness ~90%
+* Operational ~85%
+* Engineering ~90%
+
+I do not want to immediately proceed with full code-RAG and a 6000-file embedding pipeline if there is a lower-cost path that captures most of the value.
+
+Please evaluate and implement the following approach:
+
+Phase 1 — Code Grounding Without Full Code-RAG
+
+Objective:
+
+Allow Jarvis to reason from actual source code content before committing to a large embedding spend.
+
+Requirements:
+
+* Store actual code content, not just metadata.
+* Preserve existing code index.
+* Allow cognition to ground on code content lexically.
+* Maintain all existing sovereignty boundaries.
+* No execution authority.
+* No trading changes.
+* No exitConfig changes.
+* No live execution module changes.
+* No secret values stored or exposed.
+
+Goal:
+
+Determine whether Jarvis can accurately answer engineering questions using direct code content before implementing a full semantic code-RAG pipeline.
+
+After implementation:
+
+Provide an assessment:
+
+1. Can Jarvis now reason about source code?
+2. What percentage of the expected Code-RAG benefit is achieved?
+3. What limitations remain?
+4. Is full code-RAG still recommended?
+
+Then provide updated readiness estimates.
+
+If the results are satisfactory, I want to move to the next major phase:
+
+Creative Intelligence Division
+
+Future agents:
+
+* Vision Agent (images, graphics, thumbnails, branding)
+* Phoenix Agent (video ads, reels, shorts, demos)
+* Prometheus Agent (marketing strategy, campaigns, ad copy)
+
+These agents must:
+
+* Integrate with Executive Memory
+* Understand business profiles
+* Understand brand context
+* Support AICandlez, MixtapePSD, Natura AI, Natura Yoga, and future businesses
+* Require human approval before publication
+
+Do not build Creative Intelligence yet.
+
+First complete the code-grounding evaluation and tell me whether full Code-RAG is still necessary.

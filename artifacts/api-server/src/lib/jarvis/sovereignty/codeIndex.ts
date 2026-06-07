@@ -10,12 +10,15 @@ import { resolveRepoRoot } from "./repoRoot.js";
  * Jarvis Code Content Indexing (Sovereignty Pillar 4) — READ-ONLY filesystem
  * walk. Builds a lexical index of repo source / build / config / doc files into
  * `jarvis_code_files` so Jarvis can explain where important code lives with file
- * references. File CONTENTS are not stored — only a short summary + exported
- * symbol names + a content hash for idempotency.
+ * references. Stores a short summary + exported symbol names + a content hash for
+ * idempotency, PLUS the raw file CONTENT (capped at MAX_STORED_CONTENT_CHARS) for
+ * files small enough to read — large files stay metadata-only (content null).
+ * The stored content powers Phase 1 LEXICAL code grounding in cognition.
  *
- * NOTE: this is a lexical index only. It is intentionally NOT wired into the
- * cognition RAG embedding pipeline this pass (that would touch the budget gate +
- * grounding contract) — code search is exposed as its own capability.
+ * NOTE: this is a lexical index only. Code is intentionally NOT wired into the
+ * cognition RAG EMBEDDING pipeline (that would touch the budget gate + grounding
+ * contract, and code is never a graph/embedding subject) — code content is
+ * surfaced lexically via `fetchCode` in retrieval and as a citation-only ref.
  */
 
 // Top-level roots we index; everything else is ignored.
@@ -47,6 +50,9 @@ const IGNORE_DIRS = new Set([
 
 const MAX_FILES = 6000;
 const MAX_READ_BYTES = 1_048_576; // 1 MB — larger files are metadata-only.
+// Phase 1 code grounding: cap stored raw content per file so a few huge generated
+// files cannot bloat the table. Files over MAX_READ_BYTES stay `content` null.
+const MAX_STORED_CONTENT_CHARS = 60_000;
 
 function languageOf(path: string): string {
   const ext = extname(path).toLowerCase().replace(/^\./, "");
@@ -199,6 +205,9 @@ async function indexOne(
     let symbols: string[] = [];
     let summary: string | null = null;
     let hash: string;
+    // Phase 1 code grounding: raw text persisted for lexical cognition. Null for
+    // files over the read cap (metadata-only).
+    let storedContent: string | null = null;
 
     if (info.size <= MAX_READ_BYTES) {
       content = await readFile(abs, "utf8");
@@ -208,6 +217,10 @@ async function indexOne(
         symbols = extractSymbols(content);
       }
       hash = createHash("sha256").update(content).digest("hex");
+      storedContent =
+        content.length > MAX_STORED_CONTENT_CHARS
+          ? content.slice(0, MAX_STORED_CONTENT_CHARS)
+          : content;
     } else {
       // Metadata-only for very large files (hash from size+mtime).
       hash = createHash("sha256")
@@ -219,12 +232,21 @@ async function indexOne(
       .select({
         id: jarvisCodeFilesTable.id,
         contentHash: jarvisCodeFilesTable.contentHash,
+        contentPresent: sql<boolean>`(${jarvisCodeFilesTable.content} IS NOT NULL)`,
       })
       .from(jarvisCodeFilesTable)
       .where(eq(jarvisCodeFilesTable.path, relPath))
       .limit(1);
 
-    if (existing[0]?.contentHash === hash) return "unchanged";
+    // Hash-unchanged rows are skipped, EXCEPT when we have content to store and the
+    // existing row has none yet (first run after the content column was added) — so
+    // the backfill is not permanently short-circuited by a matching hash.
+    if (
+      existing[0]?.contentHash === hash &&
+      (storedContent === null || existing[0]?.contentPresent)
+    ) {
+      return "unchanged";
+    }
 
     const now = new Date();
     await db
@@ -238,6 +260,7 @@ async function indexOne(
         lineCount,
         summary,
         symbols: symbols.length > 0 ? symbols : null,
+        content: storedContent,
         contentHash: hash,
         indexedAt: now,
       })
@@ -251,6 +274,7 @@ async function indexOne(
           lineCount,
           summary,
           symbols: symbols.length > 0 ? symbols : null,
+          content: storedContent,
           contentHash: hash,
           indexedAt: now,
           updatedAt: now,

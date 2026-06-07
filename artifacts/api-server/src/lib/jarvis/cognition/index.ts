@@ -7,11 +7,11 @@ import { assemblePrompt } from "./promptAssembly.js";
 import { computeGroundingScore, validateCitations } from "./grounding.js";
 import { checkCognitionBudget, consumeCognitionBudget } from "./budget.js";
 import type {
+  CitationNodeType,
   CognitionProposal,
   CognitionProposalSection,
   CognitionResult,
   CognitionStatus,
-  GraphNodeType,
   RetrievedRef,
   ThinkInput,
 } from "./types.js";
@@ -58,7 +58,7 @@ export {
 } from "./indexer.js";
 
 const VALID_TYPES: ReadonlySet<string> = new Set([
-  "memory", "asset", "category", "decision", "task",
+  "memory", "asset", "category", "decision", "task", "code",
 ]);
 
 interface RecordRunArgs {
@@ -136,7 +136,7 @@ function normalizeRefs(raw: unknown): RetrievedRef[] {
     const type = (item as Record<string, unknown>).type;
     const id = (item as Record<string, unknown>).id;
     if (typeof type === "string" && typeof id === "string" && VALID_TYPES.has(type)) {
-      out.push({ type: type as GraphNodeType, id });
+      out.push({ type: type as CitationNodeType, id });
     }
   }
   return out;

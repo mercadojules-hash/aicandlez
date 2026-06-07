@@ -25,13 +25,24 @@ export type GraphNodeType =
   | "decision"
   | "task";
 
+/**
+ * Ref type for cognition CITATIONS + retrieval docs. Superset of `GraphNodeType`
+ * with `"code"` (Phase 1 code grounding) — a citable source-file ref backed by
+ * `jarvis_code_files`. `"code"` is DELIBERATELY NOT a `GraphNodeType`: it is never
+ * an embedding subject (no semantic indexing of code this phase), never a
+ * `jarvis_knowledge_relationships` endpoint (no FK / no edges), and is excluded
+ * from one-hop graph expansion. It only flows through lexical retrieval → prompt
+ * context → citation grounding.
+ */
+export type CitationNodeType = GraphNodeType | "code";
+
 export interface RetrievedRef {
-  type: GraphNodeType;
+  type: CitationNodeType;
   id: string;
 }
 
 export interface RetrievedDoc {
-  type: GraphNodeType;
+  type: CitationNodeType;
   id: string;
   title: string;
   text: string;
