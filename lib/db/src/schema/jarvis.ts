@@ -1097,3 +1097,102 @@ export type JarvisRepository = typeof jarvisRepositoriesTable.$inferSelect;
 export type InsertJarvisRepository = typeof jarvisRepositoriesTable.$inferInsert;
 export type JarvisRunbook = typeof jarvisRunbooksTable.$inferSelect;
 export type InsertJarvisRunbook = typeof jarvisRunbooksTable.$inferInsert;
+
+// ── Historical Intelligence Layer (read-only AICandlez analytics) ────────────
+// Durable, jarvis-owned history of platform performance so the executive layer
+// can compare periods, explain win-rate / P&L drift, and chart account growth.
+// EVERY value here is derived from a strictly read-only, LIVE-only
+// (exchange IS NOT NULL AND reconciliation_tag IS NULL) aggregate over the
+// AICandlez trade tables — Jarvis NEVER writes those tables and imports NO
+// execution modules. Paper/simulated fills are excluded by construction.
+//
+// `jarvis_aicandlez_daily_snapshots`: one immutable cumulative-as-of-day row per
+// UTC date (idempotent upsert on `snapshot_date`). The growth curve = the
+// `cumulativeRealizedPnlUsd` series across snapshots; a true equity baseline is
+// manual-entry-only upstream (never auto-reconstructed) so headline equity stays
+// NULL → dash here. A daily delta is derivable by diffing consecutive rows.
+
+export const jarvisAicandlezDailySnapshotsTable = pgTable(
+  "jarvis_aicandlez_daily_snapshots",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    // UTC calendar day (YYYY-MM-DD). Unique → one snapshot per day, upsert-safe.
+    snapshotDate: varchar("snapshot_date", { length: 10 }).notNull().unique(),
+    // Cumulative-as-of-day LIVE realized stats (all-time through this date).
+    closedTrades: integer("closed_trades").notNull().default(0),
+    wins: integer("wins").notNull().default(0),
+    losses: integer("losses").notNull().default(0),
+    // 0..1 (NULL when no decided trades → dash).
+    winRate: real("win_rate"),
+    cumulativeRealizedPnlUsd: real("cumulative_realized_pnl_usd")
+      .notNull()
+      .default(0),
+    grossProfitUsd: real("gross_profit_usd").notNull().default(0),
+    grossLossUsd: real("gross_loss_usd").notNull().default(0),
+    // gross_profit / gross_loss (NULL when no losses yet → dash).
+    profitFactor: real("profit_factor"),
+    // Open LIVE positions snapshot at capture time.
+    activeTrades: integer("active_trades").notNull().default(0),
+    openTradeValueUsd: real("open_trade_value_usd").notNull().default(0),
+    // True when the read failed and the row was written degraded (all dashes).
+    degraded: boolean("degraded").notNull().default(false),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("jarvis_aicandlez_daily_snapshots_date_idx").on(table.snapshotDate),
+  ],
+);
+
+// `jarvis_reports`: a generated executive report run. `data` holds the fully
+// computed, deterministic payload (period stats, period comparison, change /
+// subscription event digest, snapshot trend). `narrative` is an OPTIONAL,
+// grounded cognition synthesis (advisory; cites the same data) linked to the
+// immutable cognition ledger via `cognition_run_id`. NULL narrative → the
+// deterministic data still stands on its own.
+export const jarvisReportsTable = pgTable(
+  "jarvis_reports",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    businessId: uuid("business_id").references(
+      () => jarvisBusinessesTable.id,
+      { onDelete: "set null" },
+    ),
+    title: varchar("title", { length: 240 }).notNull(),
+    // executive_summary | period_comparison | growth | other
+    reportType: varchar("report_type", { length: 32 })
+      .notNull()
+      .default("executive_summary"),
+    // Primary + optional comparison windows (UTC YYYY-MM-DD; NULL = open-ended).
+    periodStart: varchar("period_start", { length: 10 }),
+    periodEnd: varchar("period_end", { length: 10 }),
+    comparePeriodStart: varchar("compare_period_start", { length: 10 }),
+    comparePeriodEnd: varchar("compare_period_end", { length: 10 }),
+    // Deterministic computed payload (period stats, comparison, events, trend).
+    data: jsonb("data").$type<Record<string, unknown>>(),
+    // Optional grounded cognition narrative (advisory; NULL → dash).
+    narrative: text("narrative"),
+    cognitionRunId: uuid("cognition_run_id").references(
+      () => jarvisCognitionRunsTable.id,
+      { onDelete: "set null" },
+    ),
+    // 0..100 grounding score from the cognition run (NULL when no narrative).
+    groundingScore: integer("grounding_score"),
+    status: varchar("status", { length: 32 }).notNull().default("complete"),
+    createdBy: varchar("created_by", { length: 255 }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("jarvis_reports_business_idx").on(table.businessId),
+    index("jarvis_reports_created_at_idx").on(table.createdAt),
+    index("jarvis_reports_type_idx").on(table.reportType),
+  ],
+);
+
+export type JarvisAicandlezDailySnapshot =
+  typeof jarvisAicandlezDailySnapshotsTable.$inferSelect;
+export type InsertJarvisAicandlezDailySnapshot =
+  typeof jarvisAicandlezDailySnapshotsTable.$inferInsert;
+export type JarvisReport = typeof jarvisReportsTable.$inferSelect;
+export type InsertJarvisReport = typeof jarvisReportsTable.$inferInsert;

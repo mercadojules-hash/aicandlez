@@ -12,6 +12,7 @@ import { getHandler } from "./registry.js";
 import { orchestrator } from "./orchestrator/index.js";
 import { recordRunOutcome } from "./governance/index.js";
 import { getIndexerTickEnabled, runIndexerPass } from "./cognition/index.js";
+import { captureDailySnapshot, todayUtc } from "./historicalIntelligence.js";
 import type { AgentRunResult, AgentTrigger, OrchestrationExtra } from "./types.js";
 
 /**
@@ -49,6 +50,7 @@ class AgentRuntime {
   private lastTickAt: number | null = null;
   private tickCount = 0;
   private tickIntervalMs = DEFAULT_TICK_MS;
+  private lastSnapshotDay: string | null = null;
   private readonly inFlight = new Set<string>();
 
   isRunning(): boolean {
@@ -137,6 +139,10 @@ class AgentRuntime {
       // throws). Keeps `jarvis_embeddings` (a derived read index) fresh without a
       // separate scheduler; a disabled flag = a single cheap settings read.
       await this.maybeIndexerPass();
+      // AICandlez Historical Intelligence: capture one read-only LIVE growth
+      // snapshot per UTC day, on the SAME loop (no second timer). Idempotent
+      // (per-day upsert) and fail-safe (never throws).
+      await this.maybeDailySnapshot();
     } catch (err) {
       logger.error({ err }, "jarvis runtime tick failed");
       agentBus.emitEvent({
@@ -172,6 +178,29 @@ class AgentRuntime {
       }
     } catch (err) {
       logger.error({ err }, "jarvis semantic indexer pass failed");
+    }
+  }
+
+  private async maybeDailySnapshot(): Promise<void> {
+    try {
+      const today = todayUtc();
+      if (this.lastSnapshotDay === today) return;
+      const snap = await captureDailySnapshot(today);
+      if (snap) {
+        this.lastSnapshotDay = today;
+        agentBus.emitEvent({
+          type: "tick",
+          severity: snap.degraded ? "warn" : "info",
+          message: `AICandlez daily snapshot captured (${today})`,
+          details: {
+            closedTrades: snap.closedTrades,
+            cumulativeRealizedPnlUsd: snap.cumulativeRealizedPnlUsd,
+            degraded: snap.degraded,
+          },
+        });
+      }
+    } catch (err) {
+      logger.error({ err }, "jarvis daily snapshot pass failed");
     }
   }
 

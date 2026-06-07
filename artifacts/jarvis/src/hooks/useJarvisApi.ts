@@ -246,6 +246,19 @@ export const jarvisKeys = {
   systemDetail: (id: string) => ["jarvis", "system-detail", id] as const,
   repositories: ["jarvis", "repositories"] as const,
   runbooks: ["jarvis", "runbooks"] as const,
+  historicalPeriod: (start: string, end: string) =>
+    ["jarvis", "historical-period", start, end] as const,
+  historicalCompare: (
+    start: string,
+    end: string,
+    cmpStart: string,
+    cmpEnd: string,
+  ) => ["jarvis", "historical-compare", start, end, cmpStart, cmpEnd] as const,
+  historicalSnapshots: ["jarvis", "historical-snapshots"] as const,
+  historicalChanges: ["jarvis", "historical-changes"] as const,
+  historicalSubscriptions: ["jarvis", "historical-subscriptions"] as const,
+  reports: ["jarvis", "reports"] as const,
+  reportDetail: (id: string) => ["jarvis", "report-detail", id] as const,
 };
 
 // ── dashboard ────────────────────────────────────────────────────────────────
@@ -3274,5 +3287,289 @@ export function useVoiceTextTurn() {
       qc.invalidateQueries({ queryKey: jarvisKeys.voiceTurns(vars.sessionId) });
       qc.invalidateQueries({ queryKey: jarvisKeys.voiceSessions });
     },
+  });
+}
+
+// ── AICandlez Historical Intelligence Layer (READ-ONLY analytics) ────────────
+// Windowed time-series, period comparison, daily growth snapshots, change /
+// subscription ingestion, and executive reports — all over the AICandlez/Stripe
+// mirrors via LIVE-only, read-only SELECTs (mutations confined to jarvis-owned
+// tables). Every field that is not reliably derivable arrives `null` and MUST
+// render as a dash — never a fabricated/estimated value.
+
+export interface HistoricalCloseReasonStat {
+  reason: string;
+  trades: number;
+  wins: number;
+  losses: number;
+  realizedPnlUsd: number;
+}
+
+export interface HistoricalDailyPoint {
+  day: string;
+  trades: number;
+  wins: number;
+  losses: number;
+  realizedPnlUsd: number;
+}
+
+export interface HistoricalPeriodStats {
+  start: string | null;
+  end: string | null;
+  closedTrades: number;
+  wins: number;
+  losses: number;
+  winRate: number | null;
+  realizedPnlUsd: number;
+  grossProfitUsd: number;
+  grossLossUsd: number;
+  profitFactor: number | null;
+  avgWinUsd: number | null;
+  avgLossUsd: number | null;
+  avgPnlPct: number | null;
+  avgDurationMs: number | null;
+  avgConfidence: number | null;
+  byCloseReason: HistoricalCloseReasonStat[];
+  degraded: boolean;
+}
+
+export interface HistoricalPeriodResponse extends HistoricalPeriodStats {
+  series: HistoricalDailyPoint[];
+  generatedAt: number;
+}
+
+export interface HistoricalPeriodDelta {
+  closedTrades: number;
+  winRatePts: number | null;
+  realizedPnlUsd: number;
+  profitFactor: number | null;
+  avgPnlPct: number | null;
+}
+
+export interface HistoricalComparison {
+  current: HistoricalPeriodStats;
+  previous: HistoricalPeriodStats;
+  delta: HistoricalPeriodDelta;
+  explanations: string[];
+  generatedAt: number;
+}
+
+export interface HistoricalSnapshot {
+  id: string;
+  snapshotDate: string;
+  closedTrades: number;
+  wins: number;
+  losses: number;
+  winRate: number | null;
+  cumulativeRealizedPnlUsd: number;
+  grossProfitUsd: number;
+  grossLossUsd: number;
+  profitFactor: number | null;
+  activeTrades: number;
+  openTradeValueUsd: number;
+  degraded: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface HistoricalChangeEvent {
+  id: string;
+  source: "admin-action" | "audit";
+  kind: string;
+  actor: string | null;
+  target: string | null;
+  summary: string;
+  payload: Record<string, unknown> | null;
+  at: number;
+}
+
+export interface HistoricalSubscriptionSummary {
+  degraded: boolean;
+  totalSubscriptions: number | null;
+  byStatus: { status: string; count: number }[];
+  activeCount: number | null;
+  canceledCount: number | null;
+  recent: { id: string; status: string; createdAt: number | null }[];
+  generatedAt: number;
+}
+
+export interface JarvisReport {
+  id: string;
+  businessId: string | null;
+  title: string;
+  reportType: string;
+  periodStart: string | null;
+  periodEnd: string | null;
+  comparePeriodStart: string | null;
+  comparePeriodEnd: string | null;
+  data: Record<string, unknown> | null;
+  narrative: string | null;
+  cognitionRunId: string | null;
+  groundingScore: number | null;
+  status: string;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GenerateReportInput {
+  title?: string;
+  reportType?: string;
+  businessId?: string;
+  start?: string;
+  end?: string;
+  compareStart?: string;
+  compareEnd?: string;
+  withNarrative?: boolean;
+}
+
+export function useHistoricalPeriod(
+  start: string,
+  end: string,
+): UseQueryResult<HistoricalPeriodResponse> {
+  return useQuery({
+    queryKey: jarvisKeys.historicalPeriod(start, end),
+    queryFn: () =>
+      authFetchJson<HistoricalPeriodResponse>(
+        `${API}/historical/period?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`,
+      ),
+    enabled: start.length > 0 && end.length > 0,
+  });
+}
+
+export function useHistoricalComparison(
+  start: string,
+  end: string,
+  compareStart: string,
+  compareEnd: string,
+): UseQueryResult<HistoricalComparison> {
+  const ready =
+    start.length > 0 &&
+    end.length > 0 &&
+    compareStart.length > 0 &&
+    compareEnd.length > 0;
+  return useQuery({
+    queryKey: jarvisKeys.historicalCompare(start, end, compareStart, compareEnd),
+    queryFn: () =>
+      authFetchJson<HistoricalComparison>(
+        `${API}/historical/compare?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}` +
+          `&compareStart=${encodeURIComponent(compareStart)}&compareEnd=${encodeURIComponent(compareEnd)}`,
+      ),
+    enabled: ready,
+  });
+}
+
+export function useHistoricalSnapshots(
+  limit = 180,
+): UseQueryResult<HistoricalSnapshot[]> {
+  return useQuery({
+    queryKey: jarvisKeys.historicalSnapshots,
+    queryFn: async () => {
+      const data = await authFetchJson<{ snapshots: HistoricalSnapshot[] }>(
+        `${API}/historical/snapshots?limit=${limit}`,
+      );
+      return data.snapshots ?? [];
+    },
+  });
+}
+
+export function useHistoricalChanges(
+  limit = 100,
+): UseQueryResult<HistoricalChangeEvent[]> {
+  return useQuery({
+    queryKey: jarvisKeys.historicalChanges,
+    queryFn: async () => {
+      const data = await authFetchJson<{ events: HistoricalChangeEvent[] }>(
+        `${API}/historical/changes?limit=${limit}`,
+      );
+      return data.events ?? [];
+    },
+  });
+}
+
+export function useHistoricalSubscriptions(): UseQueryResult<HistoricalSubscriptionSummary> {
+  return useQuery({
+    queryKey: jarvisKeys.historicalSubscriptions,
+    queryFn: () =>
+      authFetchJson<HistoricalSubscriptionSummary>(
+        `${API}/historical/subscriptions`,
+      ),
+  });
+}
+
+export function useHistoricalIngest() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: () =>
+      authFetchJson<{ changes: number; subscription: boolean; degraded: boolean }>(
+        `${API}/historical/ingest`,
+        { method: "POST" },
+      ),
+    onSuccess: invalidate,
+  });
+}
+
+export function useCaptureSnapshot() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: () =>
+      authFetchJson<{ snapshot: HistoricalSnapshot | null }>(
+        `${API}/historical/snapshots/capture`,
+        { method: "POST" },
+      ),
+    onSuccess: invalidate,
+  });
+}
+
+export function useBackfillSnapshots() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: () =>
+      authFetchJson<{ days: number; degraded: boolean }>(
+        `${API}/historical/snapshots/backfill`,
+        { method: "POST" },
+      ),
+    onSuccess: invalidate,
+  });
+}
+
+export const useReports = makeListHook<JarvisReport>({
+  path: "reports",
+  listKey: jarvisKeys.reports,
+  listField: "reports",
+  itemField: "report",
+});
+
+export function useReport(id: string | null): UseQueryResult<JarvisReport> {
+  return useQuery({
+    queryKey: jarvisKeys.reportDetail(id ?? ""),
+    queryFn: async () => {
+      const data = await authFetchJson<{ report: JarvisReport }>(
+        `${API}/reports/${id}`,
+      );
+      return data.report;
+    },
+    enabled: !!id,
+  });
+}
+
+export function useGenerateReport() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (input: GenerateReportInput) =>
+      authFetchJson<{ report: JarvisReport }>(`${API}/reports`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteReport() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (id: string) =>
+      authFetch(`${API}/reports/${id}`, { method: "DELETE" }),
+    onSuccess: invalidate,
   });
 }

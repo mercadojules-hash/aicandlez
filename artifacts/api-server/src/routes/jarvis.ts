@@ -71,6 +71,22 @@ import { agentRuntime } from "../lib/jarvis/runtime.js";
 import { agentBus } from "../lib/jarvis/agentBus.js";
 import { recordBusinessMemory } from "../lib/jarvis/memory.js";
 import {
+  resolveWindow,
+  computePeriodStats,
+  computeDailySeries,
+  comparePeriods,
+  getDailySnapshots,
+  captureDailySnapshot,
+  backfillDailySnapshots,
+  getChangeEvents,
+  getSubscriptionSummary,
+  runHistoricalIngestion,
+  listReports,
+  getReport,
+  deleteReport,
+  generateReport,
+} from "../lib/jarvis/historicalIntelligence.js";
+import {
   fetchRepoAwareness,
   parseRepoFullName,
 } from "../lib/jarvis/githubClient.js";
@@ -165,6 +181,8 @@ function slugify(name: string): string {
 }
 
 const statusSchema = z.string().trim().min(1).max(32);
+
+const ADMIN_ROLES = ["admin", "super-admin"];
 
 // ── dashboard ────────────────────────────────────────────────────────────────
 
@@ -397,6 +415,201 @@ router.get(
   async (req: Request, res: Response): Promise<void> => {
     const feed = await computeAicandlezLive(req);
     res.json(feed);
+  },
+);
+
+// ── AICandlez Historical Intelligence Layer (READ-ONLY analytics) ────────────
+// Windowed time-series aggregation, period comparison, daily growth snapshots,
+// change/subscription ingestion, and executive report generation — all over the
+// AICandlez/Stripe mirrors via strictly LIVE-only, read-only SELECTs. Writes are
+// confined to jarvis-owned tables. Every handler is admin-gated and fail-safe:
+// the underlying lib never throws, so reads degrade to null/empty rather than
+// 5xx. Mutating endpoints are audited.
+
+router.get(
+  "/jarvis/historical/period",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    const win = resolveWindow(
+      typeof req.query.start === "string" ? req.query.start : null,
+      typeof req.query.end === "string" ? req.query.end : null,
+    );
+    const [stats, series] = await Promise.all([
+      computePeriodStats(win.startMs, win.endMs, win.start, win.end),
+      computeDailySeries(win.startMs, win.endMs),
+    ]);
+    res.json({ ...stats, series, generatedAt: Date.now() });
+  },
+);
+
+router.get(
+  "/jarvis/historical/compare",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    const q = req.query;
+    const cur = resolveWindow(
+      typeof q.start === "string" ? q.start : null,
+      typeof q.end === "string" ? q.end : null,
+    );
+    const prev = resolveWindow(
+      typeof q.compareStart === "string" ? q.compareStart : null,
+      typeof q.compareEnd === "string" ? q.compareEnd : null,
+    );
+    const comparison = await comparePeriods(cur, prev);
+    res.json({ ...comparison, generatedAt: Date.now() });
+  },
+);
+
+router.get(
+  "/jarvis/historical/snapshots",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    const limit =
+      typeof req.query.limit === "string" ? Number(req.query.limit) : 180;
+    const snapshots = await getDailySnapshots(
+      Number.isFinite(limit) ? limit : 180,
+    );
+    res.json({ snapshots, generatedAt: Date.now() });
+  },
+);
+
+router.post(
+  "/jarvis/historical/snapshots/capture",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const snapshot = await captureDailySnapshot();
+    await audit(req, actor, "historical.snapshot.capture", "aicandlez-snapshot", snapshot?.snapshotDate ?? null);
+    res.json({ snapshot, generatedAt: Date.now() });
+  },
+);
+
+router.post(
+  "/jarvis/historical/snapshots/backfill",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const result = await backfillDailySnapshots();
+    await audit(req, actor, "historical.snapshot.backfill", "aicandlez-snapshot", null, result);
+    res.json({ ...result, generatedAt: Date.now() });
+  },
+);
+
+router.get(
+  "/jarvis/historical/changes",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    const limit =
+      typeof req.query.limit === "string" ? Number(req.query.limit) : 100;
+    const events = await getChangeEvents(Number.isFinite(limit) ? limit : 100);
+    res.json({ events, generatedAt: Date.now() });
+  },
+);
+
+router.get(
+  "/jarvis/historical/subscriptions",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (_req: Request, res: Response): Promise<void> => {
+    const summary = await getSubscriptionSummary();
+    res.json({ ...summary, generatedAt: Date.now() });
+  },
+);
+
+router.post(
+  "/jarvis/historical/ingest",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const result = await runHistoricalIngestion(actor.userId);
+    await audit(req, actor, "historical.ingest", "aicandlez-ingestion", null, result);
+    res.json({ ...result, generatedAt: Date.now() });
+  },
+);
+
+// ── executive reports (jarvis_reports) ───────────────────────────────────────
+
+const generateReportSchema = z.object({
+  title: z.string().trim().max(240).optional(),
+  reportType: z.string().trim().max(32).optional(),
+  businessId: z.string().uuid().optional(),
+  start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  compareStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  compareEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  withNarrative: z.boolean().optional(),
+});
+
+router.get(
+  "/jarvis/reports",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    const limit =
+      typeof req.query.limit === "string" ? Number(req.query.limit) : 50;
+    const reports = await listReports(Number.isFinite(limit) ? limit : 50);
+    res.json({ reports, generatedAt: Date.now() });
+  },
+);
+
+router.get(
+  "/jarvis/reports/:id",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    const report = await getReport(String(req.params.id));
+    if (!report) {
+      res.status(404).json({ error: "report_not_found" });
+      return;
+    }
+    res.json({ report });
+  },
+);
+
+router.post(
+  "/jarvis/reports",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    const parsed = generateReportSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_report_request" });
+      return;
+    }
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const report = await generateReport({ ...parsed.data, createdBy: actor.userId });
+    if (!report) {
+      res.status(503).json({ error: "report_generation_unavailable" });
+      return;
+    }
+    await audit(req, actor, "historical.report.generate", "jarvis-report", report.id, {
+      reportType: report.reportType,
+      withNarrative: !!parsed.data.withNarrative,
+    });
+    res.status(201).json({ report });
+  },
+);
+
+router.delete(
+  "/jarvis/reports/:id",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const ok = await deleteReport(String(req.params.id));
+    if (!ok) {
+      res.status(404).json({ error: "report_not_found" });
+      return;
+    }
+    await audit(req, actor, "historical.report.delete", "jarvis-report", String(req.params.id));
+    res.status(204).end();
   },
 );
 
@@ -6062,8 +6275,6 @@ router.get(
 // audio is ever persisted). Every route is `requireAuth` + `requireRole`. The
 // turn route ingests a raw audio body; all others are JSON. Two-plane discipline
 // lives in the orchestrator — routes are thin and audited.
-
-const ADMIN_ROLES = ["admin", "super-admin"];
 
 const voiceSettingsSchema = z.object({ enabled: z.boolean() });
 const voiceSessionStartSchema = z.object({

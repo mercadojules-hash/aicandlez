@@ -52,6 +52,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Operational Control", path: "/operational-control", icon: Server },
   { label: "Agents", path: "/agents", icon: Bot },
   { label: "Knowledge Graph", path: "/knowledge-graph", icon: Network },
+  { label: "Historical Intelligence", path: "/historical", icon: History },
   { label: "Knowledge", path: "/knowledge", icon: BookOpen },
   { label: "Voice", path: "/voice", icon: Radio },
   { label: "Settings", path: "/settings", icon: SettingsIcon },

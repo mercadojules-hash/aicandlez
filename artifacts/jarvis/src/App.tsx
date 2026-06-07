@@ -53,6 +53,7 @@ import JarvisCore from "@/pages/JarvisCore";
 import ExecutiveBriefing from "@/pages/ExecutiveBriefing";
 import ExecutiveQuery from "@/pages/ExecutiveQuery";
 import KnowledgeGraph from "@/pages/KnowledgeGraph";
+import HistoricalIntelligence from "@/pages/HistoricalIntelligence";
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
 const basePath = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
@@ -178,6 +179,11 @@ function AppRoutes() {
       <Route path="/knowledge-graph">
         <Protected>
           <KnowledgeGraph />
+        </Protected>
+      </Route>
+      <Route path="/historical">
+        <Protected>
+          <HistoricalIntelligence />
         </Protected>
       </Route>
       <Route path="/dashboard">
