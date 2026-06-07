@@ -24,8 +24,48 @@ export const qaAgent: AgentHandler = {
   defaultCapabilities: ["data-integrity", "validation", "quality-gate"],
   defaultScheduleSeconds: 240,
   defaultPriority: 25,
+  actions: ["sweep", "report"],
 
   async run(ctx) {
+    // Read-only orchestrated action — integrity issue counts, no notify/escalate.
+    if (ctx.action === "report") {
+      const [lowConf, recs, briefings] = await Promise.all([
+        db
+          .select()
+          .from(jarvisFindingsTable)
+          .where(
+            and(
+              eq(jarvisFindingsTable.status, "open"),
+              lt(jarvisFindingsTable.confidence, 30),
+            ),
+          ),
+        db
+          .select()
+          .from(jarvisRecommendationsTable)
+          .where(eq(jarvisRecommendationsTable.status, "proposed")),
+        db
+          .select()
+          .from(jarvisBriefingsTable)
+          .where(eq(jarvisBriefingsTable.status, "published")),
+      ]);
+      const recsMissingRationale = recs.filter((r) => isBlank(r.rationale)).length;
+      const emptyBriefings = briefings.filter((b) => isBlank(b.content)).length;
+      const totalIssues = lowConf.length + recsMissingRationale + emptyBriefings;
+      ctx.log(
+        `QA report: ${lowConf.length} low-confidence, ${recsMissingRationale} rationale-less, ${emptyBriefings} empty briefing(s)`,
+      );
+      return {
+        summary: `${totalIssues} integrity issue(s) across findings, recommendations and briefings`,
+        itemsProcessed: lowConf.length + recs.length + briefings.length,
+        output: {
+          lowConfidenceFindings: lowConf.length,
+          recsMissingRationale,
+          emptyBriefings,
+          totalIssues,
+        },
+      };
+    }
+
     const lowConfidenceFindings = await db
       .select()
       .from(jarvisFindingsTable)

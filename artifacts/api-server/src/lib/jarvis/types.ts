@@ -69,6 +69,18 @@ export interface AgentContext {
     entityId?: string | null,
     metadata?: Record<string, unknown>,
   ): Promise<void>;
+  // ── Sprint 6 — orchestration context (all optional / backward compatible) ──
+  /** Orchestrated action key (workflow step / delegation / command). Null on a
+   *  plain scheduled tick. */
+  action?: string | null;
+  /** Structured input for an orchestrated action. */
+  input?: Record<string, unknown> | null;
+  /** Present when this run is executing a delegation. */
+  delegation?: DelegationContextInfo | null;
+  /** Present when this run is executing a workflow step. */
+  workflowStep?: WorkflowStepContextInfo | null;
+  /** Create a tracked delegation to another agent. Returns the delegation id. */
+  delegate(input: DelegateInput): Promise<string | null>;
 }
 
 export interface AgentHandler {
@@ -81,5 +93,45 @@ export interface AgentHandler {
   defaultScheduleSeconds: number;
   /** Suggested scheduler priority (lower = runs first). */
   defaultPriority: number;
+  /**
+   * Deterministic orchestrated actions this agent supports beyond its scheduled
+   * run (Sprint 6). Surfaced in AGENT_CATALOG so the router + workflow builder
+   * know what each agent can do. Advisory-safe only.
+   */
+  actions?: string[];
   run(ctx: AgentContext): Promise<AgentRunResult>;
+}
+
+// ── Sprint 6 — orchestration shared types ───────────────────────────────────
+
+/** Extra context the orchestrator injects when invoking a handler for an
+ *  orchestrated run (workflow step / delegation / command). All optional. */
+export interface OrchestrationExtra {
+  action?: string | null;
+  input?: Record<string, unknown> | null;
+  delegation?: DelegationContextInfo | null;
+  workflowStep?: WorkflowStepContextInfo | null;
+}
+
+export interface DelegationContextInfo {
+  delegationId: string;
+  fromAgentName?: string | null;
+  objective: string;
+}
+
+export interface WorkflowStepContextInfo {
+  workflowRunId: string;
+  stepKey: string;
+}
+
+export interface DelegateInput {
+  toAgentId?: string | null;
+  toAgentType?: string | null;
+  objective: string;
+  action?: string;
+  input?: Record<string, unknown>;
+  priority?: string;
+  taskId?: string | null;
+  workflowRunId?: string | null;
+  dueAt?: Date | null;
 }

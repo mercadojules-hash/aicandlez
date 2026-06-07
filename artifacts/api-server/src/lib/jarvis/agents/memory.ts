@@ -17,8 +17,30 @@ export const memoryAgent: AgentHandler = {
   defaultCapabilities: ["memory-curation", "knowledge-promotion", "dedup"],
   defaultScheduleSeconds: 600,
   defaultPriority: 30,
+  actions: ["promote", "report"],
 
   async run(ctx) {
+    // Read-only orchestrated action — count promotion candidates, no inserts.
+    if (ctx.action === "report") {
+      const candidates = await db
+        .select({ id: jarvisFindingsTable.id })
+        .from(jarvisFindingsTable)
+        .where(
+          and(
+            eq(jarvisFindingsTable.status, "open"),
+            eq(jarvisFindingsTable.severity, "critical"),
+          ),
+        );
+      ctx.log(
+        `Memory report: ${candidates.length} critical finding(s) eligible for promotion`,
+      );
+      return {
+        summary: `${candidates.length} critical finding(s) eligible for memory promotion`,
+        itemsProcessed: candidates.length,
+        output: { candidates: candidates.length },
+      };
+    }
+
     const criticalFindings = await db
       .select()
       .from(jarvisFindingsTable)

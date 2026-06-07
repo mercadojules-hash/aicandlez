@@ -17,8 +17,43 @@ export const riskAgent: AgentHandler = {
   defaultCapabilities: ["risk-monitoring", "finding-analysis", "escalation"],
   defaultScheduleSeconds: 180,
   defaultPriority: 15,
+  actions: ["assess", "report"],
 
   async run(ctx) {
+    // Read-only orchestrated action — risk posture counts, no escalate/notify.
+    if (ctx.action === "report") {
+      const [findings, recs] = await Promise.all([
+        db
+          .select()
+          .from(jarvisFindingsTable)
+          .where(
+            and(
+              eq(jarvisFindingsTable.status, "open"),
+              inArray(jarvisFindingsTable.severity, ["high", "critical"]),
+            ),
+          ),
+        db
+          .select()
+          .from(jarvisRecommendationsTable)
+          .where(
+            and(
+              eq(jarvisRecommendationsTable.status, "proposed"),
+              eq(jarvisRecommendationsTable.impact, "high"),
+            ),
+          ),
+      ]);
+      const critical = findings.filter((f) => f.severity === "critical").length;
+      const high = findings.filter((f) => f.severity === "high").length;
+      ctx.log(
+        `Risk report: ${critical} critical, ${high} high finding(s), ${recs.length} high-impact rec(s)`,
+      );
+      return {
+        summary: `${critical} critical, ${high} high finding(s); ${recs.length} high-impact recommendation(s)`,
+        itemsProcessed: findings.length + recs.length,
+        output: { critical, high, highImpactRecs: recs.length },
+      };
+    }
+
     const severeFindings = await db
       .select()
       .from(jarvisFindingsTable)

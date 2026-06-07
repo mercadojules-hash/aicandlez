@@ -17,8 +17,40 @@ export const operationsAgent: AgentHandler = {
   defaultCapabilities: ["task-monitoring", "sla-tracking", "escalation"],
   defaultScheduleSeconds: 120,
   defaultPriority: 20,
+  actions: ["scan", "report_overdue"],
 
   async run(ctx) {
+    // Read-only orchestrated action — overdue/unassigned counts, no notify/escalate.
+    if (ctx.action === "report_overdue") {
+      const tasks = await db
+        .select()
+        .from(jarvisTasksTable)
+        .where(
+          and(
+            ne(jarvisTasksTable.status, "done"),
+            ne(jarvisTasksTable.status, "cancelled"),
+          ),
+        )
+        .orderBy(asc(jarvisTasksTable.createdAt), asc(jarvisTasksTable.id));
+      const nowMs = Date.now();
+      const overdue = tasks.filter(
+        (t) => t.dueAt != null && new Date(t.dueAt).getTime() < nowMs,
+      );
+      const unassigned = tasks.filter((t) => t.assigneeAgentId == null);
+      ctx.log(
+        `Overdue report: ${overdue.length} overdue, ${unassigned.length} unassigned of ${tasks.length} open`,
+      );
+      return {
+        summary: `${overdue.length} overdue, ${unassigned.length} unassigned of ${tasks.length} open task(s)`,
+        itemsProcessed: tasks.length,
+        output: {
+          open: tasks.length,
+          overdue: overdue.length,
+          unassigned: unassigned.length,
+        },
+      };
+    }
+
     const openTasks = await db
       .select()
       .from(jarvisTasksTable)

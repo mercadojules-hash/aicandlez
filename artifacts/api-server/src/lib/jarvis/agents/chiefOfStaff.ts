@@ -21,8 +21,46 @@ export const chiefOfStaffAgent: AgentHandler = {
   defaultCapabilities: ["orchestration", "triage", "coordination", "reporting"],
   defaultScheduleSeconds: 300,
   defaultPriority: 10,
+  actions: ["triage", "status_report"],
 
   async run(ctx) {
+    // Read-only orchestrated action — surface executive-queue counts without any
+    // handoffs or messages. Safe to compose into workflows/commands.
+    if (ctx.action === "status_report") {
+      const [escalations, approvals, tasks] = await Promise.all([
+        db
+          .select()
+          .from(jarvisEscalationsTable)
+          .where(eq(jarvisEscalationsTable.status, "open")),
+        db
+          .select()
+          .from(jarvisApprovalsTable)
+          .where(eq(jarvisApprovalsTable.status, "pending")),
+        db
+          .select()
+          .from(jarvisTasksTable)
+          .where(
+            and(
+              inArray(jarvisTasksTable.priority, ["high", "urgent"]),
+              ne(jarvisTasksTable.status, "done"),
+            ),
+          ),
+      ]);
+      ctx.log(
+        `Status report: ${escalations.length} open escalation(s), ${approvals.length} pending approval(s), ${tasks.length} priority task(s)`,
+      );
+      const itemsProcessed = escalations.length + approvals.length + tasks.length;
+      return {
+        summary: `Status: ${escalations.length} escalation(s), ${approvals.length} approval(s), ${tasks.length} priority task(s)`,
+        itemsProcessed,
+        output: {
+          openEscalations: escalations.length,
+          pendingApprovals: approvals.length,
+          highPriorityTasks: tasks.length,
+        },
+      };
+    }
+
     const openEscalations = await db
       .select()
       .from(jarvisEscalationsTable)

@@ -4,25 +4,39 @@ import {
   jarvisAgentMessagesTable,
   jarvisEscalationsTable,
   jarvisAuditLogsTable,
+  jarvisDelegationsTable,
   type JarvisAgent,
 } from "@workspace/db";
 import { and, asc, eq } from "drizzle-orm";
 import { logger } from "../logger.js";
 import { agentBus } from "./agentBus.js";
-import type { AgentContext, AgentTrigger, OutboundMessage } from "./types.js";
+import type {
+  AgentContext,
+  AgentTrigger,
+  DelegateInput,
+  DelegationContextInfo,
+  OutboundMessage,
+  WorkflowStepContextInfo,
+} from "./types.js";
 
 const RUNTIME_ACTOR = "jarvis-runtime";
 
 /**
  * Builds the per-run AgentContext. Cross-cutting helpers (messaging, escalation,
- * audit) are closures so they share the same `agent`/`runId` without relying on
- * `this` binding.
+ * delegation, audit) are closures so they share the same `agent`/`runId` without
+ * relying on `this` binding. The optional `action`/`input`/`delegation`/
+ * `workflowStep` fields are populated only for orchestrated runs (Sprint 6);
+ * a plain scheduled tick leaves them undefined (backward compatible).
  */
 export function buildContext(opts: {
   agent: JarvisAgent;
   runId: string;
   trigger: AgentTrigger;
   startedAt: Date;
+  action?: string | null;
+  input?: Record<string, unknown> | null;
+  delegation?: DelegationContextInfo | null;
+  workflowStep?: WorkflowStepContextInfo | null;
 }): AgentContext {
   const { agent, runId, trigger, startedAt } = opts;
 
@@ -152,5 +166,82 @@ export function buildContext(opts: {
     }
   };
 
-  return { agent, runId, trigger, startedAt, log, emitMessage, raiseEscalation, audit };
+  const delegate: AgentContext["delegate"] = async (input: DelegateInput) => {
+    try {
+      let toAgentId = input.toAgentId ?? null;
+      let toAgentName: string | null = null;
+      if (!toAgentId && input.toAgentType) {
+        const [target] = await db
+          .select({ id: jarvisAgentsTable.id, name: jarvisAgentsTable.name })
+          .from(jarvisAgentsTable)
+          .where(eq(jarvisAgentsTable.agentType, input.toAgentType))
+          // Deterministic target when multiple agents share a type: oldest wins.
+          .orderBy(asc(jarvisAgentsTable.createdAt), asc(jarvisAgentsTable.id))
+          .limit(1);
+        if (target) {
+          toAgentId = target.id;
+          toAgentName = target.name;
+        }
+      } else if (toAgentId) {
+        const [target] = await db
+          .select({ name: jarvisAgentsTable.name })
+          .from(jarvisAgentsTable)
+          .where(eq(jarvisAgentsTable.id, toAgentId))
+          .limit(1);
+        toAgentName = target?.name ?? null;
+      }
+      const [row] = await db
+        .insert(jarvisDelegationsTable)
+        .values({
+          fromAgentId: agent.id,
+          fromAgentName: agent.name,
+          toAgentId,
+          toAgentName,
+          taskId: input.taskId ?? null,
+          workflowRunId: input.workflowRunId ?? null,
+          objective: input.objective,
+          action: input.action ?? null,
+          input: input.input ?? null,
+          status: "assigned",
+          priority: input.priority ?? "medium",
+          dueAt: input.dueAt ?? null,
+          createdBy: RUNTIME_ACTOR,
+        })
+        .returning();
+      agentBus.emitEvent({
+        type: "delegation_created",
+        severity: "info",
+        agentId: agent.id,
+        agentName: agent.name,
+        agentType: agent.agentType,
+        runId,
+        message: `${agent.name} delegated → ${toAgentName ?? input.toAgentType ?? "unassigned"}: ${input.objective}`,
+        details: { delegationId: row?.id, action: input.action ?? null },
+      });
+      await audit("create_delegation", "jarvis_delegation", row?.id ?? null, {
+        objective: input.objective,
+        toAgentType: input.toAgentType ?? null,
+      });
+      return row?.id ?? null;
+    } catch (err) {
+      logger.warn({ err, agent: agent.id }, "jarvis agent delegate failed");
+      return null;
+    }
+  };
+
+  return {
+    agent,
+    runId,
+    trigger,
+    startedAt,
+    action: opts.action ?? null,
+    input: opts.input ?? null,
+    delegation: opts.delegation ?? null,
+    workflowStep: opts.workflowStep ?? null,
+    log,
+    emitMessage,
+    raiseEscalation,
+    delegate,
+    audit,
+  };
 }

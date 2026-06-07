@@ -65,12 +65,31 @@ export const jarvisAgentsTable = pgTable("jarvis_agents", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// A single declarative step in a workflow definition DAG. `dependsOn` lists the
+// `key`s of prerequisite steps; a step becomes ready when all of them succeed.
+// `action`/`input` are passed into the target agent handler (deterministic,
+// advisory-safe). `condition` is an optional advisory note (no eval at runtime).
+export interface JarvisWorkflowStep {
+  key: string;
+  agentType: string;
+  action: string;
+  dependsOn: string[];
+  input?: Record<string, unknown>;
+  condition?: string;
+}
+
 export const jarvisWorkflowsTable = pgTable("jarvis_workflows", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: varchar("name", { length: 200 }).notNull(),
   description: text("description"),
   trigger: varchar("trigger", { length: 120 }).notNull().default("manual"),
   status: varchar("status", { length: 32 }).notNull().default("active"),
+  // ── Sprint 6 — workflow execution ──────────────────────────────────────────
+  // definition holds the ordered step DAG; version bumps on edit; enabled gates
+  // whether the workflow may be executed by the orchestrator.
+  definition: jsonb("definition").$type<{ steps: JarvisWorkflowStep[] }>(),
+  version: integer("version").notNull().default(1),
+  enabled: boolean("enabled").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -147,6 +166,14 @@ export const jarvisEscalationsTable = pgTable("jarvis_escalations", {
   assigneeAgentId: uuid("assignee_agent_id").references(() => jarvisAgentsTable.id, {
     onDelete: "set null",
   }),
+  // ── Sprint 6 — escalation chain binding ────────────────────────────────────
+  // When bound to a chain, the orchestrator advances currentLevel on SLA timeout
+  // (nextEscalationAt). Advisory only — never auto-resolves.
+  chainId: uuid("chain_id").references((): AnyPgColumn => jarvisEscalationChainsTable.id, {
+    onDelete: "set null",
+  }),
+  currentLevel: integer("current_level").notNull().default(0),
+  nextEscalationAt: timestamp("next_escalation_at"),
   resolvedAt: timestamp("resolved_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -423,3 +450,195 @@ export type JarvisAgentRun = typeof jarvisAgentRunsTable.$inferSelect;
 export type InsertJarvisAgentRun = typeof jarvisAgentRunsTable.$inferInsert;
 export type JarvisAgentMessage = typeof jarvisAgentMessagesTable.$inferSelect;
 export type InsertJarvisAgentMessage = typeof jarvisAgentMessagesTable.$inferInsert;
+
+// ── Multi-Agent Orchestration Layer (Sprint 6) ───────────────────────────────
+// Turns the Sprint 5 ticking agents into a coordinated orchestration layer:
+// routing → delegation → workflow execution → escalation chains → executive
+// commands. The orchestrator is pumped from the SAME single runtime tick (one
+// loop, off by default, admin-gated) and is deterministic + advisory-safe. All
+// FKs `onDelete:"set null"` + denormalized name snapshots so deleting a registry
+// row never destroys orchestration history. Spec:
+// `.local/docs/jarvis-orchestration-spec.md`.
+
+// Execution ledger for a workflow definition. Snapshots the workflow name so the
+// run survives a workflow delete. stepsTotal/stepsCompleted drive UI progress.
+export const jarvisWorkflowRunsTable = pgTable("jarvis_workflow_runs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workflowId: uuid("workflow_id").references(() => jarvisWorkflowsTable.id, {
+    onDelete: "set null",
+  }),
+  workflowName: varchar("workflow_name", { length: 200 }),
+  status: varchar("status", { length: 32 }).notNull().default("pending"),
+  trigger: varchar("trigger", { length: 32 }).notNull().default("manual"),
+  context: jsonb("context").$type<Record<string, unknown>>(),
+  initiatedBy: varchar("initiated_by", { length: 255 }),
+  stepsTotal: integer("steps_total").notNull().default(0),
+  stepsCompleted: integer("steps_completed").notNull().default(0),
+  error: text("error"),
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  finishedAt: timestamp("finished_at"),
+  durationMs: integer("duration_ms"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Per-step execution record within a workflow run. dependsOn is a snapshot of the
+// definition step's prerequisite keys; the engine executes a step only once all
+// of them are `succeeded`.
+export const jarvisWorkflowStepsTable = pgTable("jarvis_workflow_steps", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workflowRunId: uuid("workflow_run_id").references(() => jarvisWorkflowRunsTable.id, {
+    onDelete: "set null",
+  }),
+  stepKey: varchar("step_key", { length: 120 }).notNull(),
+  sequence: integer("sequence").notNull().default(0),
+  agentId: uuid("agent_id").references(() => jarvisAgentsTable.id, {
+    onDelete: "set null",
+  }),
+  agentName: varchar("agent_name", { length: 200 }),
+  agentType: varchar("agent_type", { length: 48 }),
+  action: varchar("action", { length: 64 }),
+  dependsOn: jsonb("depends_on").$type<string[]>(),
+  status: varchar("status", { length: 32 }).notNull().default("pending"),
+  input: jsonb("input").$type<Record<string, unknown>>(),
+  output: jsonb("output").$type<Record<string, unknown>>(),
+  error: text("error"),
+  startedAt: timestamp("started_at"),
+  finishedAt: timestamp("finished_at"),
+  durationMs: integer("duration_ms"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// A tracked unit of work one agent assigns to another (distinct from a
+// fire-and-forget Sprint 5 message). Lifecycle: assigned → accepted →
+// in_progress → completed | declined | expired.
+export const jarvisDelegationsTable = pgTable("jarvis_delegations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  fromAgentId: uuid("from_agent_id").references(() => jarvisAgentsTable.id, {
+    onDelete: "set null",
+  }),
+  fromAgentName: varchar("from_agent_name", { length: 200 }),
+  toAgentId: uuid("to_agent_id").references(() => jarvisAgentsTable.id, {
+    onDelete: "set null",
+  }),
+  toAgentName: varchar("to_agent_name", { length: 200 }),
+  taskId: uuid("task_id").references(() => jarvisTasksTable.id, {
+    onDelete: "set null",
+  }),
+  workflowRunId: uuid("workflow_run_id").references(() => jarvisWorkflowRunsTable.id, {
+    onDelete: "set null",
+  }),
+  objective: varchar("objective", { length: 300 }).notNull(),
+  action: varchar("action", { length: 64 }),
+  input: jsonb("input").$type<Record<string, unknown>>(),
+  status: varchar("status", { length: 32 }).notNull().default("assigned"),
+  priority: varchar("priority", { length: 16 }).notNull().default("medium"),
+  dueAt: timestamp("due_at"),
+  result: jsonb("result").$type<Record<string, unknown>>(),
+  error: text("error"),
+  createdBy: varchar("created_by", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Deterministic routing rule. The router keeps `enabled` rules whose
+// matchType/matchValue predicate matches the input, orders by priority desc then
+// createdAt,id, and takes the first; falls back to fallbackAgentType otherwise.
+export const jarvisRoutingRulesTable = pgTable("jarvis_routing_rules", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: varchar("name", { length: 200 }).notNull(),
+  description: text("description"),
+  matchType: varchar("match_type", { length: 32 }).notNull().default("any"),
+  matchValue: varchar("match_value", { length: 200 }),
+  targetAgentType: varchar("target_agent_type", { length: 48 }),
+  targetAgentId: uuid("target_agent_id").references(() => jarvisAgentsTable.id, {
+    onDelete: "set null",
+  }),
+  chainId: uuid("chain_id").references((): AnyPgColumn => jarvisEscalationChainsTable.id, {
+    onDelete: "set null",
+  }),
+  fallbackAgentType: varchar("fallback_agent_type", { length: 48 }),
+  priority: integer("priority").notNull().default(100),
+  enabled: boolean("enabled").notNull().default(true),
+  createdBy: varchar("created_by", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const jarvisEscalationChainsTable = pgTable("jarvis_escalation_chains", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: varchar("name", { length: 200 }).notNull(),
+  description: text("description"),
+  enabled: boolean("enabled").notNull().default(true),
+  status: varchar("status", { length: 32 }).notNull().default("active"),
+  createdBy: varchar("created_by", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// An ordered level within an escalation chain. slaSeconds is how long the
+// orchestrator waits at this level before advancing to the next.
+export const jarvisEscalationChainStepsTable = pgTable(
+  "jarvis_escalation_chain_steps",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    chainId: uuid("chain_id").references(() => jarvisEscalationChainsTable.id, {
+      onDelete: "set null",
+    }),
+    level: integer("level").notNull().default(0),
+    sequence: integer("sequence").notNull().default(0),
+    agentType: varchar("agent_type", { length: 48 }),
+    agentId: uuid("agent_id").references(() => jarvisAgentsTable.id, {
+      onDelete: "set null",
+    }),
+    slaSeconds: integer("sla_seconds").notNull().default(3600),
+    notifyRole: varchar("notify_role", { length: 32 }),
+    instruction: text("instruction"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+);
+
+// Executive command queue. An admin issues a command; the orchestrator routes it
+// (router) then dispatches it as a direct agent run, a delegation, or a workflow
+// run. Only a fixed registry of advisory-safe verbs is accepted.
+export const jarvisCommandsTable = pgTable("jarvis_commands", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  commandText: varchar("command_text", { length: 500 }).notNull(),
+  verb: varchar("verb", { length: 64 }),
+  args: jsonb("args").$type<Record<string, unknown>>(),
+  issuedBy: varchar("issued_by", { length: 255 }),
+  status: varchar("status", { length: 32 }).notNull().default("received"),
+  routedAgentType: varchar("routed_agent_type", { length: 48 }),
+  routingRuleId: uuid("routing_rule_id").references(() => jarvisRoutingRulesTable.id, {
+    onDelete: "set null",
+  }),
+  workflowRunId: uuid("workflow_run_id").references(() => jarvisWorkflowRunsTable.id, {
+    onDelete: "set null",
+  }),
+  delegationId: uuid("delegation_id").references(() => jarvisDelegationsTable.id, {
+    onDelete: "set null",
+  }),
+  result: jsonb("result").$type<Record<string, unknown>>(),
+  error: text("error"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type JarvisWorkflowRun = typeof jarvisWorkflowRunsTable.$inferSelect;
+export type InsertJarvisWorkflowRun = typeof jarvisWorkflowRunsTable.$inferInsert;
+export type JarvisWorkflowStepRow = typeof jarvisWorkflowStepsTable.$inferSelect;
+export type InsertJarvisWorkflowStepRow = typeof jarvisWorkflowStepsTable.$inferInsert;
+export type JarvisDelegation = typeof jarvisDelegationsTable.$inferSelect;
+export type InsertJarvisDelegation = typeof jarvisDelegationsTable.$inferInsert;
+export type JarvisRoutingRule = typeof jarvisRoutingRulesTable.$inferSelect;
+export type InsertJarvisRoutingRule = typeof jarvisRoutingRulesTable.$inferInsert;
+export type JarvisEscalationChain = typeof jarvisEscalationChainsTable.$inferSelect;
+export type InsertJarvisEscalationChain =
+  typeof jarvisEscalationChainsTable.$inferInsert;
+export type JarvisEscalationChainStep =
+  typeof jarvisEscalationChainStepsTable.$inferSelect;
+export type InsertJarvisEscalationChainStep =
+  typeof jarvisEscalationChainStepsTable.$inferInsert;
+export type JarvisCommand = typeof jarvisCommandsTable.$inferSelect;
+export type InsertJarvisCommand = typeof jarvisCommandsTable.$inferInsert;

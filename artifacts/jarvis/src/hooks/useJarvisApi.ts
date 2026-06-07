@@ -213,6 +213,13 @@ export const jarvisKeys = {
   runtimeActivity: ["jarvis", "runtime-activity"] as const,
   agentRuns: ["jarvis", "agent-runs"] as const,
   agentMessages: ["jarvis", "agent-messages"] as const,
+  workflowRuns: ["jarvis", "workflow-runs"] as const,
+  delegations: ["jarvis", "delegations"] as const,
+  routingRules: ["jarvis", "routing-rules"] as const,
+  escalationChains: ["jarvis", "escalation-chains"] as const,
+  commands: ["jarvis", "commands"] as const,
+  commandRegistry: ["jarvis", "command-registry"] as const,
+  orchestrationOverview: ["jarvis", "orchestration-overview"] as const,
 };
 
 // ── dashboard ────────────────────────────────────────────────────────────────
@@ -1611,5 +1618,544 @@ export function useSeedDefaultAgents() {
         skipped: number;
       }>(`${API}/agents/seed-defaults`, { method: "POST" }),
     onSuccess: invalidate,
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sprint 6 — orchestration & coordination
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface JarvisWorkflowStepDef {
+  key: string;
+  agentType: string;
+  action: string;
+  dependsOn?: string[];
+  input?: Record<string, unknown>;
+  condition?: string;
+}
+
+export interface JarvisWorkflowDefinition {
+  steps: JarvisWorkflowStepDef[];
+}
+
+export interface JarvisWorkflowFull extends JarvisWorkflow {
+  definition: JarvisWorkflowDefinition | null;
+  version: number;
+  enabled: boolean;
+}
+
+export interface JarvisWorkflowRun {
+  id: string;
+  workflowId: string | null;
+  workflowName: string | null;
+  status: string;
+  trigger: string;
+  context: Record<string, unknown> | null;
+  initiatedBy: string | null;
+  stepsTotal: number;
+  stepsCompleted: number;
+  error: string | null;
+  startedAt: string;
+  finishedAt: string | null;
+  durationMs: number | null;
+  updatedAt: string;
+  createdAt: string;
+}
+
+export interface JarvisWorkflowStepRow {
+  id: string;
+  workflowRunId: string | null;
+  stepKey: string;
+  sequence: number;
+  agentId: string | null;
+  agentName: string | null;
+  agentType: string | null;
+  action: string | null;
+  dependsOn: string[] | null;
+  status: string;
+  input: Record<string, unknown> | null;
+  output: Record<string, unknown> | null;
+  error: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  durationMs: number | null;
+  createdAt: string;
+}
+
+export interface JarvisDelegation {
+  id: string;
+  fromAgentId: string | null;
+  fromAgentName: string | null;
+  toAgentId: string | null;
+  toAgentName: string | null;
+  taskId: string | null;
+  workflowRunId: string | null;
+  objective: string;
+  action: string | null;
+  input: Record<string, unknown> | null;
+  status: string;
+  priority: string;
+  dueAt: string | null;
+  result: Record<string, unknown> | null;
+  error: string | null;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JarvisRoutingRule {
+  id: string;
+  name: string;
+  description: string | null;
+  matchType: string;
+  matchValue: string | null;
+  targetAgentType: string | null;
+  targetAgentId: string | null;
+  chainId: string | null;
+  fallbackAgentType: string | null;
+  priority: number;
+  enabled: boolean;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JarvisRouteResult {
+  targetAgentType: string;
+  ruleId: string | null;
+  chainId: string | null;
+  reason: string;
+  fallback: boolean;
+}
+
+export interface JarvisEscalationChainStep {
+  id: string;
+  chainId: string | null;
+  level: number;
+  sequence: number;
+  agentType: string | null;
+  agentId: string | null;
+  slaSeconds: number;
+  notifyRole: string | null;
+  instruction: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JarvisEscalationChain {
+  id: string;
+  name: string;
+  description: string | null;
+  enabled: boolean;
+  status: string;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+  steps: JarvisEscalationChainStep[];
+}
+
+export interface JarvisCommand {
+  id: string;
+  commandText: string;
+  verb: string | null;
+  args: Record<string, unknown> | null;
+  issuedBy: string | null;
+  status: string;
+  routedAgentType: string | null;
+  routingRuleId: string | null;
+  workflowRunId: string | null;
+  delegationId: string | null;
+  result: Record<string, unknown> | null;
+  error: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JarvisCommandVerbSpec {
+  verb: string;
+  description: string;
+  kind: "direct" | "delegation" | "workflow";
+  agentType?: string;
+  action?: string;
+  argsHint?: string;
+}
+
+export interface JarvisOrchestrationOverview {
+  runtime: JarvisRuntimeStatus;
+  totals: {
+    workflows: number;
+    enabledWorkflows: number;
+    routingRules: number;
+    escalationChains: number;
+  };
+  runsByStatus: { status: string; c: number }[];
+  delegationsByStatus: { status: string; c: number }[];
+  commandsByStatus: { status: string; c: number }[];
+  recentRuns: JarvisWorkflowRun[];
+  recentDelegations: JarvisDelegation[];
+  recentCommands: JarvisCommand[];
+  recentMessages: JarvisAgentMessage[];
+  generatedAt: number;
+}
+
+// ── workflows (Sprint 6 full + execution) ────────────────────────────────────
+
+export interface WorkflowFullInput {
+  name: string;
+  description?: string | null;
+  trigger?: string | null;
+  status?: string;
+  definition?: JarvisWorkflowDefinition | null;
+  enabled?: boolean;
+}
+
+export const useWorkflowsFull = makeListHook<JarvisWorkflowFull>({
+  path: "workflows",
+  listKey: jarvisKeys.workflows,
+  listField: "workflows",
+  itemField: "workflow",
+});
+
+export function useCreateWorkflowFull() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (input: WorkflowFullInput) =>
+      authFetchJson<{ workflow: JarvisWorkflowFull }>(`${API}/workflows`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateWorkflowFull() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: ({ id, ...input }: Partial<WorkflowFullInput> & { id: string }) =>
+      authFetchJson<{ workflow: JarvisWorkflowFull }>(`${API}/workflows/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useExecuteWorkflow() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: ({
+      id,
+      context,
+    }: {
+      id: string;
+      context?: Record<string, unknown> | null;
+    }) =>
+      authFetchJson<{ runId: string }>(`${API}/workflows/${id}/execute`, {
+        method: "POST",
+        body: JSON.stringify({ context: context ?? null }),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+// ── workflow runs ────────────────────────────────────────────────────────────
+
+export function useWorkflowRuns(
+  params: { workflowId?: string; status?: string; limit?: number } = {},
+): UseQueryResult<JarvisWorkflowRun[]> {
+  const search = new URLSearchParams();
+  if (params.workflowId) search.set("workflowId", params.workflowId);
+  if (params.status) search.set("status", params.status);
+  if (params.limit) search.set("limit", String(params.limit));
+  const qs = search.toString();
+  return useQuery({
+    queryKey: [...jarvisKeys.workflowRuns, params],
+    queryFn: async () => {
+      const data = await authFetchJson<{ workflowRuns: JarvisWorkflowRun[] }>(
+        `${API}/workflow-runs${qs ? `?${qs}` : ""}`,
+      );
+      return data.workflowRuns ?? [];
+    },
+    refetchInterval: 5000,
+  });
+}
+
+export function useWorkflowRun(
+  id: string | null,
+): UseQueryResult<{ workflowRun: JarvisWorkflowRun; steps: JarvisWorkflowStepRow[] }> {
+  return useQuery({
+    queryKey: [...jarvisKeys.workflowRuns, "detail", id],
+    queryFn: () =>
+      authFetchJson<{ workflowRun: JarvisWorkflowRun; steps: JarvisWorkflowStepRow[] }>(
+        `${API}/workflow-runs/${id}`,
+      ),
+    enabled: !!id,
+    refetchInterval: 5000,
+  });
+}
+
+// ── delegations ──────────────────────────────────────────────────────────────
+
+export interface DelegationInput {
+  toAgentId?: string | null;
+  toAgentType?: string | null;
+  objective: string;
+  action?: string | null;
+  input?: Record<string, unknown> | null;
+  priority?: "low" | "medium" | "high" | "critical";
+  dueAt?: string | null;
+}
+
+export function useDelegations(
+  params: { status?: string; limit?: number } = {},
+): UseQueryResult<JarvisDelegation[]> {
+  const search = new URLSearchParams();
+  if (params.status) search.set("status", params.status);
+  if (params.limit) search.set("limit", String(params.limit));
+  const qs = search.toString();
+  return useQuery({
+    queryKey: [...jarvisKeys.delegations, params],
+    queryFn: async () => {
+      const data = await authFetchJson<{ delegations: JarvisDelegation[] }>(
+        `${API}/delegations${qs ? `?${qs}` : ""}`,
+      );
+      return data.delegations ?? [];
+    },
+    refetchInterval: 5000,
+  });
+}
+
+export function useCreateDelegation() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (input: DelegationInput) =>
+      authFetchJson<{ delegation: JarvisDelegation }>(`${API}/delegations`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+// ── routing rules ────────────────────────────────────────────────────────────
+
+export interface RoutingRuleInput {
+  name: string;
+  description?: string | null;
+  matchType?: "any" | "command" | "category" | "capability" | "keyword";
+  matchValue?: string | null;
+  targetAgentType?: string | null;
+  targetAgentId?: string | null;
+  chainId?: string | null;
+  fallbackAgentType?: string | null;
+  priority?: number;
+  enabled?: boolean;
+}
+
+export const useRoutingRules = makeListHook<JarvisRoutingRule>({
+  path: "routing-rules",
+  listKey: jarvisKeys.routingRules,
+  listField: "routingRules",
+  itemField: "routingRule",
+});
+
+export function useCreateRoutingRule() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (input: RoutingRuleInput) =>
+      authFetchJson<{ routingRule: JarvisRoutingRule }>(`${API}/routing-rules`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateRoutingRule() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: ({ id, ...input }: Partial<RoutingRuleInput> & { id: string }) =>
+      authFetchJson<{ routingRule: JarvisRoutingRule }>(`${API}/routing-rules/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteRoutingRule() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (id: string) =>
+      authFetchJson<{ ok: boolean }>(`${API}/routing-rules/${id}`, { method: "DELETE" }),
+    onSuccess: invalidate,
+  });
+}
+
+export interface RouteTestInput {
+  verb?: string | null;
+  category?: string | null;
+  capability?: string | null;
+  text?: string | null;
+  keywords?: string[];
+}
+
+export function useTestRoute() {
+  return useMutation({
+    mutationFn: (input: RouteTestInput) =>
+      authFetchJson<{ result: JarvisRouteResult }>(`${API}/routing-rules/test`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+  });
+}
+
+// ── escalation chains ────────────────────────────────────────────────────────
+
+export interface EscalationChainInput {
+  name: string;
+  description?: string | null;
+  enabled?: boolean;
+  status?: string;
+}
+
+export interface EscalationChainStepInput {
+  level?: number;
+  sequence?: number;
+  agentType?: string | null;
+  agentId?: string | null;
+  slaSeconds?: number;
+  notifyRole?: string | null;
+  instruction?: string | null;
+}
+
+export const useEscalationChains = makeListHook<JarvisEscalationChain>({
+  path: "escalation-chains",
+  listKey: jarvisKeys.escalationChains,
+  listField: "escalationChains",
+  itemField: "escalationChain",
+});
+
+export function useCreateEscalationChain() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (input: EscalationChainInput) =>
+      authFetchJson<{ escalationChain: JarvisEscalationChain }>(
+        `${API}/escalation-chains`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateEscalationChain() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: ({ id, ...input }: Partial<EscalationChainInput> & { id: string }) =>
+      authFetchJson<{ escalationChain: JarvisEscalationChain }>(
+        `${API}/escalation-chains/${id}`,
+        { method: "PUT", body: JSON.stringify(input) },
+      ),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteEscalationChain() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (id: string) =>
+      authFetchJson<{ ok: boolean }>(`${API}/escalation-chains/${id}`, {
+        method: "DELETE",
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useAddEscalationChainStep() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: ({
+      chainId,
+      ...input
+    }: EscalationChainStepInput & { chainId: string }) =>
+      authFetchJson<{ step: JarvisEscalationChainStep }>(
+        `${API}/escalation-chains/${chainId}/steps`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteEscalationChainStep() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: ({ chainId, stepId }: { chainId: string; stepId: string }) =>
+      authFetchJson<{ ok: boolean }>(
+        `${API}/escalation-chains/${chainId}/steps/${stepId}`,
+        { method: "DELETE" },
+      ),
+    onSuccess: invalidate,
+  });
+}
+
+// ── executive commands ───────────────────────────────────────────────────────
+
+export interface CommandInput {
+  verb: string;
+  commandText?: string | null;
+  args?: Record<string, unknown> | null;
+}
+
+export function useCommands(
+  params: { status?: string; limit?: number } = {},
+): UseQueryResult<JarvisCommand[]> {
+  const search = new URLSearchParams();
+  if (params.status) search.set("status", params.status);
+  if (params.limit) search.set("limit", String(params.limit));
+  const qs = search.toString();
+  return useQuery({
+    queryKey: [...jarvisKeys.commands, params],
+    queryFn: async () => {
+      const data = await authFetchJson<{ commands: JarvisCommand[] }>(
+        `${API}/commands${qs ? `?${qs}` : ""}`,
+      );
+      return data.commands ?? [];
+    },
+    refetchInterval: 5000,
+  });
+}
+
+export function useCommandRegistry(): UseQueryResult<JarvisCommandVerbSpec[]> {
+  return useQuery({
+    queryKey: jarvisKeys.commandRegistry,
+    queryFn: async () => {
+      const data = await authFetchJson<{ registry: JarvisCommandVerbSpec[] }>(
+        `${API}/commands/registry`,
+      );
+      return data.registry ?? [];
+    },
+  });
+}
+
+export function useIssueCommand() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (input: CommandInput) =>
+      authFetchJson<{ command: JarvisCommand }>(`${API}/commands`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+// ── orchestration overview ───────────────────────────────────────────────────
+
+export function useOrchestrationOverview(): UseQueryResult<JarvisOrchestrationOverview> {
+  return useQuery({
+    queryKey: jarvisKeys.orchestrationOverview,
+    queryFn: () =>
+      authFetchJson<JarvisOrchestrationOverview>(`${API}/orchestration/overview`),
+    refetchInterval: 5000,
   });
 }

@@ -9,7 +9,8 @@ import { logger } from "../logger.js";
 import { agentBus } from "./agentBus.js";
 import { buildContext } from "./context.js";
 import { getHandler } from "./registry.js";
-import type { AgentTrigger } from "./types.js";
+import { orchestrator } from "./orchestrator/index.js";
+import type { AgentRunResult, AgentTrigger, OrchestrationExtra } from "./types.js";
 
 /**
  * Jarvis Agent Runtime — a SEPARATE periodic loop from the AICandlez trading
@@ -36,6 +37,8 @@ export interface RunOutcome {
   runId: string | null;
   summary?: string;
   error?: string;
+  /** Full handler result (orchestration reads `output` for workflow steps). */
+  result?: AgentRunResult;
 }
 
 class AgentRuntime {
@@ -121,6 +124,11 @@ class AgentRuntime {
       for (const agent of due) {
         await this.runAgent(agent, "scheduled");
       }
+      // Orchestration pump — runs AFTER the scheduled-agent pass on the SAME
+      // single loop (no second timer). Bounded + deterministic; advisory-safe.
+      await orchestrator.pump({
+        runAgent: (agent, trigger, extra) => this.runAgent(agent, trigger, extra),
+      });
     } catch (err) {
       logger.error({ err }, "jarvis runtime tick failed");
       agentBus.emitEvent({
@@ -138,7 +146,11 @@ class AgentRuntime {
     return elapsed >= a.scheduleSeconds * 1000;
   }
 
-  async runAgent(agent: JarvisAgent, trigger: AgentTrigger): Promise<RunOutcome> {
+  async runAgent(
+    agent: JarvisAgent,
+    trigger: AgentTrigger,
+    extra?: OrchestrationExtra,
+  ): Promise<RunOutcome> {
     const handler = getHandler(agent.agentType);
     if (!handler) {
       return {
@@ -182,7 +194,16 @@ class AgentRuntime {
     // lock is ALWAYS released — even if the "running" status write or the
     // handler throws. Otherwise a throw here would strand the agent in-flight
     // (unrunnable until process restart).
-    const ctx = buildContext({ agent, runId, trigger, startedAt });
+    const ctx = buildContext({
+      agent,
+      runId,
+      trigger,
+      startedAt,
+      action: extra?.action ?? null,
+      input: extra?.input ?? null,
+      delegation: extra?.delegation ?? null,
+      workflowStep: extra?.workflowStep ?? null,
+    });
     try {
       await db
         .update(jarvisAgentsTable)
@@ -232,7 +253,7 @@ class AgentRuntime {
         message: `${agent.name}: ${result.summary}`,
         details: { itemsProcessed: result.itemsProcessed, durationMs },
       });
-      return { ok: true, runId, summary: result.summary };
+      return { ok: true, runId, summary: result.summary, result };
     } catch (err) {
       const finishedAt = new Date();
       const durationMs = finishedAt.getTime() - startedAt.getTime();

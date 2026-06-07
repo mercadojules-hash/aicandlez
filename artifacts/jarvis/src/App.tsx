@@ -18,6 +18,10 @@ import Projects from "@/pages/Projects";
 import Agents from "@/pages/Agents";
 import AgentActivity from "@/pages/AgentActivity";
 import Workflows from "@/pages/Workflows";
+import Collaboration from "@/pages/Collaboration";
+import RoutingRules from "@/pages/RoutingRules";
+import EscalationChains from "@/pages/EscalationChains";
+import CommandConsole from "@/pages/CommandConsole";
 import Operations from "@/pages/Operations";
 import Tasks from "@/pages/Tasks";
 import Decisions from "@/pages/Decisions";
@@ -170,9 +174,29 @@ function AppRoutes() {
           <AgentActivity />
         </Protected>
       </Route>
+      <Route path="/collaboration">
+        <Protected>
+          <Collaboration />
+        </Protected>
+      </Route>
       <Route path="/workflows">
         <Protected>
           <Workflows />
+        </Protected>
+      </Route>
+      <Route path="/routing-rules">
+        <Protected>
+          <RoutingRules />
+        </Protected>
+      </Route>
+      <Route path="/escalation-chains">
+        <Protected>
+          <EscalationChains />
+        </Protected>
+      </Route>
+      <Route path="/commands">
+        <Protected>
+          <CommandConsole />
         </Protected>
       </Route>
       <Route path="/operations">

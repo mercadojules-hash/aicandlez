@@ -17,7 +17,7 @@
  *   PUT    /jarvis/settings                  (admin) — upsert keys (role-gated)
  */
 import { Router, type IRouter, type Request, type Response } from "express";
-import { eq, desc, sql, ilike, or, and } from "drizzle-orm";
+import { eq, desc, asc, sql, ilike, or, and } from "drizzle-orm";
 import { z } from "zod/v4";
 import {
   db,
@@ -42,11 +42,24 @@ import {
   jarvisBriefingsTable,
   jarvisAgentRunsTable,
   jarvisAgentMessagesTable,
+  jarvisWorkflowRunsTable,
+  jarvisWorkflowStepsTable,
+  jarvisDelegationsTable,
+  jarvisRoutingRulesTable,
+  jarvisEscalationChainsTable,
+  jarvisEscalationChainStepsTable,
+  jarvisCommandsTable,
 } from "@workspace/db";
 import { requireAuth, requireRole } from "../middlewares/requireAuth.js";
 import { agentRuntime } from "../lib/jarvis/runtime.js";
 import { agentBus } from "../lib/jarvis/agentBus.js";
 import { AGENT_CATALOG, getHandler } from "../lib/jarvis/registry.js";
+import {
+  startWorkflowRun,
+  routeCommand,
+  findVerb,
+  VERB_REGISTRY,
+} from "../lib/jarvis/orchestrator/index.js";
 
 type AuthReq = Request & { clerkUserId: string };
 
@@ -899,12 +912,43 @@ router.get(
 
 // ── workflows ────────────────────────────────────────────────────────────────
 
+const workflowStepSchema = z.object({
+  key: z.string().trim().min(1).max(120),
+  agentType: z.string().trim().min(1).max(48),
+  action: z.string().trim().min(1).max(64),
+  dependsOn: z.array(z.string().trim().min(1).max(120)).max(50).optional(),
+  input: z.record(z.string(), z.unknown()).optional(),
+  condition: z.string().trim().max(200).optional(),
+});
+
+const workflowDefinitionSchema = z.object({
+  steps: z.array(workflowStepSchema).max(50),
+});
+
 const workflowBodySchema = z.object({
   name: z.string().trim().min(1).max(200),
   description: z.string().trim().max(5000).optional().nullable(),
   trigger: z.string().trim().max(120).optional().nullable(),
   status: statusSchema.optional(),
+  definition: workflowDefinitionSchema.optional().nullable(),
+  enabled: z.boolean().optional(),
 });
+
+/** Normalize a validated definition into the stored JarvisWorkflowStep shape. */
+function normalizeWorkflowDefinition(
+  def: z.infer<typeof workflowDefinitionSchema>,
+): { steps: { key: string; agentType: string; action: string; dependsOn: string[]; input?: Record<string, unknown>; condition?: string }[] } {
+  return {
+    steps: def.steps.map((s) => ({
+      key: s.key,
+      agentType: s.agentType,
+      action: s.action,
+      dependsOn: s.dependsOn ?? [],
+      ...(s.input !== undefined ? { input: s.input } : {}),
+      ...(s.condition !== undefined ? { condition: s.condition } : {}),
+    })),
+  };
+}
 
 router.get(
   "/jarvis/workflows",
@@ -926,6 +970,7 @@ router.get(
 router.post(
   "/jarvis/workflows",
   requireAuth,
+  requireRole(["admin", "super-admin"]),
   async (req: Request, res: Response): Promise<void> => {
     const actor = await resolveActor((req as AuthReq).clerkUserId);
     const parsed = workflowBodySchema.safeParse(req.body);
@@ -941,6 +986,10 @@ router.post(
           description: parsed.data.description ?? null,
           trigger: parsed.data.trigger ?? "manual",
           status: parsed.data.status ?? "active",
+          definition: parsed.data.definition
+            ? normalizeWorkflowDefinition(parsed.data.definition)
+            : null,
+          enabled: parsed.data.enabled ?? false,
         })
         .returning();
       await audit(req, actor, "create", "workflow", row.id, { name: row.name });
@@ -977,6 +1026,7 @@ router.get(
 router.put(
   "/jarvis/workflows/:id",
   requireAuth,
+  requireRole(["admin", "super-admin"]),
   async (req: Request, res: Response): Promise<void> => {
     const actor = await resolveActor((req as AuthReq).clerkUserId);
     const parsed = workflowBodySchema.partial().safeParse(req.body);
@@ -996,6 +1046,15 @@ router.put(
             ? { trigger: parsed.data.trigger ?? "manual" }
             : {}),
           ...(parsed.data.status !== undefined ? { status: parsed.data.status } : {}),
+          ...(parsed.data.definition !== undefined
+            ? {
+                definition: parsed.data.definition
+                  ? normalizeWorkflowDefinition(parsed.data.definition)
+                  : null,
+                version: sql`${jarvisWorkflowsTable.version} + 1`,
+              }
+            : {}),
+          ...(parsed.data.enabled !== undefined ? { enabled: parsed.data.enabled } : {}),
           updatedAt: new Date(),
         })
         .where(eq(jarvisWorkflowsTable.id, String(req.params.id)))
@@ -1016,6 +1075,7 @@ router.put(
 router.delete(
   "/jarvis/workflows/:id",
   requireAuth,
+  requireRole(["admin", "super-admin"]),
   async (req: Request, res: Response): Promise<void> => {
     const actor = await resolveActor((req as AuthReq).clerkUserId);
     try {
@@ -3632,6 +3692,884 @@ router.get(
     } catch (err) {
       req.log.error({ err }, "GET /jarvis/intelligence/overview failed");
       res.status(500).json({ error: "jarvis_intelligence_overview_failed" });
+    }
+  },
+);
+
+// ── Sprint 6 — orchestration & coordination ──────────────────────────────────
+//
+// Coordination surfaces pumped from the SAME single runtime tick (workflow runs,
+// delegations, escalation chains, executive commands). Reads stay requireAuth;
+// execute/control mutations are admin-gated (the orchestrator is one global
+// loop). All mutations are advisory-safe (no destructive autonomy) + audited.
+
+async function resolveAgentRef(opts: {
+  agentId?: string | null;
+  agentType?: string | null;
+}): Promise<{ id: string; name: string } | null> {
+  if (opts.agentId) {
+    const [a] = await db
+      .select({ id: jarvisAgentsTable.id, name: jarvisAgentsTable.name })
+      .from(jarvisAgentsTable)
+      .where(eq(jarvisAgentsTable.id, opts.agentId))
+      .limit(1);
+    return a ?? null;
+  }
+  if (opts.agentType) {
+    const [a] = await db
+      .select({ id: jarvisAgentsTable.id, name: jarvisAgentsTable.name })
+      .from(jarvisAgentsTable)
+      .where(eq(jarvisAgentsTable.agentType, opts.agentType))
+      .orderBy(asc(jarvisAgentsTable.createdAt), asc(jarvisAgentsTable.id))
+      .limit(1);
+    return a ?? null;
+  }
+  return null;
+}
+
+// ── workflow execution ───────────────────────────────────────────────────────
+
+router.post(
+  "/jarvis/workflows/:id/execute",
+  requireAuth,
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = z
+      .object({ context: z.record(z.string(), z.unknown()).optional().nullable() })
+      .safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_execute_options" });
+      return;
+    }
+    try {
+      const outcome = await startWorkflowRun({
+        workflowId: String(req.params.id),
+        trigger: "manual",
+        context: parsed.data.context ?? null,
+        initiatedBy: actor.email ?? actor.userId,
+      });
+      if (!outcome.ok) {
+        const code = outcome.error === "Workflow not found" ? 404 : 409;
+        res.status(code).json({ error: outcome.error ?? "workflow_execute_failed" });
+        return;
+      }
+      await audit(req, actor, "execute", "workflow", String(req.params.id), {
+        runId: outcome.runId,
+      });
+      res.status(202).json({ runId: outcome.runId });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/workflows/:id/execute failed");
+      res.status(500).json({ error: "jarvis_workflow_execute_failed" });
+    }
+  },
+);
+
+// ── workflow runs ────────────────────────────────────────────────────────────
+
+router.get(
+  "/jarvis/workflow-runs",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 200);
+    try {
+      const conds = [];
+      if (req.query.workflowId) {
+        conds.push(eq(jarvisWorkflowRunsTable.workflowId, String(req.query.workflowId)));
+      }
+      if (req.query.status) {
+        conds.push(eq(jarvisWorkflowRunsTable.status, String(req.query.status)));
+      }
+      const rows = await db
+        .select()
+        .from(jarvisWorkflowRunsTable)
+        .where(conds.length ? and(...conds) : undefined)
+        .orderBy(desc(jarvisWorkflowRunsTable.startedAt))
+        .limit(limit);
+      res.json({ workflowRuns: rows });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/workflow-runs failed");
+      res.status(500).json({ error: "jarvis_workflow_runs_read_failed" });
+    }
+  },
+);
+
+router.get(
+  "/jarvis/workflow-runs/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const [run] = await db
+        .select()
+        .from(jarvisWorkflowRunsTable)
+        .where(eq(jarvisWorkflowRunsTable.id, String(req.params.id)))
+        .limit(1);
+      if (!run) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      const steps = await db
+        .select()
+        .from(jarvisWorkflowStepsTable)
+        .where(eq(jarvisWorkflowStepsTable.workflowRunId, run.id))
+        .orderBy(asc(jarvisWorkflowStepsTable.sequence), asc(jarvisWorkflowStepsTable.id));
+      res.json({ workflowRun: run, steps });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/workflow-runs/:id failed");
+      res.status(500).json({ error: "jarvis_workflow_run_read_failed" });
+    }
+  },
+);
+
+// ── delegations ──────────────────────────────────────────────────────────────
+
+const delegationBodySchema = z.object({
+  toAgentId: z.string().uuid().optional().nullable(),
+  toAgentType: z.string().trim().max(48).optional().nullable(),
+  objective: z.string().trim().min(1).max(300),
+  action: z.string().trim().max(64).optional().nullable(),
+  input: z.record(z.string(), z.unknown()).optional().nullable(),
+  priority: z.enum(["low", "medium", "high", "critical"]).optional(),
+  dueAt: z.string().datetime().optional().nullable(),
+});
+
+router.get(
+  "/jarvis/delegations",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 200);
+    try {
+      const conds = [];
+      if (req.query.status) {
+        conds.push(eq(jarvisDelegationsTable.status, String(req.query.status)));
+      }
+      const rows = await db
+        .select()
+        .from(jarvisDelegationsTable)
+        .where(conds.length ? and(...conds) : undefined)
+        .orderBy(desc(jarvisDelegationsTable.createdAt))
+        .limit(limit);
+      res.json({ delegations: rows });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/delegations failed");
+      res.status(500).json({ error: "jarvis_delegations_read_failed" });
+    }
+  },
+);
+
+router.post(
+  "/jarvis/delegations",
+  requireAuth,
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = delegationBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_delegation" });
+      return;
+    }
+    if (!parsed.data.toAgentId && !parsed.data.toAgentType) {
+      res.status(400).json({ error: "delegation_target_required" });
+      return;
+    }
+    try {
+      const target = await resolveAgentRef({
+        agentId: parsed.data.toAgentId,
+        agentType: parsed.data.toAgentType,
+      });
+      if (!target) {
+        res.status(400).json({ error: "delegation_target_not_found" });
+        return;
+      }
+      const [row] = await db
+        .insert(jarvisDelegationsTable)
+        .values({
+          toAgentId: target.id,
+          toAgentName: target.name,
+          objective: parsed.data.objective,
+          action: parsed.data.action ?? null,
+          input: parsed.data.input ?? null,
+          status: "assigned",
+          priority: parsed.data.priority ?? "medium",
+          dueAt: parsed.data.dueAt ? new Date(parsed.data.dueAt) : null,
+          createdBy: actor.email ?? actor.userId,
+        })
+        .returning();
+      await audit(req, actor, "create", "delegation", row.id, {
+        toAgentName: row.toAgentName,
+        objective: row.objective,
+      });
+      res.status(201).json({ delegation: row });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/delegations failed");
+      res.status(500).json({ error: "jarvis_delegation_create_failed" });
+    }
+  },
+);
+
+router.get(
+  "/jarvis/delegations/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const [row] = await db
+        .select()
+        .from(jarvisDelegationsTable)
+        .where(eq(jarvisDelegationsTable.id, String(req.params.id)))
+        .limit(1);
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      res.json({ delegation: row });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/delegations/:id failed");
+      res.status(500).json({ error: "jarvis_delegation_read_failed" });
+    }
+  },
+);
+
+// ── routing rules ────────────────────────────────────────────────────────────
+
+const routingRuleBodySchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  description: z.string().trim().max(5000).optional().nullable(),
+  matchType: z
+    .enum(["any", "command", "category", "capability", "keyword"])
+    .optional(),
+  matchValue: z.string().trim().max(200).optional().nullable(),
+  targetAgentType: z.string().trim().max(48).optional().nullable(),
+  targetAgentId: z.string().uuid().optional().nullable(),
+  chainId: z.string().uuid().optional().nullable(),
+  fallbackAgentType: z.string().trim().max(48).optional().nullable(),
+  priority: z.number().int().min(0).max(100_000).optional(),
+  enabled: z.boolean().optional(),
+});
+
+router.get(
+  "/jarvis/routing-rules",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const rows = await db
+        .select()
+        .from(jarvisRoutingRulesTable)
+        .orderBy(desc(jarvisRoutingRulesTable.priority), asc(jarvisRoutingRulesTable.createdAt));
+      res.json({ routingRules: rows });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/routing-rules failed");
+      res.status(500).json({ error: "jarvis_routing_rules_read_failed" });
+    }
+  },
+);
+
+router.post(
+  "/jarvis/routing-rules/test",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const parsed = z
+      .object({
+        verb: z.string().trim().max(64).optional().nullable(),
+        category: z.string().trim().max(64).optional().nullable(),
+        capability: z.string().trim().max(64).optional().nullable(),
+        text: z.string().trim().max(500).optional().nullable(),
+        keywords: z.array(z.string().trim().max(64)).max(25).optional(),
+      })
+      .safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_route_input" });
+      return;
+    }
+    try {
+      const result = await routeCommand({
+        verb: parsed.data.verb,
+        category: parsed.data.category,
+        capability: parsed.data.capability,
+        text: parsed.data.text,
+        keywords: parsed.data.keywords,
+      });
+      res.json({ result });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/routing-rules/test failed");
+      res.status(500).json({ error: "jarvis_routing_rule_test_failed" });
+    }
+  },
+);
+
+router.post(
+  "/jarvis/routing-rules",
+  requireAuth,
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = routingRuleBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_routing_rule" });
+      return;
+    }
+    try {
+      const [row] = await db
+        .insert(jarvisRoutingRulesTable)
+        .values({
+          name: parsed.data.name,
+          description: parsed.data.description ?? null,
+          matchType: parsed.data.matchType ?? "any",
+          matchValue: parsed.data.matchValue ?? null,
+          targetAgentType: parsed.data.targetAgentType ?? null,
+          targetAgentId: parsed.data.targetAgentId ?? null,
+          chainId: parsed.data.chainId ?? null,
+          fallbackAgentType: parsed.data.fallbackAgentType ?? null,
+          priority: parsed.data.priority ?? 100,
+          enabled: parsed.data.enabled ?? true,
+          createdBy: actor.email ?? actor.userId,
+        })
+        .returning();
+      await audit(req, actor, "create", "routing_rule", row.id, { name: row.name });
+      res.status(201).json({ routingRule: row });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/routing-rules failed");
+      res.status(500).json({ error: "jarvis_routing_rule_create_failed" });
+    }
+  },
+);
+
+router.put(
+  "/jarvis/routing-rules/:id",
+  requireAuth,
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = routingRuleBodySchema.partial().safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_routing_rule" });
+      return;
+    }
+    try {
+      const d = parsed.data;
+      const [row] = await db
+        .update(jarvisRoutingRulesTable)
+        .set({
+          ...(d.name !== undefined ? { name: d.name } : {}),
+          ...(d.description !== undefined ? { description: d.description ?? null } : {}),
+          ...(d.matchType !== undefined ? { matchType: d.matchType } : {}),
+          ...(d.matchValue !== undefined ? { matchValue: d.matchValue ?? null } : {}),
+          ...(d.targetAgentType !== undefined
+            ? { targetAgentType: d.targetAgentType ?? null }
+            : {}),
+          ...(d.targetAgentId !== undefined
+            ? { targetAgentId: d.targetAgentId ?? null }
+            : {}),
+          ...(d.chainId !== undefined ? { chainId: d.chainId ?? null } : {}),
+          ...(d.fallbackAgentType !== undefined
+            ? { fallbackAgentType: d.fallbackAgentType ?? null }
+            : {}),
+          ...(d.priority !== undefined ? { priority: d.priority } : {}),
+          ...(d.enabled !== undefined ? { enabled: d.enabled } : {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(jarvisRoutingRulesTable.id, String(req.params.id)))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await audit(req, actor, "update", "routing_rule", row.id, { name: row.name });
+      res.json({ routingRule: row });
+    } catch (err) {
+      req.log.error({ err }, "PUT /jarvis/routing-rules/:id failed");
+      res.status(500).json({ error: "jarvis_routing_rule_update_failed" });
+    }
+  },
+);
+
+router.delete(
+  "/jarvis/routing-rules/:id",
+  requireAuth,
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    try {
+      const [row] = await db
+        .delete(jarvisRoutingRulesTable)
+        .where(eq(jarvisRoutingRulesTable.id, String(req.params.id)))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await audit(req, actor, "delete", "routing_rule", row.id, { name: row.name });
+      res.json({ ok: true, id: row.id });
+    } catch (err) {
+      req.log.error({ err }, "DELETE /jarvis/routing-rules/:id failed");
+      res.status(500).json({ error: "jarvis_routing_rule_delete_failed" });
+    }
+  },
+);
+
+// ── escalation chains ────────────────────────────────────────────────────────
+
+const escalationChainBodySchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  description: z.string().trim().max(5000).optional().nullable(),
+  enabled: z.boolean().optional(),
+  status: statusSchema.optional(),
+});
+
+const escalationChainStepBodySchema = z.object({
+  level: z.number().int().min(0).max(100).optional(),
+  sequence: z.number().int().min(0).max(100).optional(),
+  agentType: z.string().trim().max(48).optional().nullable(),
+  agentId: z.string().uuid().optional().nullable(),
+  slaSeconds: z.number().int().min(60).max(2_592_000).optional(),
+  notifyRole: z.string().trim().max(32).optional().nullable(),
+  instruction: z.string().trim().max(5000).optional().nullable(),
+});
+
+async function loadChainSteps(chainId: string) {
+  return db
+    .select()
+    .from(jarvisEscalationChainStepsTable)
+    .where(eq(jarvisEscalationChainStepsTable.chainId, chainId))
+    .orderBy(
+      asc(jarvisEscalationChainStepsTable.level),
+      asc(jarvisEscalationChainStepsTable.sequence),
+      asc(jarvisEscalationChainStepsTable.id),
+    );
+}
+
+router.get(
+  "/jarvis/escalation-chains",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const chains = await db
+        .select()
+        .from(jarvisEscalationChainsTable)
+        .orderBy(desc(jarvisEscalationChainsTable.createdAt));
+      const steps = await db
+        .select()
+        .from(jarvisEscalationChainStepsTable)
+        .orderBy(
+          asc(jarvisEscalationChainStepsTable.level),
+          asc(jarvisEscalationChainStepsTable.sequence),
+          asc(jarvisEscalationChainStepsTable.id),
+        );
+      const byChain = new Map<string, typeof steps>();
+      for (const s of steps) {
+        if (!s.chainId) continue;
+        const list = byChain.get(s.chainId) ?? [];
+        list.push(s);
+        byChain.set(s.chainId, list);
+      }
+      res.json({
+        escalationChains: chains.map((c) => ({
+          ...c,
+          steps: byChain.get(c.id) ?? [],
+        })),
+      });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/escalation-chains failed");
+      res.status(500).json({ error: "jarvis_escalation_chains_read_failed" });
+    }
+  },
+);
+
+router.post(
+  "/jarvis/escalation-chains",
+  requireAuth,
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = escalationChainBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_escalation_chain" });
+      return;
+    }
+    try {
+      const [row] = await db
+        .insert(jarvisEscalationChainsTable)
+        .values({
+          name: parsed.data.name,
+          description: parsed.data.description ?? null,
+          enabled: parsed.data.enabled ?? true,
+          status: parsed.data.status ?? "active",
+          createdBy: actor.email ?? actor.userId,
+        })
+        .returning();
+      await audit(req, actor, "create", "escalation_chain", row.id, { name: row.name });
+      res.status(201).json({ escalationChain: { ...row, steps: [] } });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/escalation-chains failed");
+      res.status(500).json({ error: "jarvis_escalation_chain_create_failed" });
+    }
+  },
+);
+
+router.get(
+  "/jarvis/escalation-chains/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const [chain] = await db
+        .select()
+        .from(jarvisEscalationChainsTable)
+        .where(eq(jarvisEscalationChainsTable.id, String(req.params.id)))
+        .limit(1);
+      if (!chain) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      const steps = await loadChainSteps(chain.id);
+      res.json({ escalationChain: { ...chain, steps } });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/escalation-chains/:id failed");
+      res.status(500).json({ error: "jarvis_escalation_chain_read_failed" });
+    }
+  },
+);
+
+router.put(
+  "/jarvis/escalation-chains/:id",
+  requireAuth,
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = escalationChainBodySchema.partial().safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_escalation_chain" });
+      return;
+    }
+    try {
+      const d = parsed.data;
+      const [row] = await db
+        .update(jarvisEscalationChainsTable)
+        .set({
+          ...(d.name !== undefined ? { name: d.name } : {}),
+          ...(d.description !== undefined ? { description: d.description ?? null } : {}),
+          ...(d.enabled !== undefined ? { enabled: d.enabled } : {}),
+          ...(d.status !== undefined ? { status: d.status } : {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(jarvisEscalationChainsTable.id, String(req.params.id)))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      const steps = await loadChainSteps(row.id);
+      await audit(req, actor, "update", "escalation_chain", row.id, { name: row.name });
+      res.json({ escalationChain: { ...row, steps } });
+    } catch (err) {
+      req.log.error({ err }, "PUT /jarvis/escalation-chains/:id failed");
+      res.status(500).json({ error: "jarvis_escalation_chain_update_failed" });
+    }
+  },
+);
+
+router.delete(
+  "/jarvis/escalation-chains/:id",
+  requireAuth,
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    try {
+      const [row] = await db
+        .delete(jarvisEscalationChainsTable)
+        .where(eq(jarvisEscalationChainsTable.id, String(req.params.id)))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await audit(req, actor, "delete", "escalation_chain", row.id, { name: row.name });
+      res.json({ ok: true, id: row.id });
+    } catch (err) {
+      req.log.error({ err }, "DELETE /jarvis/escalation-chains/:id failed");
+      res.status(500).json({ error: "jarvis_escalation_chain_delete_failed" });
+    }
+  },
+);
+
+router.post(
+  "/jarvis/escalation-chains/:id/steps",
+  requireAuth,
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = escalationChainStepBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_escalation_chain_step" });
+      return;
+    }
+    try {
+      const [chain] = await db
+        .select({ id: jarvisEscalationChainsTable.id })
+        .from(jarvisEscalationChainsTable)
+        .where(eq(jarvisEscalationChainsTable.id, String(req.params.id)))
+        .limit(1);
+      if (!chain) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      let agentName: string | null = null;
+      if (parsed.data.agentId || parsed.data.agentType) {
+        const ref = await resolveAgentRef({
+          agentId: parsed.data.agentId,
+          agentType: parsed.data.agentType,
+        });
+        agentName = ref?.name ?? null;
+      }
+      const [row] = await db
+        .insert(jarvisEscalationChainStepsTable)
+        .values({
+          chainId: chain.id,
+          level: parsed.data.level ?? 0,
+          sequence: parsed.data.sequence ?? 0,
+          agentType: parsed.data.agentType ?? null,
+          agentId: parsed.data.agentId ?? null,
+          slaSeconds: parsed.data.slaSeconds ?? 3600,
+          notifyRole: parsed.data.notifyRole ?? null,
+          instruction: parsed.data.instruction ?? null,
+        })
+        .returning();
+      await audit(req, actor, "create", "escalation_chain_step", row.id, {
+        chainId: chain.id,
+        agentName,
+      });
+      res.status(201).json({ step: row });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/escalation-chains/:id/steps failed");
+      res.status(500).json({ error: "jarvis_escalation_chain_step_create_failed" });
+    }
+  },
+);
+
+router.delete(
+  "/jarvis/escalation-chains/:chainId/steps/:stepId",
+  requireAuth,
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    try {
+      const [row] = await db
+        .delete(jarvisEscalationChainStepsTable)
+        .where(
+          and(
+            eq(jarvisEscalationChainStepsTable.id, String(req.params.stepId)),
+            eq(jarvisEscalationChainStepsTable.chainId, String(req.params.chainId)),
+          ),
+        )
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await audit(req, actor, "delete", "escalation_chain_step", row.id, {
+        chainId: String(req.params.chainId),
+      });
+      res.json({ ok: true, id: row.id });
+    } catch (err) {
+      req.log.error({ err }, "DELETE /jarvis/escalation-chains/:chainId/steps/:stepId failed");
+      res.status(500).json({ error: "jarvis_escalation_chain_step_delete_failed" });
+    }
+  },
+);
+
+// ── executive commands ───────────────────────────────────────────────────────
+
+const commandBodySchema = z.object({
+  verb: z.string().trim().min(1).max(64),
+  commandText: z.string().trim().max(500).optional().nullable(),
+  args: z.record(z.string(), z.unknown()).optional().nullable(),
+});
+
+router.get(
+  "/jarvis/commands/registry",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      res.json({ registry: VERB_REGISTRY });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/commands/registry failed");
+      res.status(500).json({ error: "jarvis_commands_registry_failed" });
+    }
+  },
+);
+
+router.get(
+  "/jarvis/commands",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 200);
+    try {
+      const conds = [];
+      if (req.query.status) {
+        conds.push(eq(jarvisCommandsTable.status, String(req.query.status)));
+      }
+      const rows = await db
+        .select()
+        .from(jarvisCommandsTable)
+        .where(conds.length ? and(...conds) : undefined)
+        .orderBy(desc(jarvisCommandsTable.createdAt))
+        .limit(limit);
+      res.json({ commands: rows });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/commands failed");
+      res.status(500).json({ error: "jarvis_commands_read_failed" });
+    }
+  },
+);
+
+router.post(
+  "/jarvis/commands",
+  requireAuth,
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = commandBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_command" });
+      return;
+    }
+    const spec = findVerb(parsed.data.verb);
+    if (!spec) {
+      res.status(400).json({ error: "unknown_verb" });
+      return;
+    }
+    try {
+      const [row] = await db
+        .insert(jarvisCommandsTable)
+        .values({
+          commandText: parsed.data.commandText?.trim() || spec.verb,
+          verb: spec.verb,
+          args: parsed.data.args ?? null,
+          issuedBy: actor.email ?? actor.userId,
+          status: "received",
+        })
+        .returning();
+      await audit(req, actor, "issue", "command", row.id, { verb: row.verb });
+      res.status(202).json({ command: row });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/commands failed");
+      res.status(500).json({ error: "jarvis_command_create_failed" });
+    }
+  },
+);
+
+router.get(
+  "/jarvis/commands/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const [row] = await db
+        .select()
+        .from(jarvisCommandsTable)
+        .where(eq(jarvisCommandsTable.id, String(req.params.id)))
+        .limit(1);
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      res.json({ command: row });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/commands/:id failed");
+      res.status(500).json({ error: "jarvis_command_read_failed" });
+    }
+  },
+);
+
+// ── orchestration overview ───────────────────────────────────────────────────
+
+router.get(
+  "/jarvis/orchestration/overview",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const [
+        [workflows],
+        [enabledWorkflows],
+        runsByStatus,
+        delegationsByStatus,
+        commandsByStatus,
+        [routingRules],
+        [escalationChains],
+        recentRuns,
+        recentDelegations,
+        recentCommands,
+        recentMessages,
+      ] = await Promise.all([
+        db.select({ c: sql<number>`count(*)::int` }).from(jarvisWorkflowsTable),
+        db
+          .select({ c: sql<number>`count(*)::int` })
+          .from(jarvisWorkflowsTable)
+          .where(eq(jarvisWorkflowsTable.enabled, true)),
+        db
+          .select({
+            status: jarvisWorkflowRunsTable.status,
+            c: sql<number>`count(*)::int`,
+          })
+          .from(jarvisWorkflowRunsTable)
+          .groupBy(jarvisWorkflowRunsTable.status),
+        db
+          .select({
+            status: jarvisDelegationsTable.status,
+            c: sql<number>`count(*)::int`,
+          })
+          .from(jarvisDelegationsTable)
+          .groupBy(jarvisDelegationsTable.status),
+        db
+          .select({
+            status: jarvisCommandsTable.status,
+            c: sql<number>`count(*)::int`,
+          })
+          .from(jarvisCommandsTable)
+          .groupBy(jarvisCommandsTable.status),
+        db.select({ c: sql<number>`count(*)::int` }).from(jarvisRoutingRulesTable),
+        db
+          .select({ c: sql<number>`count(*)::int` })
+          .from(jarvisEscalationChainsTable),
+        db
+          .select()
+          .from(jarvisWorkflowRunsTable)
+          .orderBy(desc(jarvisWorkflowRunsTable.startedAt))
+          .limit(10),
+        db
+          .select()
+          .from(jarvisDelegationsTable)
+          .orderBy(desc(jarvisDelegationsTable.createdAt))
+          .limit(10),
+        db
+          .select()
+          .from(jarvisCommandsTable)
+          .orderBy(desc(jarvisCommandsTable.createdAt))
+          .limit(10),
+        db
+          .select()
+          .from(jarvisAgentMessagesTable)
+          .orderBy(desc(jarvisAgentMessagesTable.createdAt))
+          .limit(25),
+      ]);
+
+      res.json({
+        runtime: agentRuntime.status(),
+        totals: {
+          workflows: workflows?.c ?? 0,
+          enabledWorkflows: enabledWorkflows?.c ?? 0,
+          routingRules: routingRules?.c ?? 0,
+          escalationChains: escalationChains?.c ?? 0,
+        },
+        runsByStatus,
+        delegationsByStatus,
+        commandsByStatus,
+        recentRuns,
+        recentDelegations,
+        recentCommands,
+        recentMessages,
+        generatedAt: Date.now(),
+      });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/orchestration/overview failed");
+      res.status(500).json({ error: "jarvis_orchestration_overview_failed" });
     }
   },
 );

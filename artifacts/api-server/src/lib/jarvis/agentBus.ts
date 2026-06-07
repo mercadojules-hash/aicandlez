@@ -17,7 +17,18 @@ export type AgentEventType =
   | "agent_error"
   | "agent_message"
   | "agent_escalation"
-  | "agent_log";
+  | "agent_log"
+  // ── Sprint 6 — orchestration events ───────────────────────────────────────
+  | "workflow_started"
+  | "workflow_step"
+  | "workflow_finished"
+  | "delegation_created"
+  | "delegation_executed"
+  | "command_received"
+  | "command_dispatched"
+  | "command_completed"
+  | "escalation_advanced"
+  | "routing_decision";
 
 export type AgentEventSeverity = "info" | "success" | "warn" | "error";
 
