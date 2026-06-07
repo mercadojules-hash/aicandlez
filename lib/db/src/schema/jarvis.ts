@@ -6,6 +6,7 @@ import {
   timestamp,
   jsonb,
   boolean,
+  integer,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
@@ -229,6 +230,92 @@ export const jarvisKnowledgeRelationshipsTable = pgTable("jarvis_knowledge_relat
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// ── Executive Intelligence Layer (Sprint 4) ──────────────────────────────────
+// Findings → Recommendations → Insights → Briefings. All `jarvis_`-prefixed and
+// isolated from the AICandlez surfaces. FKs use `onDelete: "set null"` so the
+// intelligence corpus survives registry edits.
+
+export const jarvisFindingsTable = pgTable("jarvis_findings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  title: varchar("title", { length: 200 }).notNull(),
+  summary: text("summary"),
+  detail: text("detail"),
+  category: varchar("category", { length: 64 }).notNull().default("general"),
+  severity: varchar("severity", { length: 16 }).notNull().default("medium"),
+  confidence: integer("confidence").notNull().default(50),
+  source: varchar("source", { length: 255 }),
+  businessId: uuid("business_id").references(() => jarvisBusinessesTable.id, {
+    onDelete: "set null",
+  }),
+  projectId: uuid("project_id").references(() => jarvisProjectsTable.id, {
+    onDelete: "set null",
+  }),
+  tags: jsonb("tags").$type<string[]>(),
+  status: varchar("status", { length: 32 }).notNull().default("open"),
+  createdBy: varchar("created_by", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const jarvisRecommendationsTable = pgTable("jarvis_recommendations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  title: varchar("title", { length: 200 }).notNull(),
+  rationale: text("rationale"),
+  action: text("action"),
+  priority: varchar("priority", { length: 16 }).notNull().default("medium"),
+  impact: varchar("impact", { length: 16 }).notNull().default("medium"),
+  effort: varchar("effort", { length: 16 }).notNull().default("medium"),
+  findingId: uuid("finding_id").references(() => jarvisFindingsTable.id, {
+    onDelete: "set null",
+  }),
+  businessId: uuid("business_id").references(() => jarvisBusinessesTable.id, {
+    onDelete: "set null",
+  }),
+  tags: jsonb("tags").$type<string[]>(),
+  status: varchar("status", { length: 32 }).notNull().default("proposed"),
+  createdBy: varchar("created_by", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const jarvisInsightsTable = pgTable("jarvis_insights", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  title: varchar("title", { length: 200 }).notNull(),
+  content: text("content"),
+  insightType: varchar("insight_type", { length: 32 }).notNull().default("trend"),
+  confidence: integer("confidence").notNull().default(50),
+  source: varchar("source", { length: 255 }),
+  findingId: uuid("finding_id").references(() => jarvisFindingsTable.id, {
+    onDelete: "set null",
+  }),
+  businessId: uuid("business_id").references(() => jarvisBusinessesTable.id, {
+    onDelete: "set null",
+  }),
+  tags: jsonb("tags").$type<string[]>(),
+  status: varchar("status", { length: 32 }).notNull().default("active"),
+  createdBy: varchar("created_by", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const jarvisBriefingsTable = pgTable("jarvis_briefings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  title: varchar("title", { length: 200 }).notNull(),
+  summary: text("summary"),
+  content: text("content"),
+  period: varchar("period", { length: 32 }).notNull().default("weekly"),
+  audience: varchar("audience", { length: 64 }).notNull().default("executive"),
+  businessId: uuid("business_id").references(() => jarvisBusinessesTable.id, {
+    onDelete: "set null",
+  }),
+  publishedAt: timestamp("published_at"),
+  tags: jsonb("tags").$type<string[]>(),
+  status: varchar("status", { length: 32 }).notNull().default("draft"),
+  createdBy: varchar("created_by", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export type JarvisBusiness = typeof jarvisBusinessesTable.$inferSelect;
 export type InsertJarvisBusiness = typeof jarvisBusinessesTable.$inferInsert;
 export type JarvisProject = typeof jarvisProjectsTable.$inferSelect;
@@ -260,3 +347,12 @@ export type JarvisKnowledgeRelationship =
   typeof jarvisKnowledgeRelationshipsTable.$inferSelect;
 export type InsertJarvisKnowledgeRelationship =
   typeof jarvisKnowledgeRelationshipsTable.$inferInsert;
+export type JarvisFinding = typeof jarvisFindingsTable.$inferSelect;
+export type InsertJarvisFinding = typeof jarvisFindingsTable.$inferInsert;
+export type JarvisRecommendation = typeof jarvisRecommendationsTable.$inferSelect;
+export type InsertJarvisRecommendation =
+  typeof jarvisRecommendationsTable.$inferInsert;
+export type JarvisInsight = typeof jarvisInsightsTable.$inferSelect;
+export type InsertJarvisInsight = typeof jarvisInsightsTable.$inferInsert;
+export type JarvisBriefing = typeof jarvisBriefingsTable.$inferSelect;
+export type InsertJarvisBriefing = typeof jarvisBriefingsTable.$inferInsert;

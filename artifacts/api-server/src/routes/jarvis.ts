@@ -36,6 +36,10 @@ import {
   jarvisKnowledgeAssetsTable,
   jarvisMemoriesTable,
   jarvisKnowledgeRelationshipsTable,
+  jarvisFindingsTable,
+  jarvisRecommendationsTable,
+  jarvisInsightsTable,
+  jarvisBriefingsTable,
 } from "@workspace/db";
 import { requireAuth, requireRole } from "../middlewares/requireAuth.js";
 
@@ -2541,6 +2545,786 @@ router.get(
     } catch (err) {
       req.log.error({ err }, "GET /jarvis/memory/overview failed");
       res.status(500).json({ error: "jarvis_memory_overview_failed" });
+    }
+  },
+);
+
+// ── Executive Intelligence Layer (Sprint 4) ──────────────────────────────────
+// Findings → Recommendations → Insights → Briefings + an intelligence overview.
+// Fully isolated under /api/jarvis/*; every mutation audited.
+
+async function findingExists(id: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: jarvisFindingsTable.id })
+    .from(jarvisFindingsTable)
+    .where(eq(jarvisFindingsTable.id, id))
+    .limit(1);
+  return Boolean(row);
+}
+
+const confidenceSchema = z.number().int().min(0).max(100);
+
+// ── findings ─────────────────────────────────────────────────────────────────
+
+const findingBodySchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  summary: z.string().trim().max(10000).optional().nullable(),
+  detail: z.string().trim().max(20000).optional().nullable(),
+  category: z.string().trim().min(1).max(64).optional(),
+  severity: z.string().trim().min(1).max(16).optional(),
+  confidence: confidenceSchema.optional(),
+  source: z.string().trim().max(255).optional().nullable(),
+  businessId: z.string().uuid().optional().nullable(),
+  projectId: z.string().uuid().optional().nullable(),
+  tags: tagsSchema.optional().nullable(),
+  status: statusSchema.optional(),
+});
+
+router.get(
+  "/jarvis/findings",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const rows = await db
+        .select()
+        .from(jarvisFindingsTable)
+        .orderBy(desc(jarvisFindingsTable.createdAt));
+      res.json({ findings: rows });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/findings failed");
+      res.status(500).json({ error: "jarvis_findings_read_failed" });
+    }
+  },
+);
+
+router.post(
+  "/jarvis/findings",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = findingBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_finding" });
+      return;
+    }
+    if (parsed.data.businessId && !(await businessExists(parsed.data.businessId))) {
+      res.status(400).json({ error: "unknown_business" });
+      return;
+    }
+    if (parsed.data.projectId && !(await projectExists(parsed.data.projectId))) {
+      res.status(400).json({ error: "unknown_project" });
+      return;
+    }
+    try {
+      const [row] = await db
+        .insert(jarvisFindingsTable)
+        .values({
+          title: parsed.data.title,
+          summary: parsed.data.summary ?? null,
+          detail: parsed.data.detail ?? null,
+          category: parsed.data.category ?? "general",
+          severity: parsed.data.severity ?? "medium",
+          confidence: parsed.data.confidence ?? 50,
+          source: parsed.data.source ?? null,
+          businessId: parsed.data.businessId ?? null,
+          projectId: parsed.data.projectId ?? null,
+          tags: parsed.data.tags ?? null,
+          status: parsed.data.status ?? "open",
+          createdBy: actor.email,
+        })
+        .returning();
+      await audit(req, actor, "create", "finding", row.id, { title: row.title });
+      res.status(201).json({ finding: row });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/findings failed");
+      res.status(500).json({ error: "jarvis_finding_create_failed" });
+    }
+  },
+);
+
+router.get(
+  "/jarvis/findings/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const [row] = await db
+        .select()
+        .from(jarvisFindingsTable)
+        .where(eq(jarvisFindingsTable.id, String(req.params.id)))
+        .limit(1);
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      res.json({ finding: row });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/findings/:id failed");
+      res.status(500).json({ error: "jarvis_finding_read_failed" });
+    }
+  },
+);
+
+router.put(
+  "/jarvis/findings/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = findingBodySchema.partial().safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_finding" });
+      return;
+    }
+    if (parsed.data.businessId && !(await businessExists(parsed.data.businessId))) {
+      res.status(400).json({ error: "unknown_business" });
+      return;
+    }
+    if (parsed.data.projectId && !(await projectExists(parsed.data.projectId))) {
+      res.status(400).json({ error: "unknown_project" });
+      return;
+    }
+    try {
+      const d = parsed.data;
+      const [row] = await db
+        .update(jarvisFindingsTable)
+        .set({
+          ...(d.title !== undefined ? { title: d.title } : {}),
+          ...(d.summary !== undefined ? { summary: d.summary ?? null } : {}),
+          ...(d.detail !== undefined ? { detail: d.detail ?? null } : {}),
+          ...(d.category !== undefined ? { category: d.category } : {}),
+          ...(d.severity !== undefined ? { severity: d.severity } : {}),
+          ...(d.confidence !== undefined ? { confidence: d.confidence } : {}),
+          ...(d.source !== undefined ? { source: d.source ?? null } : {}),
+          ...(d.businessId !== undefined ? { businessId: d.businessId ?? null } : {}),
+          ...(d.projectId !== undefined ? { projectId: d.projectId ?? null } : {}),
+          ...(d.tags !== undefined ? { tags: d.tags ?? null } : {}),
+          ...(d.status !== undefined ? { status: d.status } : {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(jarvisFindingsTable.id, String(req.params.id)))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await audit(req, actor, "update", "finding", row.id, { title: row.title });
+      res.json({ finding: row });
+    } catch (err) {
+      req.log.error({ err }, "PUT /jarvis/findings/:id failed");
+      res.status(500).json({ error: "jarvis_finding_update_failed" });
+    }
+  },
+);
+
+router.delete(
+  "/jarvis/findings/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    try {
+      const [row] = await db
+        .delete(jarvisFindingsTable)
+        .where(eq(jarvisFindingsTable.id, String(req.params.id)))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await audit(req, actor, "delete", "finding", row.id, { title: row.title });
+      res.json({ ok: true, id: row.id });
+    } catch (err) {
+      req.log.error({ err }, "DELETE /jarvis/findings/:id failed");
+      res.status(500).json({ error: "jarvis_finding_delete_failed" });
+    }
+  },
+);
+
+// ── recommendations ──────────────────────────────────────────────────────────
+
+const recommendationBodySchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  rationale: z.string().trim().max(20000).optional().nullable(),
+  action: z.string().trim().max(20000).optional().nullable(),
+  priority: z.string().trim().min(1).max(16).optional(),
+  impact: z.string().trim().min(1).max(16).optional(),
+  effort: z.string().trim().min(1).max(16).optional(),
+  findingId: z.string().uuid().optional().nullable(),
+  businessId: z.string().uuid().optional().nullable(),
+  tags: tagsSchema.optional().nullable(),
+  status: statusSchema.optional(),
+});
+
+router.get(
+  "/jarvis/recommendations",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const rows = await db
+        .select()
+        .from(jarvisRecommendationsTable)
+        .orderBy(desc(jarvisRecommendationsTable.createdAt));
+      res.json({ recommendations: rows });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/recommendations failed");
+      res.status(500).json({ error: "jarvis_recommendations_read_failed" });
+    }
+  },
+);
+
+router.post(
+  "/jarvis/recommendations",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = recommendationBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_recommendation" });
+      return;
+    }
+    if (parsed.data.findingId && !(await findingExists(parsed.data.findingId))) {
+      res.status(400).json({ error: "unknown_finding" });
+      return;
+    }
+    if (parsed.data.businessId && !(await businessExists(parsed.data.businessId))) {
+      res.status(400).json({ error: "unknown_business" });
+      return;
+    }
+    try {
+      const [row] = await db
+        .insert(jarvisRecommendationsTable)
+        .values({
+          title: parsed.data.title,
+          rationale: parsed.data.rationale ?? null,
+          action: parsed.data.action ?? null,
+          priority: parsed.data.priority ?? "medium",
+          impact: parsed.data.impact ?? "medium",
+          effort: parsed.data.effort ?? "medium",
+          findingId: parsed.data.findingId ?? null,
+          businessId: parsed.data.businessId ?? null,
+          tags: parsed.data.tags ?? null,
+          status: parsed.data.status ?? "proposed",
+          createdBy: actor.email,
+        })
+        .returning();
+      await audit(req, actor, "create", "recommendation", row.id, {
+        title: row.title,
+      });
+      res.status(201).json({ recommendation: row });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/recommendations failed");
+      res.status(500).json({ error: "jarvis_recommendation_create_failed" });
+    }
+  },
+);
+
+router.get(
+  "/jarvis/recommendations/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const [row] = await db
+        .select()
+        .from(jarvisRecommendationsTable)
+        .where(eq(jarvisRecommendationsTable.id, String(req.params.id)))
+        .limit(1);
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      res.json({ recommendation: row });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/recommendations/:id failed");
+      res.status(500).json({ error: "jarvis_recommendation_read_failed" });
+    }
+  },
+);
+
+router.put(
+  "/jarvis/recommendations/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = recommendationBodySchema.partial().safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_recommendation" });
+      return;
+    }
+    if (parsed.data.findingId && !(await findingExists(parsed.data.findingId))) {
+      res.status(400).json({ error: "unknown_finding" });
+      return;
+    }
+    if (parsed.data.businessId && !(await businessExists(parsed.data.businessId))) {
+      res.status(400).json({ error: "unknown_business" });
+      return;
+    }
+    try {
+      const d = parsed.data;
+      const [row] = await db
+        .update(jarvisRecommendationsTable)
+        .set({
+          ...(d.title !== undefined ? { title: d.title } : {}),
+          ...(d.rationale !== undefined ? { rationale: d.rationale ?? null } : {}),
+          ...(d.action !== undefined ? { action: d.action ?? null } : {}),
+          ...(d.priority !== undefined ? { priority: d.priority } : {}),
+          ...(d.impact !== undefined ? { impact: d.impact } : {}),
+          ...(d.effort !== undefined ? { effort: d.effort } : {}),
+          ...(d.findingId !== undefined ? { findingId: d.findingId ?? null } : {}),
+          ...(d.businessId !== undefined ? { businessId: d.businessId ?? null } : {}),
+          ...(d.tags !== undefined ? { tags: d.tags ?? null } : {}),
+          ...(d.status !== undefined ? { status: d.status } : {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(jarvisRecommendationsTable.id, String(req.params.id)))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await audit(req, actor, "update", "recommendation", row.id, {
+        title: row.title,
+      });
+      res.json({ recommendation: row });
+    } catch (err) {
+      req.log.error({ err }, "PUT /jarvis/recommendations/:id failed");
+      res.status(500).json({ error: "jarvis_recommendation_update_failed" });
+    }
+  },
+);
+
+router.delete(
+  "/jarvis/recommendations/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    try {
+      const [row] = await db
+        .delete(jarvisRecommendationsTable)
+        .where(eq(jarvisRecommendationsTable.id, String(req.params.id)))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await audit(req, actor, "delete", "recommendation", row.id, {
+        title: row.title,
+      });
+      res.json({ ok: true, id: row.id });
+    } catch (err) {
+      req.log.error({ err }, "DELETE /jarvis/recommendations/:id failed");
+      res.status(500).json({ error: "jarvis_recommendation_delete_failed" });
+    }
+  },
+);
+
+// ── insights ─────────────────────────────────────────────────────────────────
+
+const insightBodySchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  content: z.string().trim().max(20000).optional().nullable(),
+  insightType: z.string().trim().min(1).max(32).optional(),
+  confidence: confidenceSchema.optional(),
+  source: z.string().trim().max(255).optional().nullable(),
+  findingId: z.string().uuid().optional().nullable(),
+  businessId: z.string().uuid().optional().nullable(),
+  tags: tagsSchema.optional().nullable(),
+  status: statusSchema.optional(),
+});
+
+router.get(
+  "/jarvis/insights",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const rows = await db
+        .select()
+        .from(jarvisInsightsTable)
+        .orderBy(desc(jarvisInsightsTable.createdAt));
+      res.json({ insights: rows });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/insights failed");
+      res.status(500).json({ error: "jarvis_insights_read_failed" });
+    }
+  },
+);
+
+router.post(
+  "/jarvis/insights",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = insightBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_insight" });
+      return;
+    }
+    if (parsed.data.findingId && !(await findingExists(parsed.data.findingId))) {
+      res.status(400).json({ error: "unknown_finding" });
+      return;
+    }
+    if (parsed.data.businessId && !(await businessExists(parsed.data.businessId))) {
+      res.status(400).json({ error: "unknown_business" });
+      return;
+    }
+    try {
+      const [row] = await db
+        .insert(jarvisInsightsTable)
+        .values({
+          title: parsed.data.title,
+          content: parsed.data.content ?? null,
+          insightType: parsed.data.insightType ?? "trend",
+          confidence: parsed.data.confidence ?? 50,
+          source: parsed.data.source ?? null,
+          findingId: parsed.data.findingId ?? null,
+          businessId: parsed.data.businessId ?? null,
+          tags: parsed.data.tags ?? null,
+          status: parsed.data.status ?? "active",
+          createdBy: actor.email,
+        })
+        .returning();
+      await audit(req, actor, "create", "insight", row.id, { title: row.title });
+      res.status(201).json({ insight: row });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/insights failed");
+      res.status(500).json({ error: "jarvis_insight_create_failed" });
+    }
+  },
+);
+
+router.get(
+  "/jarvis/insights/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const [row] = await db
+        .select()
+        .from(jarvisInsightsTable)
+        .where(eq(jarvisInsightsTable.id, String(req.params.id)))
+        .limit(1);
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      res.json({ insight: row });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/insights/:id failed");
+      res.status(500).json({ error: "jarvis_insight_read_failed" });
+    }
+  },
+);
+
+router.put(
+  "/jarvis/insights/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = insightBodySchema.partial().safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_insight" });
+      return;
+    }
+    if (parsed.data.findingId && !(await findingExists(parsed.data.findingId))) {
+      res.status(400).json({ error: "unknown_finding" });
+      return;
+    }
+    if (parsed.data.businessId && !(await businessExists(parsed.data.businessId))) {
+      res.status(400).json({ error: "unknown_business" });
+      return;
+    }
+    try {
+      const d = parsed.data;
+      const [row] = await db
+        .update(jarvisInsightsTable)
+        .set({
+          ...(d.title !== undefined ? { title: d.title } : {}),
+          ...(d.content !== undefined ? { content: d.content ?? null } : {}),
+          ...(d.insightType !== undefined ? { insightType: d.insightType } : {}),
+          ...(d.confidence !== undefined ? { confidence: d.confidence } : {}),
+          ...(d.source !== undefined ? { source: d.source ?? null } : {}),
+          ...(d.findingId !== undefined ? { findingId: d.findingId ?? null } : {}),
+          ...(d.businessId !== undefined ? { businessId: d.businessId ?? null } : {}),
+          ...(d.tags !== undefined ? { tags: d.tags ?? null } : {}),
+          ...(d.status !== undefined ? { status: d.status } : {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(jarvisInsightsTable.id, String(req.params.id)))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await audit(req, actor, "update", "insight", row.id, { title: row.title });
+      res.json({ insight: row });
+    } catch (err) {
+      req.log.error({ err }, "PUT /jarvis/insights/:id failed");
+      res.status(500).json({ error: "jarvis_insight_update_failed" });
+    }
+  },
+);
+
+router.delete(
+  "/jarvis/insights/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    try {
+      const [row] = await db
+        .delete(jarvisInsightsTable)
+        .where(eq(jarvisInsightsTable.id, String(req.params.id)))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await audit(req, actor, "delete", "insight", row.id, { title: row.title });
+      res.json({ ok: true, id: row.id });
+    } catch (err) {
+      req.log.error({ err }, "DELETE /jarvis/insights/:id failed");
+      res.status(500).json({ error: "jarvis_insight_delete_failed" });
+    }
+  },
+);
+
+// ── briefings ────────────────────────────────────────────────────────────────
+
+const briefingBodySchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  summary: z.string().trim().max(20000).optional().nullable(),
+  content: z.string().trim().max(50000).optional().nullable(),
+  period: z.string().trim().min(1).max(32).optional(),
+  audience: z.string().trim().min(1).max(64).optional(),
+  businessId: z.string().uuid().optional().nullable(),
+  tags: tagsSchema.optional().nullable(),
+  status: statusSchema.optional(),
+});
+
+router.get(
+  "/jarvis/briefings",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const rows = await db
+        .select()
+        .from(jarvisBriefingsTable)
+        .orderBy(desc(jarvisBriefingsTable.createdAt));
+      res.json({ briefings: rows });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/briefings failed");
+      res.status(500).json({ error: "jarvis_briefings_read_failed" });
+    }
+  },
+);
+
+router.post(
+  "/jarvis/briefings",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = briefingBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_briefing" });
+      return;
+    }
+    if (parsed.data.businessId && !(await businessExists(parsed.data.businessId))) {
+      res.status(400).json({ error: "unknown_business" });
+      return;
+    }
+    try {
+      const status = parsed.data.status ?? "draft";
+      const [row] = await db
+        .insert(jarvisBriefingsTable)
+        .values({
+          title: parsed.data.title,
+          summary: parsed.data.summary ?? null,
+          content: parsed.data.content ?? null,
+          period: parsed.data.period ?? "weekly",
+          audience: parsed.data.audience ?? "executive",
+          businessId: parsed.data.businessId ?? null,
+          publishedAt: status === "published" ? new Date() : null,
+          tags: parsed.data.tags ?? null,
+          status,
+          createdBy: actor.email,
+        })
+        .returning();
+      await audit(req, actor, "create", "briefing", row.id, { title: row.title });
+      res.status(201).json({ briefing: row });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/briefings failed");
+      res.status(500).json({ error: "jarvis_briefing_create_failed" });
+    }
+  },
+);
+
+router.get(
+  "/jarvis/briefings/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const [row] = await db
+        .select()
+        .from(jarvisBriefingsTable)
+        .where(eq(jarvisBriefingsTable.id, String(req.params.id)))
+        .limit(1);
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      res.json({ briefing: row });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/briefings/:id failed");
+      res.status(500).json({ error: "jarvis_briefing_read_failed" });
+    }
+  },
+);
+
+router.put(
+  "/jarvis/briefings/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = briefingBodySchema.partial().safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_briefing" });
+      return;
+    }
+    if (parsed.data.businessId && !(await businessExists(parsed.data.businessId))) {
+      res.status(400).json({ error: "unknown_business" });
+      return;
+    }
+    try {
+      const d = parsed.data;
+      // Stamp publishedAt the first time a briefing transitions to "published".
+      const [existing] = await db
+        .select({
+          status: jarvisBriefingsTable.status,
+          publishedAt: jarvisBriefingsTable.publishedAt,
+        })
+        .from(jarvisBriefingsTable)
+        .where(eq(jarvisBriefingsTable.id, String(req.params.id)))
+        .limit(1);
+      if (!existing) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      let publishedAtPatch: Record<string, Date | null> = {};
+      if (d.status !== undefined) {
+        if (d.status === "published" && !existing.publishedAt) {
+          publishedAtPatch = { publishedAt: new Date() };
+        } else if (d.status !== "published") {
+          publishedAtPatch = { publishedAt: null };
+        }
+      }
+      const [row] = await db
+        .update(jarvisBriefingsTable)
+        .set({
+          ...(d.title !== undefined ? { title: d.title } : {}),
+          ...(d.summary !== undefined ? { summary: d.summary ?? null } : {}),
+          ...(d.content !== undefined ? { content: d.content ?? null } : {}),
+          ...(d.period !== undefined ? { period: d.period } : {}),
+          ...(d.audience !== undefined ? { audience: d.audience } : {}),
+          ...(d.businessId !== undefined ? { businessId: d.businessId ?? null } : {}),
+          ...(d.tags !== undefined ? { tags: d.tags ?? null } : {}),
+          ...(d.status !== undefined ? { status: d.status } : {}),
+          ...publishedAtPatch,
+          updatedAt: new Date(),
+        })
+        .where(eq(jarvisBriefingsTable.id, String(req.params.id)))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await audit(req, actor, "update", "briefing", row.id, { title: row.title });
+      res.json({ briefing: row });
+    } catch (err) {
+      req.log.error({ err }, "PUT /jarvis/briefings/:id failed");
+      res.status(500).json({ error: "jarvis_briefing_update_failed" });
+    }
+  },
+);
+
+router.delete(
+  "/jarvis/briefings/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    try {
+      const [row] = await db
+        .delete(jarvisBriefingsTable)
+        .where(eq(jarvisBriefingsTable.id, String(req.params.id)))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await audit(req, actor, "delete", "briefing", row.id, { title: row.title });
+      res.json({ ok: true, id: row.id });
+    } catch (err) {
+      req.log.error({ err }, "DELETE /jarvis/briefings/:id failed");
+      res.status(500).json({ error: "jarvis_briefing_delete_failed" });
+    }
+  },
+);
+
+// ── intelligence overview ────────────────────────────────────────────────────
+
+router.get(
+  "/jarvis/intelligence/overview",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const [findings, recommendations, insights, briefings] = await Promise.all([
+        db
+          .select()
+          .from(jarvisFindingsTable)
+          .orderBy(desc(jarvisFindingsTable.createdAt)),
+        db
+          .select()
+          .from(jarvisRecommendationsTable)
+          .orderBy(desc(jarvisRecommendationsTable.createdAt)),
+        db
+          .select()
+          .from(jarvisInsightsTable)
+          .orderBy(desc(jarvisInsightsTable.createdAt)),
+        db
+          .select()
+          .from(jarvisBriefingsTable)
+          .orderBy(desc(jarvisBriefingsTable.createdAt)),
+      ]);
+      res.json({
+        counts: {
+          findings: findings.length,
+          recommendations: recommendations.length,
+          insights: insights.length,
+          briefings: briefings.length,
+          openFindings: findings.filter(
+            (f) => f.status !== "resolved" && f.status !== "dismissed",
+          ).length,
+          pendingRecommendations: recommendations.filter(
+            (r) => r.status === "proposed",
+          ).length,
+        },
+        findings: {
+          bySeverity: tallyBy(findings, (f) => f.severity),
+          byStatus: tallyBy(findings, (f) => f.status),
+        },
+        recommendations: {
+          byPriority: tallyBy(recommendations, (r) => r.priority),
+          byStatus: tallyBy(recommendations, (r) => r.status),
+        },
+        insights: {
+          byType: tallyBy(insights, (i) => i.insightType),
+        },
+        briefings: {
+          byStatus: tallyBy(briefings, (b) => b.status),
+        },
+        recentFindings: findings.slice(0, 8),
+        recentRecommendations: recommendations.slice(0, 8),
+        recentInsights: insights.slice(0, 8),
+        recentBriefings: briefings.slice(0, 8),
+        generatedAt: Date.now(),
+      });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/intelligence/overview failed");
+      res.status(500).json({ error: "jarvis_intelligence_overview_failed" });
     }
   },
 );

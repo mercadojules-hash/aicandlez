@@ -32,6 +32,11 @@ import Categories from "@/pages/Categories";
 import Relationships from "@/pages/Relationships";
 import Search from "@/pages/Search";
 import Navigation from "@/pages/Navigation";
+import IntelligenceDashboard from "@/pages/IntelligenceDashboard";
+import Findings from "@/pages/Findings";
+import Recommendations from "@/pages/Recommendations";
+import Insights from "@/pages/Insights";
+import Briefings from "@/pages/Briefings";
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
 const basePath = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
@@ -187,6 +192,31 @@ function AppRoutes() {
       <Route path="/approvals">
         <Protected>
           <Approvals />
+        </Protected>
+      </Route>
+      <Route path="/intelligence">
+        <Protected>
+          <IntelligenceDashboard />
+        </Protected>
+      </Route>
+      <Route path="/findings">
+        <Protected>
+          <Findings />
+        </Protected>
+      </Route>
+      <Route path="/recommendations">
+        <Protected>
+          <Recommendations />
+        </Protected>
+      </Route>
+      <Route path="/insights">
+        <Protected>
+          <Insights />
+        </Protected>
+      </Route>
+      <Route path="/briefings">
+        <Protected>
+          <Briefings />
         </Protected>
       </Route>
       <Route path="/memory">

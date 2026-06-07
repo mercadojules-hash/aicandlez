@@ -193,6 +193,11 @@ export const jarvisKeys = {
   search: ["jarvis", "search"] as const,
   knowledgeGraph: ["jarvis", "knowledge-graph"] as const,
   memoryOverview: ["jarvis", "memory-overview"] as const,
+  findings: ["jarvis", "findings"] as const,
+  recommendations: ["jarvis", "recommendations"] as const,
+  insights: ["jarvis", "insights"] as const,
+  briefings: ["jarvis", "briefings"] as const,
+  intelligenceOverview: ["jarvis", "intelligence-overview"] as const,
 };
 
 // ── dashboard ────────────────────────────────────────────────────────────────
@@ -1040,6 +1045,338 @@ export function useMemoryOverview(): UseQueryResult<JarvisMemoryOverview> {
   return useQuery({
     queryKey: jarvisKeys.memoryOverview,
     queryFn: () => authFetchJson<JarvisMemoryOverview>(`${API}/memory/overview`),
+    refetchInterval: 15000,
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sprint 4 — executive intelligence layer
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface JarvisFinding {
+  id: string;
+  title: string;
+  summary: string | null;
+  detail: string | null;
+  category: string;
+  severity: string;
+  confidence: number;
+  source: string | null;
+  businessId: string | null;
+  projectId: string | null;
+  tags: string[] | null;
+  status: string;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JarvisRecommendation {
+  id: string;
+  title: string;
+  rationale: string | null;
+  action: string | null;
+  priority: string;
+  impact: string;
+  effort: string;
+  findingId: string | null;
+  businessId: string | null;
+  tags: string[] | null;
+  status: string;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JarvisInsight {
+  id: string;
+  title: string;
+  content: string | null;
+  insightType: string;
+  confidence: number;
+  source: string | null;
+  findingId: string | null;
+  businessId: string | null;
+  tags: string[] | null;
+  status: string;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JarvisBriefing {
+  id: string;
+  title: string;
+  summary: string | null;
+  content: string | null;
+  period: string;
+  audience: string;
+  businessId: string | null;
+  publishedAt: string | null;
+  tags: string[] | null;
+  status: string;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ── findings ─────────────────────────────────────────────────────────────────
+
+export interface FindingInput {
+  title: string;
+  summary?: string | null;
+  detail?: string | null;
+  category?: string;
+  severity?: string;
+  confidence?: number;
+  source?: string | null;
+  businessId?: string | null;
+  projectId?: string | null;
+  tags?: string[] | null;
+  status?: string;
+}
+
+export const useFindings = makeListHook<JarvisFinding>({
+  path: "findings",
+  listKey: jarvisKeys.findings,
+  listField: "findings",
+  itemField: "finding",
+});
+
+export function useCreateFinding() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (input: FindingInput) =>
+      authFetchJson<{ finding: JarvisFinding }>(`${API}/findings`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateFinding() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: ({ id, ...input }: FindingInput & { id: string }) =>
+      authFetchJson<{ finding: JarvisFinding }>(`${API}/findings/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteFinding() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (id: string) =>
+      authFetchJson<{ ok: boolean }>(`${API}/findings/${id}`, { method: "DELETE" }),
+    onSuccess: invalidate,
+  });
+}
+
+// ── recommendations ──────────────────────────────────────────────────────────
+
+export interface RecommendationInput {
+  title: string;
+  rationale?: string | null;
+  action?: string | null;
+  priority?: string;
+  impact?: string;
+  effort?: string;
+  findingId?: string | null;
+  businessId?: string | null;
+  tags?: string[] | null;
+  status?: string;
+}
+
+export const useRecommendations = makeListHook<JarvisRecommendation>({
+  path: "recommendations",
+  listKey: jarvisKeys.recommendations,
+  listField: "recommendations",
+  itemField: "recommendation",
+});
+
+export function useCreateRecommendation() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (input: RecommendationInput) =>
+      authFetchJson<{ recommendation: JarvisRecommendation }>(
+        `${API}/recommendations`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateRecommendation() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: ({ id, ...input }: RecommendationInput & { id: string }) =>
+      authFetchJson<{ recommendation: JarvisRecommendation }>(
+        `${API}/recommendations/${id}`,
+        { method: "PUT", body: JSON.stringify(input) },
+      ),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteRecommendation() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (id: string) =>
+      authFetchJson<{ ok: boolean }>(`${API}/recommendations/${id}`, {
+        method: "DELETE",
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+// ── insights ─────────────────────────────────────────────────────────────────
+
+export interface InsightInput {
+  title: string;
+  content?: string | null;
+  insightType?: string;
+  confidence?: number;
+  source?: string | null;
+  findingId?: string | null;
+  businessId?: string | null;
+  tags?: string[] | null;
+  status?: string;
+}
+
+export const useInsights = makeListHook<JarvisInsight>({
+  path: "insights",
+  listKey: jarvisKeys.insights,
+  listField: "insights",
+  itemField: "insight",
+});
+
+export function useCreateInsight() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (input: InsightInput) =>
+      authFetchJson<{ insight: JarvisInsight }>(`${API}/insights`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateInsight() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: ({ id, ...input }: InsightInput & { id: string }) =>
+      authFetchJson<{ insight: JarvisInsight }>(`${API}/insights/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteInsight() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (id: string) =>
+      authFetchJson<{ ok: boolean }>(`${API}/insights/${id}`, { method: "DELETE" }),
+    onSuccess: invalidate,
+  });
+}
+
+// ── briefings ────────────────────────────────────────────────────────────────
+
+export interface BriefingInput {
+  title: string;
+  summary?: string | null;
+  content?: string | null;
+  period?: string;
+  audience?: string;
+  businessId?: string | null;
+  tags?: string[] | null;
+  status?: string;
+}
+
+export const useBriefings = makeListHook<JarvisBriefing>({
+  path: "briefings",
+  listKey: jarvisKeys.briefings,
+  listField: "briefings",
+  itemField: "briefing",
+});
+
+export function useCreateBriefing() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (input: BriefingInput) =>
+      authFetchJson<{ briefing: JarvisBriefing }>(`${API}/briefings`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateBriefing() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: ({ id, ...input }: BriefingInput & { id: string }) =>
+      authFetchJson<{ briefing: JarvisBriefing }>(`${API}/briefings/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteBriefing() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (id: string) =>
+      authFetchJson<{ ok: boolean }>(`${API}/briefings/${id}`, { method: "DELETE" }),
+    onSuccess: invalidate,
+  });
+}
+
+// ── intelligence dashboard (overview) ────────────────────────────────────────
+
+export interface JarvisIntelligenceOverview {
+  counts: {
+    findings: number;
+    recommendations: number;
+    insights: number;
+    briefings: number;
+    openFindings: number;
+    pendingRecommendations: number;
+  };
+  findings: {
+    bySeverity: Record<string, number>;
+    byStatus: Record<string, number>;
+  };
+  recommendations: {
+    byPriority: Record<string, number>;
+    byStatus: Record<string, number>;
+  };
+  insights: {
+    byType: Record<string, number>;
+  };
+  briefings: {
+    byStatus: Record<string, number>;
+  };
+  recentFindings: JarvisFinding[];
+  recentRecommendations: JarvisRecommendation[];
+  recentInsights: JarvisInsight[];
+  recentBriefings: JarvisBriefing[];
+  generatedAt: number;
+}
+
+export function useIntelligenceOverview(): UseQueryResult<JarvisIntelligenceOverview> {
+  return useQuery({
+    queryKey: jarvisKeys.intelligenceOverview,
+    queryFn: () =>
+      authFetchJson<JarvisIntelligenceOverview>(`${API}/intelligence/overview`),
     refetchInterval: 15000,
   });
 }

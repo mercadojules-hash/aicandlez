@@ -21,6 +21,10 @@ import {
   Network,
   Search as SearchIcon,
   Compass,
+  Lightbulb,
+  Sparkles,
+  FileText,
+  Telescope,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -41,6 +45,11 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Decisions", path: "/decisions", icon: GitBranch },
   { label: "Escalations", path: "/escalations", icon: AlertTriangle },
   { label: "Approvals", path: "/approvals", icon: CheckSquare },
+  { label: "Intelligence", path: "/intelligence", icon: Telescope },
+  { label: "Findings", path: "/findings", icon: SearchIcon },
+  { label: "Recommendations", path: "/recommendations", icon: Lightbulb },
+  { label: "Insights", path: "/insights", icon: Sparkles },
+  { label: "Briefings", path: "/briefings", icon: FileText },
   { label: "Memory", path: "/memory", icon: Gauge },
   { label: "Executive Memory", path: "/memories", icon: Brain },
   { label: "Knowledge", path: "/knowledge", icon: BookOpen },
