@@ -7,6 +7,9 @@ import {
   jsonb,
   boolean,
   integer,
+  index,
+  uniqueIndex,
+  vector,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
@@ -840,3 +843,52 @@ export const jarvisCognitionRunsTable = pgTable("jarvis_cognition_runs", {
 export type JarvisCognitionRun = typeof jarvisCognitionRunsTable.$inferSelect;
 export type InsertJarvisCognitionRun =
   typeof jarvisCognitionRunsTable.$inferInsert;
+
+// ── Semantic Retrieval (Sprint 9) ────────────────────────────────────────────
+// `jarvis_embeddings` is a DERIVED READ INDEX maintained by the deterministic
+// control plane (indexer/backfill) — NOT corpus data and NOT a cognition
+// effector. The managed AI proxy only COMPUTES the vector; this row is written
+// by deterministic code and never alters any source `jarvis_` row. Upsert-only,
+// keyed by (subjectType, subjectId, model) + a contentHash so unchanged rows are
+// skipped (honors the no-delete invariant: re-embed UPDATES in place). businessId
+// + createdBy are denormalized so personalized/org-scoped semantic pre-filtering
+// never joins back to the source row. Locked S9 model: OpenAI
+// text-embedding-3-small (1536 dims), cosine distance, HNSW ANN index.
+// Spec: `.local/docs/jarvis-semantic-retrieval-architecture.md` §2.
+export const JARVIS_EMBEDDING_DIMS = 1536;
+
+export const jarvisEmbeddingsTable = pgTable(
+  "jarvis_embeddings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    subjectType: varchar("subject_type", { length: 64 }).notNull(),
+    subjectId: uuid("subject_id").notNull(),
+    model: varchar("model", { length: 120 }).notNull(),
+    dims: integer("dims").notNull().default(JARVIS_EMBEDDING_DIMS),
+    embedding: vector("embedding", { dimensions: JARVIS_EMBEDDING_DIMS }).notNull(),
+    contentHash: varchar("content_hash", { length: 64 }).notNull(),
+    businessId: uuid("business_id").references(() => jarvisBusinessesTable.id, {
+      onDelete: "set null",
+    }),
+    createdBy: varchar("created_by", { length: 255 }),
+    status: varchar("status", { length: 32 }).notNull().default("active"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("jarvis_embeddings_subject_model_uq").on(
+      table.subjectType,
+      table.subjectId,
+      table.model,
+    ),
+    index("jarvis_embeddings_business_idx").on(table.businessId),
+    index("jarvis_embeddings_created_by_idx").on(table.createdBy),
+    index("jarvis_embeddings_hnsw_idx").using(
+      "hnsw",
+      table.embedding.op("vector_cosine_ops"),
+    ),
+  ],
+);
+
+export type JarvisEmbedding = typeof jarvisEmbeddingsTable.$inferSelect;
+export type InsertJarvisEmbedding = typeof jarvisEmbeddingsTable.$inferInsert;
