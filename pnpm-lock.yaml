@@ -383,6 +383,9 @@ importers:
 
   artifacts/api-server:
     dependencies:
+      '@anthropic-ai/sdk':
+        specifier: ^0.78.0
+        version: 0.78.0(zod@3.25.76)
       '@clerk/backend':
         specifier: ^3.4.7
         version: 3.4.11

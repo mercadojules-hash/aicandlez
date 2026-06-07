@@ -1,15 +1,19 @@
 /**
  * Jarvis GitHub read-only awareness client.
  *
- * Uses the Replit GitHub connector (integration: github) via the
- * @replit/connectors-sdk proxy. The SDK handles identity, OAuth token refresh,
- * and auth headers automatically — never cache the client or its tokens.
+ * SOVEREIGNTY: prefers a DIRECT GitHub REST call using a self-owned token
+ * (GITHUB_TOKEN || GITHUB_PAT) so Jarvis can stay repo-aware WITHOUT Replit as
+ * the broker. Only when no direct token is configured does it fall back to the
+ * Replit GitHub connector (integration: github) via the @replit/connectors-sdk
+ * proxy (which handles identity / OAuth refresh / headers — never cache it).
  *
  * READ-ONLY: every call here is a GET. Jarvis NEVER writes to a remote repo.
  * All helpers fail soft (return null / throw a tagged error) so a transient
  * GitHub outage degrades to a dash in the UI, never a crash.
  */
 import { ReplitConnectors } from "@replit/connectors-sdk";
+
+const GITHUB_API_BASE = "https://api.github.com";
 
 export interface RepoAwareness {
   defaultBranch: string | null;
@@ -40,7 +44,29 @@ export function parseRepoFullName(
   return { owner, repo };
 }
 
+/** Read-only GET. Prefers a direct token; falls back to the Replit connector. */
 async function ghGet(path: string): Promise<unknown> {
+  const token =
+    process.env.GITHUB_TOKEN?.trim() || process.env.GITHUB_PAT?.trim();
+
+  if (token) {
+    // Direct, self-grounded path — strictly a GET to api.github.com.
+    const response = await fetch(`${GITHUB_API_BASE}${path}`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "aicandlez-jarvis",
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`github_${response.status}`);
+    }
+    return response.json();
+  }
+
+  // Fallback: Replit GitHub connector proxy (also GET-only).
   const connectors = new ReplitConnectors();
   const response = await connectors.proxy("github", path, { method: "GET" });
   if (!response.ok) {
