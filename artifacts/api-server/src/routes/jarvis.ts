@@ -54,6 +54,9 @@ import {
   jarvisAgentTrustTable,
   jarvisBudgetsTable,
   jarvisCognitionRunsTable,
+  jarvisBrandProfilesTable,
+  jarvisCreativeCampaignsTable,
+  jarvisCreativeAssetsTable,
   // ── AICandlez live integration (READ-ONLY) ─────────────────────────────────
   // These trading tables are imported for a strictly read-only, live-only
   // (exchange IS NOT NULL) aggregate feed surfaced inside Jarvis. Jarvis NEVER
@@ -103,6 +106,11 @@ import {
 import { evaluateGovernance } from "../lib/jarvis/governance/index.js";
 import { synthesizeBriefing } from "../lib/jarvis/cognition/briefingCognition.js";
 import { publishBriefing } from "../lib/jarvis/cognition/publishGate.js";
+import { generateCampaign } from "../lib/jarvis/creative/prometheus.js";
+import { publishCreativeAsset } from "../lib/jarvis/creative/publishGate.js";
+import { loadBrandProfile } from "../lib/jarvis/creative/brandContext.js";
+import { seedCreativeDivision } from "../lib/jarvis/creative/seed.js";
+import { MEDIA_PROVIDER_STATUS } from "../lib/jarvis/creative/provider.js";
 import {
   checkCognitionBudget,
   runIndexerPass,
@@ -4556,6 +4564,246 @@ router.post(
     } catch (err) {
       req.log.error({ err }, "POST /jarvis/briefings/:id/publish failed");
       res.status(500).json({ error: "jarvis_briefing_publish_failed" });
+    }
+  },
+);
+
+// ── Creative Intelligence Division (advisory-only) ───────────────────────────
+// Prometheus drafts marketing campaigns grounded on the Business Registry,
+// per-business Brand Profile, and Executive Memory. ADVISORY-ONLY: drafts only,
+// never published and never auto-posted. PUBLISH is the governed action (mirrors
+// the briefing gate); weak/ungrounded drafts require human approval and stay
+// visible. Admin-gated + reuses the same global cognition toggle.
+
+const generateCampaignSchema = z.object({
+  businessId: z.string().uuid(),
+  query: z.string().trim().min(1).max(2000),
+  objective: z.string().trim().max(2000).optional().nullable(),
+  channel: z.string().trim().max(64).optional().nullable(),
+  audience: z.string().trim().max(2000).optional().nullable(),
+  durationDays: z.number().int().min(1).max(365).optional().nullable(),
+  instructions: z.string().trim().max(4000).optional().nullable(),
+  executiveUserId: z.string().uuid().optional().nullable(),
+});
+
+router.post(
+  "/jarvis/creative/prometheus/campaign",
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = generateCampaignSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_campaign_request" });
+      return;
+    }
+    if (!(await isCognitionEnabled())) {
+      res.status(409).json({ error: "cognition_disabled" });
+      return;
+    }
+    if (!(await businessExists(parsed.data.businessId))) {
+      res.status(400).json({ error: "unknown_business" });
+      return;
+    }
+    try {
+      const result = await generateCampaign({
+        businessId: parsed.data.businessId,
+        query: parsed.data.query,
+        objective: parsed.data.objective ?? null,
+        channel: parsed.data.channel ?? null,
+        audience: parsed.data.audience ?? null,
+        durationDays: parsed.data.durationDays ?? null,
+        instructions: parsed.data.instructions ?? null,
+        createdBy: actor.email ?? actor.userId,
+        executiveUserId: parsed.data.executiveUserId ?? null,
+      });
+      if (result.ok && result.campaign) {
+        await audit(req, actor, "create", "creative_campaign", result.campaign.id, {
+          name: result.campaign.name,
+          sourceMode: "cognition",
+          runId: result.runId,
+          groundingScore: result.groundingScore,
+          assets: result.assets.length,
+        });
+      }
+      res.status(result.ok ? 201 : 200).json({
+        ok: result.ok,
+        status: result.status,
+        campaign: result.campaign,
+        assets: result.assets,
+        runId: result.runId,
+        groundingScore: result.groundingScore,
+        citations: result.citations,
+        reason: result.reason,
+      });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/creative/prometheus/campaign failed");
+      res.status(500).json({ error: "jarvis_creative_campaign_failed" });
+    }
+  },
+);
+
+router.get(
+  "/jarvis/creative/campaigns",
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    try {
+      const businessId =
+        typeof req.query.businessId === "string" ? req.query.businessId : null;
+      const rows = await db
+        .select()
+        .from(jarvisCreativeCampaignsTable)
+        .where(
+          businessId
+            ? eq(jarvisCreativeCampaignsTable.businessId, businessId)
+            : undefined,
+        )
+        .orderBy(desc(jarvisCreativeCampaignsTable.createdAt))
+        .limit(100);
+      await audit(req, actor, "creative.campaigns.list", "creative_campaign", null, {
+        businessId,
+        count: rows.length,
+      });
+      res.json({ campaigns: rows });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/creative/campaigns failed");
+      res.status(500).json({ error: "jarvis_creative_campaigns_read_failed" });
+    }
+  },
+);
+
+router.get(
+  "/jarvis/creative/campaigns/:id",
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    try {
+      const [campaign] = await db
+        .select()
+        .from(jarvisCreativeCampaignsTable)
+        .where(eq(jarvisCreativeCampaignsTable.id, String(req.params.id)))
+        .limit(1);
+      if (!campaign) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      const assets = await db
+        .select()
+        .from(jarvisCreativeAssetsTable)
+        .where(eq(jarvisCreativeAssetsTable.campaignId, campaign.id))
+        .orderBy(asc(jarvisCreativeAssetsTable.createdAt));
+      await audit(req, actor, "creative.campaign.read", "creative_campaign", campaign.id, {
+        assetCount: assets.length,
+      });
+      res.json({ campaign, assets });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/creative/campaigns/:id failed");
+      res.status(500).json({ error: "jarvis_creative_campaign_read_failed" });
+    }
+  },
+);
+
+// Governed publish for a single creative asset. Mirrors the briefing gate:
+// weak/ungrounded cognition assets route to require_approval and stay drafts.
+router.post(
+  "/jarvis/creative/assets/:id/publish",
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    try {
+      const [asset] = await db
+        .select()
+        .from(jarvisCreativeAssetsTable)
+        .where(eq(jarvisCreativeAssetsTable.id, String(req.params.id)))
+        .limit(1);
+      if (!asset) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      const outcome = await publishCreativeAsset(asset, actor.email ?? actor.userId);
+      await audit(req, actor, "update", "creative_asset", asset.id, {
+        action: "publish",
+        decision: outcome.decision,
+        reason: outcome.reason,
+        approvalId: outcome.approvalId,
+      });
+      res.json({
+        decision: outcome.decision,
+        reason: outcome.reason,
+        groundingScore: outcome.groundingScore,
+        threshold: outcome.threshold,
+        approvalId: outcome.approvalId,
+        asset: outcome.asset,
+      });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/creative/assets/:id/publish failed");
+      res.status(500).json({ error: "jarvis_creative_asset_publish_failed" });
+    }
+  },
+);
+
+router.get(
+  "/jarvis/creative/brand-profile/:businessId",
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    try {
+      const profile = await loadBrandProfile(String(req.params.businessId));
+      if (!profile) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await audit(
+        req,
+        actor,
+        "creative.brand_profile.read",
+        "brand_profile",
+        profile.id,
+        { businessId: String(req.params.businessId) },
+      );
+      res.json({ brandProfile: profile });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/creative/brand-profile/:businessId failed");
+      res.status(500).json({ error: "jarvis_creative_brand_profile_read_failed" });
+    }
+  },
+);
+
+router.get(
+  "/jarvis/creative/provider-status",
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    try {
+      await audit(
+        req,
+        actor,
+        "creative.provider.status",
+        "creative_provider",
+        null,
+      );
+      res.json({ providers: MEDIA_PROVIDER_STATUS });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/creative/provider-status failed");
+      res.status(500).json({ error: "jarvis_creative_provider_status_failed" });
+    }
+  },
+);
+
+// Idempotent seed of businesses + brand profiles + advisory agents + cognition
+// budget. Super-admin only (mutates the registry baseline).
+router.post(
+  "/jarvis/creative/seed",
+  requireRole(["super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    try {
+      const result = await seedCreativeDivision(actor.email ?? actor.userId);
+      await audit(req, actor, "create", "creative_seed", null, { ...result });
+      res.json({ ok: true, ...result });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/creative/seed failed");
+      res.status(500).json({ error: "jarvis_creative_seed_failed" });
     }
   },
 );

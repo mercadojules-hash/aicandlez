@@ -1372,3 +1372,167 @@ export type InsertJarvisRenderService =
   typeof jarvisRenderServicesTable.$inferInsert;
 export type JarvisCodeFile = typeof jarvisCodeFilesTable.$inferSelect;
 export type InsertJarvisCodeFile = typeof jarvisCodeFilesTable.$inferInsert;
+
+// ── Creative Intelligence Division (Phase 0) ─────────────────────────────────
+// Three advisory tables powering the creative agents (Prometheus marketing,
+// Vision images, Phoenix video). ADVISORY-ONLY + jarvis_-scoped: agents PROPOSE
+// drafts; publication is the governed action (mirrors the briefing publish gate,
+// decision D1) and never auto-posts anywhere. Binaries (Vision/Phoenix, later
+// phases) live in object storage — the DB stores the key + metadata only, never
+// the bytes and never a secret VALUE. Text drafts can be promoted into the
+// knowledge corpus (text only) for memory writeback.
+
+// One brand profile per business (businessId unique). Holds the durable brand
+// system every creative draft is grounded against: palette, typography, voice,
+// positioning, do/don't guardrails, and an optional logo object-storage key.
+// FK cascades on business delete — a brand profile is a strict child of its
+// business, not historical audit data.
+export const jarvisBrandProfilesTable = pgTable(
+  "jarvis_brand_profiles",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => jarvisBusinessesTable.id, { onDelete: "cascade" }),
+    brandName: varchar("brand_name", { length: 200 }).notNull(),
+    tagline: varchar("tagline", { length: 300 }),
+    positioning: text("positioning"),
+    targetAudience: text("target_audience"),
+    voice: text("voice"),
+    tone: varchar("tone", { length: 120 }),
+    // [{ name?, hex }] — advisory palette. Never rendered as authority for the
+    // live AICandlez UI tokens; this is the creative brief palette.
+    palette: jsonb("palette").$type<{ name?: string; hex: string }[]>(),
+    typography: jsonb("typography").$type<Record<string, unknown>>(),
+    valueProps: jsonb("value_props").$type<string[]>(),
+    keywords: jsonb("keywords").$type<string[]>(),
+    // Brand guardrails — fed verbatim into every creative prompt.
+    dos: jsonb("dos").$type<string[]>(),
+    donts: jsonb("donts").$type<string[]>(),
+    // Optional logo reference in object storage (set later by Vision / manual).
+    logoStorageKey: varchar("logo_storage_key", { length: 1024 }),
+    links: jsonb("links").$type<Record<string, string>>(),
+    notes: text("notes"),
+    createdBy: varchar("created_by", { length: 255 }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("jarvis_brand_profiles_business_idx").on(table.businessId),
+  ],
+);
+
+// A campaign is the container for a coordinated set of creative assets (strategy,
+// calendar, ad concepts, briefs, schedule). sourceMode/cognitionRunId/citations/
+// groundingScore mirror the briefing draft lineage so a reasoned campaign links
+// back to its immutable cognition run. governanceState rides the same publish
+// gate as assets. businessId detaches (set null) on business delete to preserve
+// campaign history.
+export const jarvisCreativeCampaignsTable = pgTable(
+  "jarvis_creative_campaigns",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    businessId: uuid("business_id").references(() => jarvisBusinessesTable.id, {
+      onDelete: "set null",
+    }),
+    name: varchar("name", { length: 200 }).notNull(),
+    objective: text("objective"),
+    channel: varchar("channel", { length: 64 }).notNull().default("multi"),
+    audience: text("audience"),
+    durationDays: integer("duration_days"),
+    // Narrative strategy (markdown) synthesized by Prometheus.
+    strategy: text("strategy"),
+    // Structured plan: content calendar, social schedule, funnel, launch plan.
+    schedule: jsonb("schedule").$type<Record<string, unknown>>(),
+    status: varchar("status", { length: 32 }).notNull().default("draft"),
+    sourceMode: varchar("source_mode", { length: 32 })
+      .notNull()
+      .default("cognition"),
+    cognitionRunId: uuid("cognition_run_id").references(
+      () => jarvisCognitionRunsTable.id,
+      { onDelete: "set null" },
+    ),
+    citations: jsonb("citations").$type<{ type: string; id: string }[]>(),
+    groundingScore: integer("grounding_score"),
+    governanceState: varchar("governance_state", { length: 32 })
+      .notNull()
+      .default("none"),
+    createdBy: varchar("created_by", { length: 255 }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("jarvis_creative_campaigns_business_idx").on(table.businessId),
+    index("jarvis_creative_campaigns_status_idx").on(table.status),
+  ],
+);
+
+// An individual creative artifact. `agent` records the producing agent
+// (prometheus/vision/phoenix). `kind` is the artifact type (strategy/ad_concept/
+// ad_copy/content_calendar/creative_brief/social_post/social_schedule/funnel_plan/
+// launch_plan/image/video). Text lives in bodyText; binaries (images/video) live
+// in object storage referenced by storageKey + mimeType (DB never holds bytes).
+// Publication is governed: governanceState + approvalId mirror the briefing gate;
+// status flips to "published" only on an allowed/approved decision. version +
+// contentHash support regenerate-as-new-version (no destructive edits; rows are
+// never deleted — archive instead).
+export const jarvisCreativeAssetsTable = pgTable(
+  "jarvis_creative_assets",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    businessId: uuid("business_id").references(() => jarvisBusinessesTable.id, {
+      onDelete: "set null",
+    }),
+    campaignId: uuid("campaign_id").references(
+      () => jarvisCreativeCampaignsTable.id,
+      { onDelete: "set null" },
+    ),
+    agent: varchar("agent", { length: 48 }).notNull().default("prometheus"),
+    kind: varchar("kind", { length: 48 }).notNull(),
+    title: varchar("title", { length: 300 }).notNull(),
+    prompt: text("prompt"),
+    rationale: text("rationale"),
+    bodyText: text("body_text"),
+    storageKey: varchar("storage_key", { length: 1024 }),
+    mimeType: varchar("mime_type", { length: 120 }),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    citations: jsonb("citations").$type<{ type: string; id: string }[]>(),
+    groundingScore: integer("grounding_score"),
+    sourceMode: varchar("source_mode", { length: 32 })
+      .notNull()
+      .default("cognition"),
+    cognitionRunId: uuid("cognition_run_id").references(
+      () => jarvisCognitionRunsTable.id,
+      { onDelete: "set null" },
+    ),
+    governanceState: varchar("governance_state", { length: 32 })
+      .notNull()
+      .default("none"),
+    approvalId: uuid("approval_id").references(() => jarvisApprovalsTable.id, {
+      onDelete: "set null",
+    }),
+    status: varchar("status", { length: 32 }).notNull().default("draft"),
+    publishedAt: timestamp("published_at"),
+    contentHash: varchar("content_hash", { length: 64 }),
+    version: integer("version").notNull().default(1),
+    createdBy: varchar("created_by", { length: 255 }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("jarvis_creative_assets_campaign_idx").on(table.campaignId),
+    index("jarvis_creative_assets_business_idx").on(table.businessId),
+    index("jarvis_creative_assets_kind_idx").on(table.kind),
+  ],
+);
+
+export type JarvisBrandProfile = typeof jarvisBrandProfilesTable.$inferSelect;
+export type InsertJarvisBrandProfile =
+  typeof jarvisBrandProfilesTable.$inferInsert;
+export type JarvisCreativeCampaign =
+  typeof jarvisCreativeCampaignsTable.$inferSelect;
+export type InsertJarvisCreativeCampaign =
+  typeof jarvisCreativeCampaignsTable.$inferInsert;
+export type JarvisCreativeAsset = typeof jarvisCreativeAssetsTable.$inferSelect;
+export type InsertJarvisCreativeAsset =
+  typeof jarvisCreativeAssetsTable.$inferInsert;
