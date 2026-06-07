@@ -63,6 +63,93 @@ export interface JarvisAuditLog {
   createdAt: string;
 }
 
+export interface JarvisTask {
+  id: string;
+  title: string;
+  description: string | null;
+  status: string;
+  priority: string;
+  businessId: string | null;
+  projectId: string | null;
+  assigneeAgentId: string | null;
+  dueAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JarvisDecision {
+  id: string;
+  title: string;
+  context: string | null;
+  decision: string | null;
+  rationale: string | null;
+  status: string;
+  businessId: string | null;
+  decidedBy: string | null;
+  decidedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JarvisEscalation {
+  id: string;
+  title: string;
+  description: string | null;
+  severity: string;
+  status: string;
+  businessId: string | null;
+  assigneeAgentId: string | null;
+  resolvedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JarvisApproval {
+  id: string;
+  title: string;
+  description: string | null;
+  status: string;
+  requestedBy: string | null;
+  decidedBy: string | null;
+  decidedAt: string | null;
+  businessId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JarvisOperations {
+  tasks: {
+    total: number;
+    byStatus: Record<string, number>;
+    byPriority: Record<string, number>;
+    overdue: number;
+  };
+  decisions: {
+    total: number;
+    byStatus: Record<string, number>;
+    pending: number;
+  };
+  escalations: {
+    total: number;
+    byStatus: Record<string, number>;
+    bySeverity: Record<string, number>;
+    open: number;
+    criticalOpen: number;
+  };
+  approvals: {
+    total: number;
+    byStatus: Record<string, number>;
+    pending: number;
+  };
+  queues: {
+    openTasks: JarvisTask[];
+    openEscalations: JarvisEscalation[];
+    pendingApprovals: JarvisApproval[];
+    recentDecisions: JarvisDecision[];
+  };
+  generatedAt: number;
+}
+
 export interface JarvisDashboard {
   counts: {
     businesses: number;
@@ -94,6 +181,11 @@ export const jarvisKeys = {
   workflows: ["jarvis", "workflows"] as const,
   auditLogs: ["jarvis", "audit-logs"] as const,
   settings: ["jarvis", "settings"] as const,
+  tasks: ["jarvis", "tasks"] as const,
+  decisions: ["jarvis", "decisions"] as const,
+  escalations: ["jarvis", "escalations"] as const,
+  approvals: ["jarvis", "approvals"] as const,
+  operations: ["jarvis", "operations"] as const,
 };
 
 // ── dashboard ────────────────────────────────────────────────────────────────
@@ -363,5 +455,219 @@ export function useUpdateSettings() {
         body: JSON.stringify(patch),
       }),
     onSuccess: invalidate,
+  });
+}
+
+// ── tasks ────────────────────────────────────────────────────────────────────
+
+export interface TaskInput {
+  title: string;
+  description?: string | null;
+  status?: string;
+  priority?: string;
+  businessId?: string | null;
+  projectId?: string | null;
+  assigneeAgentId?: string | null;
+  dueAt?: string | null;
+}
+
+export const useTasks = makeListHook<JarvisTask>({
+  path: "tasks",
+  listKey: jarvisKeys.tasks,
+  listField: "tasks",
+  itemField: "task",
+});
+
+export function useCreateTask() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (input: TaskInput) =>
+      authFetchJson<{ task: JarvisTask }>(`${API}/tasks`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateTask() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: ({ id, ...input }: TaskInput & { id: string }) =>
+      authFetchJson<{ task: JarvisTask }>(`${API}/tasks/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteTask() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (id: string) =>
+      authFetchJson<{ ok: boolean }>(`${API}/tasks/${id}`, { method: "DELETE" }),
+    onSuccess: invalidate,
+  });
+}
+
+// ── decisions ────────────────────────────────────────────────────────────────
+
+export interface DecisionInput {
+  title: string;
+  context?: string | null;
+  decision?: string | null;
+  rationale?: string | null;
+  status?: string;
+  businessId?: string | null;
+}
+
+export const useDecisions = makeListHook<JarvisDecision>({
+  path: "decisions",
+  listKey: jarvisKeys.decisions,
+  listField: "decisions",
+  itemField: "decision",
+});
+
+export function useCreateDecision() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (input: DecisionInput) =>
+      authFetchJson<{ decision: JarvisDecision }>(`${API}/decisions`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateDecision() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: ({ id, ...input }: DecisionInput & { id: string }) =>
+      authFetchJson<{ decision: JarvisDecision }>(`${API}/decisions/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteDecision() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (id: string) =>
+      authFetchJson<{ ok: boolean }>(`${API}/decisions/${id}`, { method: "DELETE" }),
+    onSuccess: invalidate,
+  });
+}
+
+// ── escalations ──────────────────────────────────────────────────────────────
+
+export interface EscalationInput {
+  title: string;
+  description?: string | null;
+  severity?: string;
+  status?: string;
+  businessId?: string | null;
+  assigneeAgentId?: string | null;
+}
+
+export const useEscalations = makeListHook<JarvisEscalation>({
+  path: "escalations",
+  listKey: jarvisKeys.escalations,
+  listField: "escalations",
+  itemField: "escalation",
+});
+
+export function useCreateEscalation() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (input: EscalationInput) =>
+      authFetchJson<{ escalation: JarvisEscalation }>(`${API}/escalations`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateEscalation() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: ({ id, ...input }: EscalationInput & { id: string }) =>
+      authFetchJson<{ escalation: JarvisEscalation }>(`${API}/escalations/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteEscalation() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (id: string) =>
+      authFetchJson<{ ok: boolean }>(`${API}/escalations/${id}`, { method: "DELETE" }),
+    onSuccess: invalidate,
+  });
+}
+
+// ── approvals ────────────────────────────────────────────────────────────────
+
+export interface ApprovalInput {
+  title: string;
+  description?: string | null;
+  status?: string;
+  businessId?: string | null;
+}
+
+export const useApprovals = makeListHook<JarvisApproval>({
+  path: "approvals",
+  listKey: jarvisKeys.approvals,
+  listField: "approvals",
+  itemField: "approval",
+});
+
+export function useCreateApproval() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (input: ApprovalInput) =>
+      authFetchJson<{ approval: JarvisApproval }>(`${API}/approvals`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateApproval() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: ({ id, ...input }: ApprovalInput & { id: string }) =>
+      authFetchJson<{ approval: JarvisApproval }>(`${API}/approvals/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteApproval() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (id: string) =>
+      authFetchJson<{ ok: boolean }>(`${API}/approvals/${id}`, { method: "DELETE" }),
+    onSuccess: invalidate,
+  });
+}
+
+// ── operations dashboard ─────────────────────────────────────────────────────
+
+export function useOperations(): UseQueryResult<JarvisOperations> {
+  return useQuery({
+    queryKey: jarvisKeys.operations,
+    queryFn: () => authFetchJson<JarvisOperations>(`${API}/operations`),
+    refetchInterval: 15000,
   });
 }

@@ -6,6 +6,12 @@ import {
   FolderKanban,
   Bot,
   Workflow,
+  Activity,
+  ListTodo,
+  GitBranch,
+  AlertTriangle,
+  CheckSquare,
+  History,
   ScrollText,
   Settings as SettingsIcon,
 } from "lucide-react";
@@ -19,10 +25,16 @@ export interface NavItem {
 
 export const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", path: "/", icon: LayoutDashboard },
+  { label: "Operations", path: "/operations", icon: Activity },
   { label: "Businesses", path: "/businesses", icon: Building2 },
   { label: "Projects", path: "/projects", icon: FolderKanban },
   { label: "Agents", path: "/agents", icon: Bot },
   { label: "Workflows", path: "/workflows", icon: Workflow },
+  { label: "Tasks", path: "/tasks", icon: ListTodo },
+  { label: "Decisions", path: "/decisions", icon: GitBranch },
+  { label: "Escalations", path: "/escalations", icon: AlertTriangle },
+  { label: "Approvals", path: "/approvals", icon: CheckSquare },
+  { label: "Timeline", path: "/timeline", icon: History },
   { label: "Audit Log", path: "/audit", icon: ScrollText },
   { label: "Settings", path: "/settings", icon: SettingsIcon },
 ];

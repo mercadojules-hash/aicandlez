@@ -44,7 +44,7 @@ import {
 export interface FieldConfig {
   name: string;
   label: string;
-  type?: "text" | "textarea" | "select";
+  type?: "text" | "textarea" | "select" | "date";
   required?: boolean;
   placeholder?: string;
   options?: { label: string; value: string }[];
@@ -245,6 +245,7 @@ export function RegistryView<T extends { id: string }>({
                 ) : (
                   <Input
                     id={f.name}
+                    type={f.type === "date" ? "date" : "text"}
                     value={values[f.name] ?? ""}
                     placeholder={f.placeholder}
                     onChange={(e) =>

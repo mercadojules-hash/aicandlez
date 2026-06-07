@@ -28,6 +28,10 @@ import {
   jarvisWorkflowsTable,
   jarvisAuditLogsTable,
   jarvisSettingsTable,
+  jarvisTasksTable,
+  jarvisDecisionsTable,
+  jarvisEscalationsTable,
+  jarvisApprovalsTable,
 } from "@workspace/db";
 import { requireAuth, requireRole } from "../middlewares/requireAuth.js";
 
@@ -790,6 +794,783 @@ router.put(
     } catch (err) {
       req.log.error({ err }, "PUT /jarvis/settings failed");
       res.status(500).json({ error: "jarvis_settings_write_failed" });
+    }
+  },
+);
+
+// ── Sprint 2: operations layer ───────────────────────────────────────────────
+// Task / Decision / Escalation / Approval management + an aggregated operations
+// dashboard. Same isolation + audit posture as the Sprint 1 registries.
+
+async function projectExists(id: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: jarvisProjectsTable.id })
+    .from(jarvisProjectsTable)
+    .where(eq(jarvisProjectsTable.id, id))
+    .limit(1);
+  return Boolean(row);
+}
+
+async function agentExists(id: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: jarvisAgentsTable.id })
+    .from(jarvisAgentsTable)
+    .where(eq(jarvisAgentsTable.id, id))
+    .limit(1);
+  return Boolean(row);
+}
+
+// Validate any provided FK before write so a well-formed but unknown UUID
+// returns a 4xx domain error instead of a raw FK 500.
+async function validateRefs(refs: {
+  businessId?: string | null;
+  projectId?: string | null;
+  assigneeAgentId?: string | null;
+}): Promise<string | null> {
+  if (refs.businessId && !(await businessExists(refs.businessId)))
+    return "invalid_business_reference";
+  if (refs.projectId && !(await projectExists(refs.projectId)))
+    return "invalid_project_reference";
+  if (refs.assigneeAgentId && !(await agentExists(refs.assigneeAgentId)))
+    return "invalid_agent_reference";
+  return null;
+}
+
+const optionalUuid = z.string().uuid().optional().nullable();
+const optionalText = z.string().trim().max(5000).optional().nullable();
+const optionalIsoDate = z
+  .string()
+  .trim()
+  .refine((s) => !Number.isNaN(Date.parse(s)), { message: "invalid_date" })
+  .optional()
+  .nullable();
+
+function toDate(v: string | null | undefined): Date | null {
+  return v ? new Date(v) : null;
+}
+
+// ── tasks ────────────────────────────────────────────────────────────────────
+
+const taskBodySchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  description: optionalText,
+  status: statusSchema.optional(),
+  priority: z.string().trim().min(1).max(16).optional(),
+  businessId: optionalUuid,
+  projectId: optionalUuid,
+  assigneeAgentId: optionalUuid,
+  dueAt: optionalIsoDate,
+});
+
+router.get(
+  "/jarvis/tasks",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const rows = await db
+        .select()
+        .from(jarvisTasksTable)
+        .orderBy(desc(jarvisTasksTable.createdAt));
+      res.json({ tasks: rows });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/tasks failed");
+      res.status(500).json({ error: "jarvis_tasks_read_failed" });
+    }
+  },
+);
+
+router.post(
+  "/jarvis/tasks",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = taskBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_task" });
+      return;
+    }
+    const refErr = await validateRefs(parsed.data);
+    if (refErr) {
+      res.status(400).json({ error: refErr });
+      return;
+    }
+    try {
+      const [row] = await db
+        .insert(jarvisTasksTable)
+        .values({
+          title: parsed.data.title,
+          description: parsed.data.description ?? null,
+          status: parsed.data.status ?? "todo",
+          priority: parsed.data.priority ?? "medium",
+          businessId: parsed.data.businessId ?? null,
+          projectId: parsed.data.projectId ?? null,
+          assigneeAgentId: parsed.data.assigneeAgentId ?? null,
+          dueAt: toDate(parsed.data.dueAt),
+        })
+        .returning();
+      await audit(req, actor, "create", "task", row.id, { title: row.title });
+      res.status(201).json({ task: row });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/tasks failed");
+      res.status(500).json({ error: "jarvis_task_create_failed" });
+    }
+  },
+);
+
+router.get(
+  "/jarvis/tasks/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const [row] = await db
+        .select()
+        .from(jarvisTasksTable)
+        .where(eq(jarvisTasksTable.id, String(req.params.id)))
+        .limit(1);
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      res.json({ task: row });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/tasks/:id failed");
+      res.status(500).json({ error: "jarvis_task_read_failed" });
+    }
+  },
+);
+
+router.put(
+  "/jarvis/tasks/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = taskBodySchema.partial().safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_task" });
+      return;
+    }
+    const refErr = await validateRefs(parsed.data);
+    if (refErr) {
+      res.status(400).json({ error: refErr });
+      return;
+    }
+    const d = parsed.data;
+    try {
+      const [row] = await db
+        .update(jarvisTasksTable)
+        .set({
+          ...(d.title !== undefined ? { title: d.title } : {}),
+          ...(d.description !== undefined ? { description: d.description ?? null } : {}),
+          ...(d.status !== undefined ? { status: d.status } : {}),
+          ...(d.priority !== undefined ? { priority: d.priority } : {}),
+          ...(d.businessId !== undefined ? { businessId: d.businessId ?? null } : {}),
+          ...(d.projectId !== undefined ? { projectId: d.projectId ?? null } : {}),
+          ...(d.assigneeAgentId !== undefined
+            ? { assigneeAgentId: d.assigneeAgentId ?? null }
+            : {}),
+          ...(d.dueAt !== undefined ? { dueAt: toDate(d.dueAt) } : {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(jarvisTasksTable.id, String(req.params.id)))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await audit(req, actor, "update", "task", row.id, { title: row.title });
+      res.json({ task: row });
+    } catch (err) {
+      req.log.error({ err }, "PUT /jarvis/tasks/:id failed");
+      res.status(500).json({ error: "jarvis_task_update_failed" });
+    }
+  },
+);
+
+router.delete(
+  "/jarvis/tasks/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    try {
+      const [row] = await db
+        .delete(jarvisTasksTable)
+        .where(eq(jarvisTasksTable.id, String(req.params.id)))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await audit(req, actor, "delete", "task", row.id, { title: row.title });
+      res.json({ ok: true, id: row.id });
+    } catch (err) {
+      req.log.error({ err }, "DELETE /jarvis/tasks/:id failed");
+      res.status(500).json({ error: "jarvis_task_delete_failed" });
+    }
+  },
+);
+
+// ── decisions ────────────────────────────────────────────────────────────────
+
+const decisionBodySchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  context: optionalText,
+  decision: optionalText,
+  rationale: optionalText,
+  status: statusSchema.optional(),
+  businessId: optionalUuid,
+});
+
+// Terminal decision states stamp who decided + when.
+function decisionStamp(
+  status: string | undefined,
+  actor: { userId: string; email: string | null },
+): { decidedBy: string; decidedAt: Date } | null {
+  if (status && status !== "proposed") {
+    return { decidedBy: actor.email ?? actor.userId, decidedAt: new Date() };
+  }
+  return null;
+}
+
+router.get(
+  "/jarvis/decisions",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const rows = await db
+        .select()
+        .from(jarvisDecisionsTable)
+        .orderBy(desc(jarvisDecisionsTable.createdAt));
+      res.json({ decisions: rows });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/decisions failed");
+      res.status(500).json({ error: "jarvis_decisions_read_failed" });
+    }
+  },
+);
+
+router.post(
+  "/jarvis/decisions",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = decisionBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_decision" });
+      return;
+    }
+    if (parsed.data.businessId && !(await businessExists(parsed.data.businessId))) {
+      res.status(400).json({ error: "invalid_business_reference" });
+      return;
+    }
+    const stamp = decisionStamp(parsed.data.status, actor);
+    try {
+      const [row] = await db
+        .insert(jarvisDecisionsTable)
+        .values({
+          title: parsed.data.title,
+          context: parsed.data.context ?? null,
+          decision: parsed.data.decision ?? null,
+          rationale: parsed.data.rationale ?? null,
+          status: parsed.data.status ?? "proposed",
+          businessId: parsed.data.businessId ?? null,
+          decidedBy: stamp?.decidedBy ?? null,
+          decidedAt: stamp?.decidedAt ?? null,
+        })
+        .returning();
+      await audit(req, actor, "create", "decision", row.id, { title: row.title });
+      res.status(201).json({ decision: row });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/decisions failed");
+      res.status(500).json({ error: "jarvis_decision_create_failed" });
+    }
+  },
+);
+
+router.get(
+  "/jarvis/decisions/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const [row] = await db
+        .select()
+        .from(jarvisDecisionsTable)
+        .where(eq(jarvisDecisionsTable.id, String(req.params.id)))
+        .limit(1);
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      res.json({ decision: row });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/decisions/:id failed");
+      res.status(500).json({ error: "jarvis_decision_read_failed" });
+    }
+  },
+);
+
+router.put(
+  "/jarvis/decisions/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = decisionBodySchema.partial().safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_decision" });
+      return;
+    }
+    if (parsed.data.businessId && !(await businessExists(parsed.data.businessId))) {
+      res.status(400).json({ error: "invalid_business_reference" });
+      return;
+    }
+    const d = parsed.data;
+    const stamp = decisionStamp(d.status, actor);
+    try {
+      const [row] = await db
+        .update(jarvisDecisionsTable)
+        .set({
+          ...(d.title !== undefined ? { title: d.title } : {}),
+          ...(d.context !== undefined ? { context: d.context ?? null } : {}),
+          ...(d.decision !== undefined ? { decision: d.decision ?? null } : {}),
+          ...(d.rationale !== undefined ? { rationale: d.rationale ?? null } : {}),
+          ...(d.status !== undefined ? { status: d.status } : {}),
+          ...(d.businessId !== undefined ? { businessId: d.businessId ?? null } : {}),
+          ...(d.status !== undefined
+            ? stamp
+              ? { decidedBy: stamp.decidedBy, decidedAt: stamp.decidedAt }
+              : { decidedBy: null, decidedAt: null }
+            : {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(jarvisDecisionsTable.id, String(req.params.id)))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await audit(req, actor, "update", "decision", row.id, { title: row.title });
+      res.json({ decision: row });
+    } catch (err) {
+      req.log.error({ err }, "PUT /jarvis/decisions/:id failed");
+      res.status(500).json({ error: "jarvis_decision_update_failed" });
+    }
+  },
+);
+
+router.delete(
+  "/jarvis/decisions/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    try {
+      const [row] = await db
+        .delete(jarvisDecisionsTable)
+        .where(eq(jarvisDecisionsTable.id, String(req.params.id)))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await audit(req, actor, "delete", "decision", row.id, { title: row.title });
+      res.json({ ok: true, id: row.id });
+    } catch (err) {
+      req.log.error({ err }, "DELETE /jarvis/decisions/:id failed");
+      res.status(500).json({ error: "jarvis_decision_delete_failed" });
+    }
+  },
+);
+
+// ── escalations ──────────────────────────────────────────────────────────────
+
+const escalationBodySchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  description: optionalText,
+  severity: z.string().trim().min(1).max(16).optional(),
+  status: statusSchema.optional(),
+  businessId: optionalUuid,
+  assigneeAgentId: optionalUuid,
+});
+
+router.get(
+  "/jarvis/escalations",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const rows = await db
+        .select()
+        .from(jarvisEscalationsTable)
+        .orderBy(desc(jarvisEscalationsTable.createdAt));
+      res.json({ escalations: rows });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/escalations failed");
+      res.status(500).json({ error: "jarvis_escalations_read_failed" });
+    }
+  },
+);
+
+router.post(
+  "/jarvis/escalations",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = escalationBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_escalation" });
+      return;
+    }
+    const refErr = await validateRefs(parsed.data);
+    if (refErr) {
+      res.status(400).json({ error: refErr });
+      return;
+    }
+    const resolved = parsed.data.status === "resolved" ? new Date() : null;
+    try {
+      const [row] = await db
+        .insert(jarvisEscalationsTable)
+        .values({
+          title: parsed.data.title,
+          description: parsed.data.description ?? null,
+          severity: parsed.data.severity ?? "medium",
+          status: parsed.data.status ?? "open",
+          businessId: parsed.data.businessId ?? null,
+          assigneeAgentId: parsed.data.assigneeAgentId ?? null,
+          resolvedAt: resolved,
+        })
+        .returning();
+      await audit(req, actor, "create", "escalation", row.id, { title: row.title });
+      res.status(201).json({ escalation: row });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/escalations failed");
+      res.status(500).json({ error: "jarvis_escalation_create_failed" });
+    }
+  },
+);
+
+router.get(
+  "/jarvis/escalations/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const [row] = await db
+        .select()
+        .from(jarvisEscalationsTable)
+        .where(eq(jarvisEscalationsTable.id, String(req.params.id)))
+        .limit(1);
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      res.json({ escalation: row });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/escalations/:id failed");
+      res.status(500).json({ error: "jarvis_escalation_read_failed" });
+    }
+  },
+);
+
+router.put(
+  "/jarvis/escalations/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = escalationBodySchema.partial().safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_escalation" });
+      return;
+    }
+    const refErr = await validateRefs(parsed.data);
+    if (refErr) {
+      res.status(400).json({ error: refErr });
+      return;
+    }
+    const d = parsed.data;
+    try {
+      const [row] = await db
+        .update(jarvisEscalationsTable)
+        .set({
+          ...(d.title !== undefined ? { title: d.title } : {}),
+          ...(d.description !== undefined ? { description: d.description ?? null } : {}),
+          ...(d.severity !== undefined ? { severity: d.severity } : {}),
+          ...(d.status !== undefined ? { status: d.status } : {}),
+          ...(d.businessId !== undefined ? { businessId: d.businessId ?? null } : {}),
+          ...(d.assigneeAgentId !== undefined
+            ? { assigneeAgentId: d.assigneeAgentId ?? null }
+            : {}),
+          ...(d.status !== undefined
+            ? { resolvedAt: d.status === "resolved" ? new Date() : null }
+            : {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(jarvisEscalationsTable.id, String(req.params.id)))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await audit(req, actor, "update", "escalation", row.id, { title: row.title });
+      res.json({ escalation: row });
+    } catch (err) {
+      req.log.error({ err }, "PUT /jarvis/escalations/:id failed");
+      res.status(500).json({ error: "jarvis_escalation_update_failed" });
+    }
+  },
+);
+
+router.delete(
+  "/jarvis/escalations/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    try {
+      const [row] = await db
+        .delete(jarvisEscalationsTable)
+        .where(eq(jarvisEscalationsTable.id, String(req.params.id)))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await audit(req, actor, "delete", "escalation", row.id, { title: row.title });
+      res.json({ ok: true, id: row.id });
+    } catch (err) {
+      req.log.error({ err }, "DELETE /jarvis/escalations/:id failed");
+      res.status(500).json({ error: "jarvis_escalation_delete_failed" });
+    }
+  },
+);
+
+// ── approvals ────────────────────────────────────────────────────────────────
+
+const approvalBodySchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  description: optionalText,
+  status: statusSchema.optional(),
+  businessId: optionalUuid,
+});
+
+router.get(
+  "/jarvis/approvals",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const rows = await db
+        .select()
+        .from(jarvisApprovalsTable)
+        .orderBy(desc(jarvisApprovalsTable.createdAt));
+      res.json({ approvals: rows });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/approvals failed");
+      res.status(500).json({ error: "jarvis_approvals_read_failed" });
+    }
+  },
+);
+
+router.post(
+  "/jarvis/approvals",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = approvalBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_approval" });
+      return;
+    }
+    if (parsed.data.businessId && !(await businessExists(parsed.data.businessId))) {
+      res.status(400).json({ error: "invalid_business_reference" });
+      return;
+    }
+    const decided = parsed.data.status && parsed.data.status !== "pending";
+    try {
+      const [row] = await db
+        .insert(jarvisApprovalsTable)
+        .values({
+          title: parsed.data.title,
+          description: parsed.data.description ?? null,
+          status: parsed.data.status ?? "pending",
+          requestedBy: actor.email ?? actor.userId,
+          decidedBy: decided ? (actor.email ?? actor.userId) : null,
+          decidedAt: decided ? new Date() : null,
+          businessId: parsed.data.businessId ?? null,
+        })
+        .returning();
+      await audit(req, actor, "create", "approval", row.id, { title: row.title });
+      res.status(201).json({ approval: row });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/approvals failed");
+      res.status(500).json({ error: "jarvis_approval_create_failed" });
+    }
+  },
+);
+
+router.get(
+  "/jarvis/approvals/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const [row] = await db
+        .select()
+        .from(jarvisApprovalsTable)
+        .where(eq(jarvisApprovalsTable.id, String(req.params.id)))
+        .limit(1);
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      res.json({ approval: row });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/approvals/:id failed");
+      res.status(500).json({ error: "jarvis_approval_read_failed" });
+    }
+  },
+);
+
+router.put(
+  "/jarvis/approvals/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = approvalBodySchema.partial().safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_approval" });
+      return;
+    }
+    if (parsed.data.businessId && !(await businessExists(parsed.data.businessId))) {
+      res.status(400).json({ error: "invalid_business_reference" });
+      return;
+    }
+    const d = parsed.data;
+    const decided = d.status && d.status !== "pending";
+    try {
+      const [row] = await db
+        .update(jarvisApprovalsTable)
+        .set({
+          ...(d.title !== undefined ? { title: d.title } : {}),
+          ...(d.description !== undefined ? { description: d.description ?? null } : {}),
+          ...(d.status !== undefined ? { status: d.status } : {}),
+          ...(d.businessId !== undefined ? { businessId: d.businessId ?? null } : {}),
+          ...(d.status !== undefined
+            ? decided
+              ? { decidedBy: actor.email ?? actor.userId, decidedAt: new Date() }
+              : { decidedBy: null, decidedAt: null }
+            : {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(jarvisApprovalsTable.id, String(req.params.id)))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await audit(req, actor, "update", "approval", row.id, { title: row.title });
+      res.json({ approval: row });
+    } catch (err) {
+      req.log.error({ err }, "PUT /jarvis/approvals/:id failed");
+      res.status(500).json({ error: "jarvis_approval_update_failed" });
+    }
+  },
+);
+
+router.delete(
+  "/jarvis/approvals/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    try {
+      const [row] = await db
+        .delete(jarvisApprovalsTable)
+        .where(eq(jarvisApprovalsTable.id, String(req.params.id)))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await audit(req, actor, "delete", "approval", row.id, { title: row.title });
+      res.json({ ok: true, id: row.id });
+    } catch (err) {
+      req.log.error({ err }, "DELETE /jarvis/approvals/:id failed");
+      res.status(500).json({ error: "jarvis_approval_delete_failed" });
+    }
+  },
+);
+
+// ── operations dashboard (aggregate, read-only) ──────────────────────────────
+
+function tallyBy<T>(rows: T[], pick: (r: T) => string): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const r of rows) {
+    const k = pick(r);
+    out[k] = (out[k] ?? 0) + 1;
+  }
+  return out;
+}
+
+router.get(
+  "/jarvis/operations",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const [tasks, decisions, escalations, approvals] = await Promise.all([
+        db.select().from(jarvisTasksTable).orderBy(desc(jarvisTasksTable.createdAt)),
+        db
+          .select()
+          .from(jarvisDecisionsTable)
+          .orderBy(desc(jarvisDecisionsTable.createdAt)),
+        db
+          .select()
+          .from(jarvisEscalationsTable)
+          .orderBy(desc(jarvisEscalationsTable.createdAt)),
+        db
+          .select()
+          .from(jarvisApprovalsTable)
+          .orderBy(desc(jarvisApprovalsTable.createdAt)),
+      ]);
+
+      const now = Date.now();
+      const overdue = tasks.filter(
+        (t) =>
+          t.dueAt !== null &&
+          new Date(t.dueAt).getTime() < now &&
+          t.status !== "done",
+      ).length;
+
+      res.json({
+        tasks: {
+          total: tasks.length,
+          byStatus: tallyBy(tasks, (t) => t.status),
+          byPriority: tallyBy(tasks, (t) => t.priority),
+          overdue,
+        },
+        decisions: {
+          total: decisions.length,
+          byStatus: tallyBy(decisions, (d) => d.status),
+          pending: decisions.filter((d) => d.status === "proposed").length,
+        },
+        escalations: {
+          total: escalations.length,
+          byStatus: tallyBy(escalations, (e) => e.status),
+          bySeverity: tallyBy(escalations, (e) => e.severity),
+          open: escalations.filter((e) => e.status !== "resolved").length,
+          criticalOpen: escalations.filter(
+            (e) => e.severity === "critical" && e.status !== "resolved",
+          ).length,
+        },
+        approvals: {
+          total: approvals.length,
+          byStatus: tallyBy(approvals, (a) => a.status),
+          pending: approvals.filter((a) => a.status === "pending").length,
+        },
+        queues: {
+          openTasks: tasks.filter((t) => t.status !== "done").slice(0, 8),
+          openEscalations: escalations
+            .filter((e) => e.status !== "resolved")
+            .slice(0, 8),
+          pendingApprovals: approvals.filter((a) => a.status === "pending").slice(0, 8),
+          recentDecisions: decisions.slice(0, 8),
+        },
+        generatedAt: now,
+      });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/operations failed");
+      res.status(500).json({ error: "jarvis_operations_failed" });
     }
   },
 );

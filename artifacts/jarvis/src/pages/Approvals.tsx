@@ -1,0 +1,111 @@
+import { RegistryView, StatusBadge } from "@/components/RegistryView";
+import {
+  useApprovals,
+  useCreateApproval,
+  useUpdateApproval,
+  useDeleteApproval,
+  useBusinesses,
+} from "@/hooks/useJarvisApi";
+
+const UNASSIGNED = "__none__";
+
+export default function Approvals() {
+  const { data, isLoading, isError } = useApprovals();
+  const { data: businesses } = useBusinesses();
+  const create = useCreateApproval();
+  const update = useUpdateApproval();
+  const remove = useDeleteApproval();
+
+  const businessName = (id: string | null) =>
+    id ? (businesses?.find((b) => b.id === id)?.name ?? "—") : "—";
+
+  const businessOptions = [
+    { label: "Unassigned", value: UNASSIGNED },
+    ...(businesses ?? []).map((b) => ({ label: b.name, value: b.id })),
+  ];
+
+  const resolveBusinessId = (v: string) => (v && v !== UNASSIGNED ? v : null);
+
+  return (
+    <RegistryView
+      title="Approvals"
+      description="Requests awaiting executive sign-off."
+      entityLabel="Approval"
+      items={data}
+      isLoading={isLoading}
+      isError={isError}
+      isMutating={create.isPending || update.isPending}
+      columns={[
+        {
+          key: "title",
+          label: "Title",
+          render: (r) => <span className="font-medium">{r.title}</span>,
+        },
+        { key: "status", label: "Status", render: (r) => <StatusBadge status={r.status} /> },
+        {
+          key: "business",
+          label: "Business",
+          render: (r) => (
+            <span className="text-muted-foreground">{businessName(r.businessId)}</span>
+          ),
+        },
+        {
+          key: "requestedBy",
+          label: "Requested By",
+          render: (r) => <span className="text-muted-foreground">{r.requestedBy ?? "—"}</span>,
+        },
+        {
+          key: "decidedBy",
+          label: "Decided By",
+          render: (r) => <span className="text-muted-foreground">{r.decidedBy ?? "—"}</span>,
+        },
+      ]}
+      fields={[
+        { name: "title", label: "Title", required: true, placeholder: "e.g. Approve marketing spend" },
+        { name: "description", label: "Description", type: "textarea" },
+        {
+          name: "status",
+          label: "Status",
+          type: "select",
+          defaultValue: "pending",
+          options: [
+            { label: "Pending", value: "pending" },
+            { label: "Approved", value: "approved" },
+            { label: "Rejected", value: "rejected" },
+          ],
+        },
+        {
+          name: "businessId",
+          label: "Business",
+          type: "select",
+          defaultValue: UNASSIGNED,
+          options: businessOptions,
+        },
+      ]}
+      toFormValues={(r) => ({
+        title: r.title,
+        description: r.description ?? "",
+        status: r.status,
+        businessId: r.businessId ?? UNASSIGNED,
+      })}
+      onCreate={(v) =>
+        create.mutateAsync({
+          title: v.title,
+          description: v.description || null,
+          status: v.status,
+          businessId: resolveBusinessId(v.businessId),
+        })
+      }
+      onUpdate={(id, v) =>
+        update.mutateAsync({
+          id,
+          title: v.title,
+          description: v.description || null,
+          status: v.status,
+          businessId: resolveBusinessId(v.businessId),
+        })
+      }
+      onDelete={(id) => remove.mutateAsync(id)}
+    />
+  );
+}

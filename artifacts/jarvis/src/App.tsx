@@ -17,6 +17,12 @@ import Businesses from "@/pages/Businesses";
 import Projects from "@/pages/Projects";
 import Agents from "@/pages/Agents";
 import Workflows from "@/pages/Workflows";
+import Operations from "@/pages/Operations";
+import Tasks from "@/pages/Tasks";
+import Decisions from "@/pages/Decisions";
+import Escalations from "@/pages/Escalations";
+import Approvals from "@/pages/Approvals";
+import Timeline from "@/pages/Timeline";
 import Audit from "@/pages/Audit";
 import Settings from "@/pages/Settings";
 
@@ -149,6 +155,36 @@ function AppRoutes() {
       <Route path="/workflows">
         <Protected>
           <Workflows />
+        </Protected>
+      </Route>
+      <Route path="/operations">
+        <Protected>
+          <Operations />
+        </Protected>
+      </Route>
+      <Route path="/tasks">
+        <Protected>
+          <Tasks />
+        </Protected>
+      </Route>
+      <Route path="/decisions">
+        <Protected>
+          <Decisions />
+        </Protected>
+      </Route>
+      <Route path="/escalations">
+        <Protected>
+          <Escalations />
+        </Protected>
+      </Route>
+      <Route path="/approvals">
+        <Protected>
+          <Approvals />
+        </Protected>
+      </Route>
+      <Route path="/timeline">
+        <Protected>
+          <Timeline />
         </Protected>
       </Route>
       <Route path="/audit">
