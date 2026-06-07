@@ -7,6 +7,7 @@
     "dev": "export NODE_ENV=development && pnpm run build && pnpm run migrate && pnpm run start",
     "build": "node ./build.mjs",
     "migrate": "node --experimental-strip-types ./src/migrate.ts",
+    "jarvis:backfill-embeddings": "node --experimental-strip-types ./src/scripts/jarvisBackfillEmbeddings.ts",
     "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
@@ -31,6 +32,7 @@
     "express": "^5",
     "helmet": "^8.1.0",
     "http-proxy-middleware": "^4.0.0",
+    "openai": "^6.42.0",
     "pino": "^9",
     "pino-http": "^10",
     "stripe": "^22.1.1",

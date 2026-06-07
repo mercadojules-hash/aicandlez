@@ -68,7 +68,13 @@ import {
 import { evaluateGovernance } from "../lib/jarvis/governance/index.js";
 import { synthesizeBriefing } from "../lib/jarvis/cognition/briefingCognition.js";
 import { publishBriefing } from "../lib/jarvis/cognition/publishGate.js";
-import { checkCognitionBudget } from "../lib/jarvis/cognition/index.js";
+import {
+  checkCognitionBudget,
+  runIndexerPass,
+  getSemanticStatus,
+  setSemanticRetrievalEnabled,
+  setIndexerTickEnabled,
+} from "../lib/jarvis/cognition/index.js";
 
 type AuthReq = Request & { clerkUserId: string };
 
@@ -3901,6 +3907,108 @@ router.get(
     } catch (err) {
       req.log.error({ err }, "GET /jarvis/cognition/overview failed");
       res.status(500).json({ error: "jarvis_cognition_overview_read_failed" });
+    }
+  },
+);
+
+// ── Sprint 9: semantic retrieval (hybrid lexical + pgvector) ──────────────────
+// OFF by default + admin-gated. `jarvis_embeddings` is a DERIVED read index; these
+// routes only flip the toggles and trigger the deterministic indexer/backfill —
+// the cognition model never writes corpus and PUBLISH stays governed. Status read
+// is requireAuth; every mutation (toggle, indexer tick, backfill) is requireRole.
+
+router.get(
+  "/jarvis/cognition/semantic/status",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      res.json(await getSemanticStatus());
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/cognition/semantic/status failed");
+      res.status(500).json({ error: "jarvis_semantic_status_read_failed" });
+    }
+  },
+);
+
+const semanticEnabledSchema = z.object({ enabled: z.boolean() });
+
+router.post(
+  "/jarvis/cognition/semantic/enabled",
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = semanticEnabledSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_semantic_toggle" });
+      return;
+    }
+    try {
+      await setSemanticRetrievalEnabled(parsed.data.enabled, actor.userId);
+      await audit(req, actor, "update", "settings", null, {
+        key: "cognition.semanticRetrieval.enabled",
+        enabled: parsed.data.enabled,
+      });
+      res.json({ enabled: parsed.data.enabled });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/cognition/semantic/enabled failed");
+      res.status(500).json({ error: "jarvis_semantic_enabled_write_failed" });
+    }
+  },
+);
+
+router.post(
+  "/jarvis/cognition/semantic/indexer-tick",
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = semanticEnabledSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_indexer_tick_toggle" });
+      return;
+    }
+    try {
+      await setIndexerTickEnabled(parsed.data.enabled, actor.userId);
+      await audit(req, actor, "update", "settings", null, {
+        key: "cognition.semanticIndexer.tickEnabled",
+        enabled: parsed.data.enabled,
+      });
+      res.json({ enabled: parsed.data.enabled });
+    } catch (err) {
+      req.log.error(
+        { err },
+        "POST /jarvis/cognition/semantic/indexer-tick failed",
+      );
+      res.status(500).json({ error: "jarvis_indexer_tick_write_failed" });
+    }
+  },
+);
+
+const backfillSchema = z.object({
+  limit: z.number().int().min(1).max(500).optional(),
+});
+
+router.post(
+  "/jarvis/cognition/semantic/backfill",
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = backfillSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_backfill_request" });
+      return;
+    }
+    try {
+      const result = await runIndexerPass({ limit: parsed.data.limit });
+      await audit(req, actor, "execute", "settings", null, {
+        action: "semantic_backfill",
+        upserted: result.upserted,
+        scanned: result.scanned,
+        budgetExceeded: result.budgetExceeded,
+      });
+      res.json(result);
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/cognition/semantic/backfill failed");
+      res.status(500).json({ error: "jarvis_semantic_backfill_failed" });
     }
   },
 );

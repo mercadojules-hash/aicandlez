@@ -11,6 +11,7 @@ import { buildContext } from "./context.js";
 import { getHandler } from "./registry.js";
 import { orchestrator } from "./orchestrator/index.js";
 import { recordRunOutcome } from "./governance/index.js";
+import { getIndexerTickEnabled, runIndexerPass } from "./cognition/index.js";
 import type { AgentRunResult, AgentTrigger, OrchestrationExtra } from "./types.js";
 
 /**
@@ -130,6 +131,12 @@ class AgentRuntime {
       await orchestrator.pump({
         runAgent: (agent, trigger, extra) => this.runAgent(agent, trigger, extra),
       });
+      // Sprint 9: OPTIONAL semantic indexer pass — OFF by default, admin-gated
+      // via the `cognition.semanticIndexer.tickEnabled` setting. Runs on the SAME
+      // single loop (no second timer), bounded + budgeted, fail-safe (never
+      // throws). Keeps `jarvis_embeddings` (a derived read index) fresh without a
+      // separate scheduler; a disabled flag = a single cheap settings read.
+      await this.maybeIndexerPass();
     } catch (err) {
       logger.error({ err }, "jarvis runtime tick failed");
       agentBus.emitEvent({
@@ -137,6 +144,34 @@ class AgentRuntime {
         severity: "error",
         message: `Runtime tick error: ${(err as Error).message}`,
       });
+    }
+  }
+
+  /**
+   * OFF-by-default semantic indexer pass. Reads one settings flag; when disabled
+   * (the default) it returns immediately. Bounded + budgeted inside
+   * `runIndexerPass`, which never throws — but we still wrap it so a settings-read
+   * failure can never break the agent tick.
+   */
+  private async maybeIndexerPass(): Promise<void> {
+    try {
+      if (!(await getIndexerTickEnabled())) return;
+      const result = await runIndexerPass({ limit: 16 });
+      if (result.upserted > 0 || result.budgetExceeded || result.errored) {
+        agentBus.emitEvent({
+          type: "tick",
+          severity: result.errored ? "error" : "info",
+          message: `Semantic indexer: ${result.upserted} embedded, ${result.skipped} unchanged`,
+          details: {
+            upserted: result.upserted,
+            skipped: result.skipped,
+            budgetExceeded: result.budgetExceeded,
+            error: result.error,
+          },
+        });
+      }
+    } catch (err) {
+      logger.error({ err }, "jarvis semantic indexer pass failed");
     }
   }
 

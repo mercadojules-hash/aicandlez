@@ -22,6 +22,8 @@ export interface SynthesizeBriefingInput {
   audience?: string | null;
   businessId?: string | null;
   createdBy?: string | null;
+  /** Optional executive scope — personalizes recall toward this user's corpus. */
+  executiveUserId?: string | null;
 }
 
 export interface SynthesizeBriefingResult {
@@ -45,6 +47,7 @@ export async function synthesizeBriefing(
     audience: input.audience ?? null,
     businessId: input.businessId ?? null,
     createdBy: input.createdBy ?? null,
+    executiveUserId: input.executiveUserId ?? null,
     agentType: "cognition",
   });
 

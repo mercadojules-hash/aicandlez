@@ -234,6 +234,7 @@ export const jarvisKeys = {
   cognitionRuns: ["jarvis", "cognition-runs"] as const,
   cognitionRun: (id: string) => ["jarvis", "cognition-run", id] as const,
   cognitionOverview: ["jarvis", "cognition-overview"] as const,
+  semanticStatus: ["jarvis", "semantic-status"] as const,
 };
 
 // ── dashboard ────────────────────────────────────────────────────────────────
@@ -1542,6 +1543,83 @@ export function useCognitionOverview(): UseQueryResult<JarvisCognitionOverview> 
     queryFn: () =>
       authFetchJson<JarvisCognitionOverview>(`${API}/cognition/overview`),
     refetchInterval: 15000,
+  });
+}
+
+// ── Sprint 9: semantic retrieval (hybrid lexical + pgvector) ──────────────────
+
+export interface JarvisSemanticStatus {
+  enabled: boolean;
+  indexerTickEnabled: boolean;
+  model: string;
+  hasApiKey: boolean;
+  totals: { corpus: number; embedded: number };
+  perType: Record<string, { corpus: number; embedded: number }>;
+  lastRun: {
+    status: string;
+    createdAt: string;
+    costMicros: number;
+    error: string | null;
+  } | null;
+}
+
+export interface JarvisBackfillResult {
+  ok: boolean;
+  scanned: number;
+  upserted: number;
+  skipped: number;
+  empty: number;
+  budgetExceeded: boolean;
+  errored: boolean;
+  error: string | null;
+  perType: Record<string, { upserted: number; skipped: number }>;
+}
+
+export function useSemanticStatus(): UseQueryResult<JarvisSemanticStatus> {
+  return useQuery({
+    queryKey: jarvisKeys.semanticStatus,
+    queryFn: () =>
+      authFetchJson<JarvisSemanticStatus>(`${API}/cognition/semantic/status`),
+    refetchInterval: 15000,
+  });
+}
+
+export function useSetSemanticEnabled() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (enabled: boolean) =>
+      authFetchJson<{ enabled: boolean }>(`${API}/cognition/semantic/enabled`, {
+        method: "POST",
+        body: JSON.stringify({ enabled }),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useSetIndexerTickEnabled() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (enabled: boolean) =>
+      authFetchJson<{ enabled: boolean }>(
+        `${API}/cognition/semantic/indexer-tick`,
+        {
+          method: "POST",
+          body: JSON.stringify({ enabled }),
+        },
+      ),
+    onSuccess: invalidate,
+  });
+}
+
+export function useRunSemanticBackfill() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (limit?: number) =>
+      authFetchJson<JarvisBackfillResult>(`${API}/cognition/semantic/backfill`, {
+        method: "POST",
+        body: JSON.stringify(limit != null ? { limit } : {}),
+      }),
+    onSuccess: invalidate,
   });
 }
 

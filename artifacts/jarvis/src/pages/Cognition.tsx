@@ -1,7 +1,8 @@
-import { Brain, Gauge, Coins, Activity } from "lucide-react";
+import { Brain, Gauge, Coins, Activity, Layers, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -18,6 +19,10 @@ import {
   useCognitionOverview,
   useCognitionEnabled,
   useSetCognitionEnabled,
+  useSemanticStatus,
+  useSetSemanticEnabled,
+  useSetIndexerTickEnabled,
+  useRunSemanticBackfill,
   type CognitionRunStatus,
 } from "@/hooks/useJarvisApi";
 
@@ -62,6 +67,168 @@ function StatCard({
 
 function formatUsd(micros: number): string {
   return `$${(micros / 1_000_000).toFixed(4)}`;
+}
+
+function coveragePct(embedded: number, corpus: number): number {
+  if (corpus <= 0) return 0;
+  return Math.min(100, Math.round((embedded / corpus) * 100));
+}
+
+function SemanticRetrievalCard({ isAdmin }: { isAdmin: boolean }) {
+  const { data, isLoading, isError } = useSemanticStatus();
+  const setSemantic = useSetSemanticEnabled();
+  const setTick = useSetIndexerTickEnabled();
+  const backfill = useRunSemanticBackfill();
+
+  async function onToggleSemantic(next: boolean) {
+    try {
+      await setSemantic.mutateAsync(next);
+      toast.success(next ? "Semantic retrieval enabled." : "Semantic retrieval disabled.");
+    } catch {
+      toast.error("Toggle failed — you may lack the required role.");
+    }
+  }
+
+  async function onToggleTick(next: boolean) {
+    try {
+      await setTick.mutateAsync(next);
+      toast.success(next ? "Indexer tick pass enabled." : "Indexer tick pass disabled.");
+    } catch {
+      toast.error("Toggle failed — you may lack the required role.");
+    }
+  }
+
+  async function onBackfill() {
+    try {
+      const res = await backfill.mutateAsync(undefined);
+      if (res.budgetExceeded) {
+        toast.warning(`Backfill stopped — budget exceeded (${res.upserted} embedded).`);
+      } else if (res.errored) {
+        toast.error(`Backfill error: ${res.error ?? "unknown"}`);
+      } else {
+        toast.success(`Backfill complete — ${res.upserted} embedded, ${res.skipped} unchanged.`);
+      }
+    } catch {
+      toast.error("Backfill failed — you may lack the required role.");
+    }
+  }
+
+  return (
+    <Card>
+      <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-3">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-primary" />
+          <h2 className="text-sm font-semibold">Semantic Retrieval</h2>
+          {data ? (
+            <Badge
+              variant="outline"
+              className={
+                data.enabled
+                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-500"
+                  : "border-border bg-muted text-muted-foreground"
+              }
+            >
+              {data.enabled ? "Hybrid" : "Lexical-only"}
+            </Badge>
+          ) : null}
+        </div>
+        {isAdmin && data ? (
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Label htmlFor="sem-toggle" className="text-xs text-muted-foreground">
+                Semantic
+              </Label>
+              <Switch
+                id="sem-toggle"
+                checked={data.enabled}
+                disabled={setSemantic.isPending}
+                onCheckedChange={onToggleSemantic}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="tick-toggle" className="text-xs text-muted-foreground">
+                Tick index
+              </Label>
+              <Switch
+                id="tick-toggle"
+                checked={data.indexerTickEnabled}
+                disabled={setTick.isPending}
+                onCheckedChange={onToggleTick}
+              />
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={backfill.isPending}
+              onClick={onBackfill}
+            >
+              {backfill.isPending ? "Backfilling…" : "Backfill"}
+            </Button>
+          </div>
+        ) : null}
+      </div>
+
+      {isLoading ? (
+        <div className="p-5">
+          <Skeleton className="h-24 w-full" />
+        </div>
+      ) : isError || !data ? (
+        <p className="p-8 text-center text-sm text-destructive">
+          Failed to load semantic status.
+        </p>
+      ) : (
+        <div className="space-y-4 p-5">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <StatCard
+              label="Embedding Coverage"
+              value={`${coveragePct(data.totals.embedded, data.totals.corpus)}%`}
+              hint={`${data.totals.embedded} / ${data.totals.corpus} indexed`}
+              icon={Layers}
+            />
+            <StatCard
+              label="Model"
+              value={data.hasApiKey ? "Ready" : "No key"}
+              hint={data.model}
+              icon={Brain}
+            />
+            <StatCard
+              label="Last Index Run"
+              value={data.lastRun ? data.lastRun.status : "—"}
+              hint={
+                data.lastRun
+                  ? new Date(data.lastRun.createdAt).toLocaleString()
+                  : "never run"
+              }
+              icon={Activity}
+            />
+          </div>
+
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Type</TableHead>
+                <TableHead>Embedded</TableHead>
+                <TableHead>Corpus</TableHead>
+                <TableHead>Coverage</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {Object.entries(data.perType).map(([type, c]) => (
+                <TableRow key={type}>
+                  <TableCell className="font-medium capitalize">{type}</TableCell>
+                  <TableCell className="text-muted-foreground">{c.embedded}</TableCell>
+                  <TableCell className="text-muted-foreground">{c.corpus}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {coveragePct(c.embedded, c.corpus)}%
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+    </Card>
+  );
 }
 
 export default function Cognition() {
@@ -215,6 +382,8 @@ export default function Cognition() {
               </Table>
             )}
           </Card>
+
+          <SemanticRetrievalCard isAdmin={!roleLoading && isAdmin} />
         </>
       )}
     </div>

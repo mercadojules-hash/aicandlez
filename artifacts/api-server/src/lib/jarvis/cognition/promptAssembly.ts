@@ -40,17 +40,31 @@ export function getSystemPrompt(): string {
   return SYSTEM_PROMPT;
 }
 
+/**
+ * Approximate token budget for the assembled CONTEXT block. We greedily include
+ * docs (already ranked: hop-0 fused hits first, hop-1 neighbours last) until the
+ * budget is reached, always keeping at least the top doc. ~4 chars/token is the
+ * standard rough proxy — this bounds prompt cost without a tokenizer dependency.
+ */
+const MAX_CONTEXT_CHARS = 9000;
+
 function contextBlock(docs: RetrievedDoc[]): string {
   if (docs.length === 0) {
     return "CONTEXT: (none — no grounding sources were retrieved)";
   }
-  const lines = docs.map((d) => {
+  const lines: string[] = [];
+  let used = 0;
+  for (const d of docs) {
     const tag = d.hop === 1 ? " (related)" : "";
-    return [
+    const block = [
       `[${d.type}:${d.id}]${tag} ${d.title}`,
       d.text ? d.text : "(no body)",
     ].join("\n");
-  });
+    // Always include the first (highest-ranked) doc; budget-gate the rest.
+    if (lines.length > 0 && used + block.length > MAX_CONTEXT_CHARS) break;
+    lines.push(block);
+    used += block.length;
+  }
   return ["CONTEXT:", ...lines].join("\n\n");
 }
 

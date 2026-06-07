@@ -106,6 +106,13 @@ export interface ThinkInput {
   audience?: string | null;
   businessId?: string | null;
   createdBy?: string | null;
+  /**
+   * Optional executive scope (Sprint 9). When set, retrieval BOOSTS (never hard-
+   * filters) corpus authored by this user so recall is personalized to the
+   * executive, while org-global knowledge remains available (org→global default,
+   * opt-in executive scope). Distinct from `createdBy`, which attributes the run.
+   */
+  executiveUserId?: string | null;
   agentId?: string | null;
   agentType?: string | null;
   /** Max direct (hop-0) docs to retrieve. Default 8. */

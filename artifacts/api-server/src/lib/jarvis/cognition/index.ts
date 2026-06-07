@@ -33,6 +33,29 @@ export {
   type CognitionBudgetState,
 } from "./budget.js";
 export { callModel, estimateCostMicros, COGNITION_MODEL } from "./provider.js";
+export {
+  embed,
+  embedOne,
+  estimateEmbeddingCostMicros,
+  recordEmbeddingRun,
+  EMBEDDING_MODEL,
+  EMBEDDING_DIMS,
+  EMBEDDING_MAX_BATCH,
+  type EmbeddingResult,
+} from "./embeddings.js";
+export {
+  runIndexerPass,
+  getSemanticStatus,
+  getSemanticRetrievalEnabled,
+  setSemanticRetrievalEnabled,
+  getIndexerTickEnabled,
+  setIndexerTickEnabled,
+  INDEXED_SUBJECT_TYPES,
+  SETTING_SEMANTIC_ENABLED,
+  SETTING_INDEXER_TICK_ENABLED,
+  type IndexerPassResult,
+  type SemanticStatus,
+} from "./indexer.js";
 
 const VALID_TYPES: ReadonlySet<string> = new Set([
   "memory", "asset", "category", "decision", "task",
@@ -68,6 +91,7 @@ async function recordRun(args: RecordRunArgs): Promise<string | null> {
           period: args.input.period ?? null,
           audience: args.input.audience ?? null,
           businessId: args.input.businessId ?? null,
+          executiveUserId: args.input.executiveUserId ?? null,
         },
         promptHash: args.promptHash,
         retrievedRefs: args.retrievedRefs,
