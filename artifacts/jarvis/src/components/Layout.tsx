@@ -14,6 +14,13 @@ import {
   History,
   ScrollText,
   Settings as SettingsIcon,
+  Gauge,
+  Brain,
+  BookOpen,
+  FolderTree,
+  Network,
+  Search as SearchIcon,
+  Compass,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -34,6 +41,13 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Decisions", path: "/decisions", icon: GitBranch },
   { label: "Escalations", path: "/escalations", icon: AlertTriangle },
   { label: "Approvals", path: "/approvals", icon: CheckSquare },
+  { label: "Memory", path: "/memory", icon: Gauge },
+  { label: "Executive Memory", path: "/memories", icon: Brain },
+  { label: "Knowledge", path: "/knowledge", icon: BookOpen },
+  { label: "Categories", path: "/categories", icon: FolderTree },
+  { label: "Relationships", path: "/relationships", icon: Network },
+  { label: "Search", path: "/search", icon: SearchIcon },
+  { label: "Navigation", path: "/navigation", icon: Compass },
   { label: "Timeline", path: "/timeline", icon: History },
   { label: "Audit Log", path: "/audit", icon: ScrollText },
   { label: "Settings", path: "/settings", icon: SettingsIcon },

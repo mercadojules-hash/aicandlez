@@ -17,7 +17,7 @@
  *   PUT    /jarvis/settings                  (admin) — upsert keys (role-gated)
  */
 import { Router, type IRouter, type Request, type Response } from "express";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, ilike, or, and } from "drizzle-orm";
 import { z } from "zod/v4";
 import {
   db,
@@ -32,6 +32,10 @@ import {
   jarvisDecisionsTable,
   jarvisEscalationsTable,
   jarvisApprovalsTable,
+  jarvisKnowledgeCategoriesTable,
+  jarvisKnowledgeAssetsTable,
+  jarvisMemoriesTable,
+  jarvisKnowledgeRelationshipsTable,
 } from "@workspace/db";
 import { requireAuth, requireRole } from "../middlewares/requireAuth.js";
 
@@ -1000,6 +1004,7 @@ router.delete(
         res.status(404).json({ error: "not_found" });
         return;
       }
+      await deleteRelationshipsForNode("task", row.id);
       await audit(req, actor, "delete", "task", row.id, { title: row.title });
       res.json({ ok: true, id: row.id });
     } catch (err) {
@@ -1170,6 +1175,7 @@ router.delete(
         res.status(404).json({ error: "not_found" });
         return;
       }
+      await deleteRelationshipsForNode("decision", row.id);
       await audit(req, actor, "delete", "decision", row.id, { title: row.title });
       res.json({ ok: true, id: row.id });
     } catch (err) {
@@ -1571,6 +1577,970 @@ router.get(
     } catch (err) {
       req.log.error({ err }, "GET /jarvis/operations failed");
       res.status(500).json({ error: "jarvis_operations_failed" });
+    }
+  },
+);
+
+// ── Sprint 3 — memory & knowledge layer ──────────────────────────────────────
+// Knowledge Categories (taxonomy) · Knowledge Assets (repository) · Memories
+// (executive memory) · Knowledge Relationships (typed graph edges). Search,
+// knowledge-graph and memory/overview are derived read surfaces.
+
+const KNOWLEDGE_NODE_TYPES = [
+  "memory",
+  "asset",
+  "category",
+  "decision",
+  "task",
+] as const;
+type KnowledgeNodeType = (typeof KNOWLEDGE_NODE_TYPES)[number];
+
+async function categoryExists(id: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: jarvisKnowledgeCategoriesTable.id })
+    .from(jarvisKnowledgeCategoriesTable)
+    .where(eq(jarvisKnowledgeCategoriesTable.id, id))
+    .limit(1);
+  return Boolean(row);
+}
+
+async function assetExists(id: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: jarvisKnowledgeAssetsTable.id })
+    .from(jarvisKnowledgeAssetsTable)
+    .where(eq(jarvisKnowledgeAssetsTable.id, id))
+    .limit(1);
+  return Boolean(row);
+}
+
+async function memoryExists(id: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: jarvisMemoriesTable.id })
+    .from(jarvisMemoriesTable)
+    .where(eq(jarvisMemoriesTable.id, id))
+    .limit(1);
+  return Boolean(row);
+}
+
+async function decisionExists(id: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: jarvisDecisionsTable.id })
+    .from(jarvisDecisionsTable)
+    .where(eq(jarvisDecisionsTable.id, id))
+    .limit(1);
+  return Boolean(row);
+}
+
+async function taskExists(id: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: jarvisTasksTable.id })
+    .from(jarvisTasksTable)
+    .where(eq(jarvisTasksTable.id, id))
+    .limit(1);
+  return Boolean(row);
+}
+
+async function nodeExists(type: KnowledgeNodeType, id: string): Promise<boolean> {
+  switch (type) {
+    case "memory":
+      return memoryExists(id);
+    case "asset":
+      return assetExists(id);
+    case "category":
+      return categoryExists(id);
+    case "decision":
+      return decisionExists(id);
+    case "task":
+      return taskExists(id);
+    default:
+      return false;
+  }
+}
+
+// Detach typed edges that reference a node being deleted (best-effort; the
+// polymorphic relationship table carries no DB-level FK).
+async function deleteRelationshipsForNode(
+  type: KnowledgeNodeType,
+  id: string,
+): Promise<void> {
+  await db.delete(jarvisKnowledgeRelationshipsTable).where(
+    or(
+      and(
+        eq(jarvisKnowledgeRelationshipsTable.sourceType, type),
+        eq(jarvisKnowledgeRelationshipsTable.sourceId, id),
+      ),
+      and(
+        eq(jarvisKnowledgeRelationshipsTable.targetType, type),
+        eq(jarvisKnowledgeRelationshipsTable.targetId, id),
+      ),
+    ),
+  );
+}
+
+async function uniqueCategorySlug(name: string): Promise<string> {
+  const base = slugify(name);
+  const [clash] = await db
+    .select({ id: jarvisKnowledgeCategoriesTable.id })
+    .from(jarvisKnowledgeCategoriesTable)
+    .where(eq(jarvisKnowledgeCategoriesTable.slug, base))
+    .limit(1);
+  return clash ? `${base}-${Date.now().toString(36).slice(-4)}` : base;
+}
+
+const tagsSchema = z.array(z.string().trim().min(1).max(60)).max(40).optional().nullable();
+const longText = z.string().trim().max(50000).optional().nullable();
+
+// ── knowledge categories ─────────────────────────────────────────────────────
+
+const categoryBodySchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  description: optionalText,
+  color: z.string().trim().max(32).optional().nullable(),
+  parentId: optionalUuid,
+  status: statusSchema.optional(),
+});
+
+router.get(
+  "/jarvis/knowledge-categories",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const rows = await db
+        .select()
+        .from(jarvisKnowledgeCategoriesTable)
+        .orderBy(desc(jarvisKnowledgeCategoriesTable.createdAt));
+      res.json({ categories: rows });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/knowledge-categories failed");
+      res.status(500).json({ error: "jarvis_categories_read_failed" });
+    }
+  },
+);
+
+router.post(
+  "/jarvis/knowledge-categories",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = categoryBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_category" });
+      return;
+    }
+    if (parsed.data.parentId && !(await categoryExists(parsed.data.parentId))) {
+      res.status(400).json({ error: "invalid_parent_reference" });
+      return;
+    }
+    try {
+      const [row] = await db
+        .insert(jarvisKnowledgeCategoriesTable)
+        .values({
+          name: parsed.data.name,
+          slug: await uniqueCategorySlug(parsed.data.name),
+          description: parsed.data.description ?? null,
+          color: parsed.data.color ?? null,
+          parentId: parsed.data.parentId ?? null,
+          status: parsed.data.status ?? "active",
+        })
+        .returning();
+      await audit(req, actor, "create", "knowledge_category", row.id, {
+        name: row.name,
+      });
+      res.status(201).json({ category: row });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/knowledge-categories failed");
+      res.status(500).json({ error: "jarvis_category_create_failed" });
+    }
+  },
+);
+
+router.get(
+  "/jarvis/knowledge-categories/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const [row] = await db
+        .select()
+        .from(jarvisKnowledgeCategoriesTable)
+        .where(eq(jarvisKnowledgeCategoriesTable.id, String(req.params.id)))
+        .limit(1);
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      res.json({ category: row });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/knowledge-categories/:id failed");
+      res.status(500).json({ error: "jarvis_category_read_failed" });
+    }
+  },
+);
+
+router.put(
+  "/jarvis/knowledge-categories/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const id = String(req.params.id);
+    const parsed = categoryBodySchema.partial().safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_category" });
+      return;
+    }
+    if (parsed.data.parentId) {
+      if (parsed.data.parentId === id) {
+        res.status(400).json({ error: "category_cannot_parent_itself" });
+        return;
+      }
+      if (!(await categoryExists(parsed.data.parentId))) {
+        res.status(400).json({ error: "invalid_parent_reference" });
+        return;
+      }
+    }
+    try {
+      const [row] = await db
+        .update(jarvisKnowledgeCategoriesTable)
+        .set({
+          ...(parsed.data.name !== undefined ? { name: parsed.data.name } : {}),
+          ...(parsed.data.description !== undefined
+            ? { description: parsed.data.description ?? null }
+            : {}),
+          ...(parsed.data.color !== undefined
+            ? { color: parsed.data.color ?? null }
+            : {}),
+          ...(parsed.data.parentId !== undefined
+            ? { parentId: parsed.data.parentId ?? null }
+            : {}),
+          ...(parsed.data.status !== undefined ? { status: parsed.data.status } : {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(jarvisKnowledgeCategoriesTable.id, id))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await audit(req, actor, "update", "knowledge_category", row.id, {
+        name: row.name,
+      });
+      res.json({ category: row });
+    } catch (err) {
+      req.log.error({ err }, "PUT /jarvis/knowledge-categories/:id failed");
+      res.status(500).json({ error: "jarvis_category_update_failed" });
+    }
+  },
+);
+
+router.delete(
+  "/jarvis/knowledge-categories/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const id = String(req.params.id);
+    try {
+      const [row] = await db
+        .delete(jarvisKnowledgeCategoriesTable)
+        .where(eq(jarvisKnowledgeCategoriesTable.id, id))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await deleteRelationshipsForNode("category", id);
+      await audit(req, actor, "delete", "knowledge_category", id, { name: row.name });
+      res.json({ ok: true });
+    } catch (err) {
+      req.log.error({ err }, "DELETE /jarvis/knowledge-categories/:id failed");
+      res.status(500).json({ error: "jarvis_category_delete_failed" });
+    }
+  },
+);
+
+// ── knowledge assets (repository) ────────────────────────────────────────────
+
+const assetBodySchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  summary: optionalText,
+  content: longText,
+  assetType: z.string().trim().min(1).max(32).optional(),
+  sourceUrl: z.string().trim().max(2048).optional().nullable(),
+  categoryId: optionalUuid,
+  businessId: optionalUuid,
+  tags: tagsSchema,
+  status: statusSchema.optional(),
+});
+
+async function validateAssetRefs(refs: {
+  categoryId?: string | null;
+  businessId?: string | null;
+}): Promise<string | null> {
+  if (refs.categoryId && !(await categoryExists(refs.categoryId)))
+    return "invalid_category_reference";
+  if (refs.businessId && !(await businessExists(refs.businessId)))
+    return "invalid_business_reference";
+  return null;
+}
+
+router.get(
+  "/jarvis/knowledge-assets",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const rows = await db
+        .select()
+        .from(jarvisKnowledgeAssetsTable)
+        .orderBy(desc(jarvisKnowledgeAssetsTable.updatedAt));
+      res.json({ assets: rows });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/knowledge-assets failed");
+      res.status(500).json({ error: "jarvis_assets_read_failed" });
+    }
+  },
+);
+
+router.post(
+  "/jarvis/knowledge-assets",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = assetBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_asset" });
+      return;
+    }
+    const refErr = await validateAssetRefs(parsed.data);
+    if (refErr) {
+      res.status(400).json({ error: refErr });
+      return;
+    }
+    try {
+      const [row] = await db
+        .insert(jarvisKnowledgeAssetsTable)
+        .values({
+          title: parsed.data.title,
+          summary: parsed.data.summary ?? null,
+          content: parsed.data.content ?? null,
+          assetType: parsed.data.assetType ?? "document",
+          sourceUrl: parsed.data.sourceUrl ?? null,
+          categoryId: parsed.data.categoryId ?? null,
+          businessId: parsed.data.businessId ?? null,
+          tags: parsed.data.tags ?? null,
+          status: parsed.data.status ?? "active",
+          createdBy: actor.email ?? actor.userId,
+        })
+        .returning();
+      await audit(req, actor, "create", "knowledge_asset", row.id, {
+        title: row.title,
+      });
+      res.status(201).json({ asset: row });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/knowledge-assets failed");
+      res.status(500).json({ error: "jarvis_asset_create_failed" });
+    }
+  },
+);
+
+router.get(
+  "/jarvis/knowledge-assets/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const [row] = await db
+        .select()
+        .from(jarvisKnowledgeAssetsTable)
+        .where(eq(jarvisKnowledgeAssetsTable.id, String(req.params.id)))
+        .limit(1);
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      res.json({ asset: row });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/knowledge-assets/:id failed");
+      res.status(500).json({ error: "jarvis_asset_read_failed" });
+    }
+  },
+);
+
+router.put(
+  "/jarvis/knowledge-assets/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = assetBodySchema.partial().safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_asset" });
+      return;
+    }
+    const refErr = await validateAssetRefs(parsed.data);
+    if (refErr) {
+      res.status(400).json({ error: refErr });
+      return;
+    }
+    try {
+      const [row] = await db
+        .update(jarvisKnowledgeAssetsTable)
+        .set({
+          ...(parsed.data.title !== undefined ? { title: parsed.data.title } : {}),
+          ...(parsed.data.summary !== undefined
+            ? { summary: parsed.data.summary ?? null }
+            : {}),
+          ...(parsed.data.content !== undefined
+            ? { content: parsed.data.content ?? null }
+            : {}),
+          ...(parsed.data.assetType !== undefined
+            ? { assetType: parsed.data.assetType }
+            : {}),
+          ...(parsed.data.sourceUrl !== undefined
+            ? { sourceUrl: parsed.data.sourceUrl ?? null }
+            : {}),
+          ...(parsed.data.categoryId !== undefined
+            ? { categoryId: parsed.data.categoryId ?? null }
+            : {}),
+          ...(parsed.data.businessId !== undefined
+            ? { businessId: parsed.data.businessId ?? null }
+            : {}),
+          ...(parsed.data.tags !== undefined ? { tags: parsed.data.tags ?? null } : {}),
+          ...(parsed.data.status !== undefined ? { status: parsed.data.status } : {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(jarvisKnowledgeAssetsTable.id, String(req.params.id)))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await audit(req, actor, "update", "knowledge_asset", row.id, {
+        title: row.title,
+      });
+      res.json({ asset: row });
+    } catch (err) {
+      req.log.error({ err }, "PUT /jarvis/knowledge-assets/:id failed");
+      res.status(500).json({ error: "jarvis_asset_update_failed" });
+    }
+  },
+);
+
+router.delete(
+  "/jarvis/knowledge-assets/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const id = String(req.params.id);
+    try {
+      const [row] = await db
+        .delete(jarvisKnowledgeAssetsTable)
+        .where(eq(jarvisKnowledgeAssetsTable.id, id))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await deleteRelationshipsForNode("asset", id);
+      await audit(req, actor, "delete", "knowledge_asset", id, { title: row.title });
+      res.json({ ok: true });
+    } catch (err) {
+      req.log.error({ err }, "DELETE /jarvis/knowledge-assets/:id failed");
+      res.status(500).json({ error: "jarvis_asset_delete_failed" });
+    }
+  },
+);
+
+// ── memories (executive memory) ──────────────────────────────────────────────
+
+const memoryBodySchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  content: longText,
+  memoryType: z.string().trim().min(1).max(32).optional(),
+  importance: z.string().trim().min(1).max(16).optional(),
+  categoryId: optionalUuid,
+  businessId: optionalUuid,
+  sourceType: z.string().trim().max(64).optional().nullable(),
+  sourceId: z.string().trim().max(255).optional().nullable(),
+  pinned: z.boolean().optional(),
+  tags: tagsSchema,
+  status: statusSchema.optional(),
+});
+
+router.get(
+  "/jarvis/memories",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const rows = await db
+        .select()
+        .from(jarvisMemoriesTable)
+        .orderBy(desc(jarvisMemoriesTable.pinned), desc(jarvisMemoriesTable.updatedAt));
+      res.json({ memories: rows });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/memories failed");
+      res.status(500).json({ error: "jarvis_memories_read_failed" });
+    }
+  },
+);
+
+router.post(
+  "/jarvis/memories",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = memoryBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_memory" });
+      return;
+    }
+    const refErr = await validateAssetRefs(parsed.data);
+    if (refErr) {
+      res.status(400).json({ error: refErr });
+      return;
+    }
+    try {
+      const [row] = await db
+        .insert(jarvisMemoriesTable)
+        .values({
+          title: parsed.data.title,
+          content: parsed.data.content ?? null,
+          memoryType: parsed.data.memoryType ?? "fact",
+          importance: parsed.data.importance ?? "normal",
+          categoryId: parsed.data.categoryId ?? null,
+          businessId: parsed.data.businessId ?? null,
+          sourceType: parsed.data.sourceType ?? null,
+          sourceId: parsed.data.sourceId ?? null,
+          pinned: parsed.data.pinned ?? false,
+          tags: parsed.data.tags ?? null,
+          status: parsed.data.status ?? "active",
+          createdBy: actor.email ?? actor.userId,
+        })
+        .returning();
+      await audit(req, actor, "create", "memory", row.id, { title: row.title });
+      res.status(201).json({ memory: row });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/memories failed");
+      res.status(500).json({ error: "jarvis_memory_create_failed" });
+    }
+  },
+);
+
+router.get(
+  "/jarvis/memories/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const [row] = await db
+        .select()
+        .from(jarvisMemoriesTable)
+        .where(eq(jarvisMemoriesTable.id, String(req.params.id)))
+        .limit(1);
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      res.json({ memory: row });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/memories/:id failed");
+      res.status(500).json({ error: "jarvis_memory_read_failed" });
+    }
+  },
+);
+
+router.put(
+  "/jarvis/memories/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = memoryBodySchema.partial().safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_memory" });
+      return;
+    }
+    const refErr = await validateAssetRefs(parsed.data);
+    if (refErr) {
+      res.status(400).json({ error: refErr });
+      return;
+    }
+    try {
+      const [row] = await db
+        .update(jarvisMemoriesTable)
+        .set({
+          ...(parsed.data.title !== undefined ? { title: parsed.data.title } : {}),
+          ...(parsed.data.content !== undefined
+            ? { content: parsed.data.content ?? null }
+            : {}),
+          ...(parsed.data.memoryType !== undefined
+            ? { memoryType: parsed.data.memoryType }
+            : {}),
+          ...(parsed.data.importance !== undefined
+            ? { importance: parsed.data.importance }
+            : {}),
+          ...(parsed.data.categoryId !== undefined
+            ? { categoryId: parsed.data.categoryId ?? null }
+            : {}),
+          ...(parsed.data.businessId !== undefined
+            ? { businessId: parsed.data.businessId ?? null }
+            : {}),
+          ...(parsed.data.sourceType !== undefined
+            ? { sourceType: parsed.data.sourceType ?? null }
+            : {}),
+          ...(parsed.data.sourceId !== undefined
+            ? { sourceId: parsed.data.sourceId ?? null }
+            : {}),
+          ...(parsed.data.pinned !== undefined ? { pinned: parsed.data.pinned } : {}),
+          ...(parsed.data.tags !== undefined ? { tags: parsed.data.tags ?? null } : {}),
+          ...(parsed.data.status !== undefined ? { status: parsed.data.status } : {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(jarvisMemoriesTable.id, String(req.params.id)))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await audit(req, actor, "update", "memory", row.id, { title: row.title });
+      res.json({ memory: row });
+    } catch (err) {
+      req.log.error({ err }, "PUT /jarvis/memories/:id failed");
+      res.status(500).json({ error: "jarvis_memory_update_failed" });
+    }
+  },
+);
+
+router.delete(
+  "/jarvis/memories/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const id = String(req.params.id);
+    try {
+      const [row] = await db
+        .delete(jarvisMemoriesTable)
+        .where(eq(jarvisMemoriesTable.id, id))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await deleteRelationshipsForNode("memory", id);
+      await audit(req, actor, "delete", "memory", id, { title: row.title });
+      res.json({ ok: true });
+    } catch (err) {
+      req.log.error({ err }, "DELETE /jarvis/memories/:id failed");
+      res.status(500).json({ error: "jarvis_memory_delete_failed" });
+    }
+  },
+);
+
+// ── knowledge relationships (graph edges) ────────────────────────────────────
+
+const relationshipBodySchema = z.object({
+  sourceType: z.enum(KNOWLEDGE_NODE_TYPES),
+  sourceId: z.string().uuid(),
+  targetType: z.enum(KNOWLEDGE_NODE_TYPES),
+  targetId: z.string().uuid(),
+  relationType: z.string().trim().min(1).max(48).optional(),
+  note: optionalText,
+});
+
+router.get(
+  "/jarvis/knowledge-relationships",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const rows = await db
+        .select()
+        .from(jarvisKnowledgeRelationshipsTable)
+        .orderBy(desc(jarvisKnowledgeRelationshipsTable.createdAt));
+      res.json({ relationships: rows });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/knowledge-relationships failed");
+      res.status(500).json({ error: "jarvis_relationships_read_failed" });
+    }
+  },
+);
+
+router.post(
+  "/jarvis/knowledge-relationships",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = relationshipBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_relationship" });
+      return;
+    }
+    const { sourceType, sourceId, targetType, targetId } = parsed.data;
+    if (sourceType === targetType && sourceId === targetId) {
+      res.status(400).json({ error: "relationship_cannot_self_link" });
+      return;
+    }
+    if (!(await nodeExists(sourceType, sourceId))) {
+      res.status(400).json({ error: "invalid_source_reference" });
+      return;
+    }
+    if (!(await nodeExists(targetType, targetId))) {
+      res.status(400).json({ error: "invalid_target_reference" });
+      return;
+    }
+    try {
+      const [row] = await db
+        .insert(jarvisKnowledgeRelationshipsTable)
+        .values({
+          sourceType,
+          sourceId,
+          targetType,
+          targetId,
+          relationType: parsed.data.relationType ?? "relates_to",
+          note: parsed.data.note ?? null,
+          createdBy: actor.email ?? actor.userId,
+        })
+        .returning();
+      await audit(req, actor, "create", "knowledge_relationship", row.id, {
+        relationType: row.relationType,
+      });
+      res.status(201).json({ relationship: row });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/knowledge-relationships failed");
+      res.status(500).json({ error: "jarvis_relationship_create_failed" });
+    }
+  },
+);
+
+router.delete(
+  "/jarvis/knowledge-relationships/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const id = String(req.params.id);
+    try {
+      const [row] = await db
+        .delete(jarvisKnowledgeRelationshipsTable)
+        .where(eq(jarvisKnowledgeRelationshipsTable.id, id))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await audit(req, actor, "delete", "knowledge_relationship", id, {
+        relationType: row.relationType,
+      });
+      res.json({ ok: true });
+    } catch (err) {
+      req.log.error({ err }, "DELETE /jarvis/knowledge-relationships/:id failed");
+      res.status(500).json({ error: "jarvis_relationship_delete_failed" });
+    }
+  },
+);
+
+// ── enterprise search ────────────────────────────────────────────────────────
+
+router.get(
+  "/jarvis/search",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const q = String(req.query.q ?? "").trim();
+    const typesParam = String(req.query.types ?? "")
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
+    const wantMemories = typesParam.length === 0 || typesParam.includes("memory");
+    const wantAssets = typesParam.length === 0 || typesParam.includes("asset");
+    if (!q) {
+      res.json({ query: "", memories: [], assets: [], total: 0 });
+      return;
+    }
+    const like = `%${q.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
+    try {
+      const [memories, assets] = await Promise.all([
+        wantMemories
+          ? db
+              .select()
+              .from(jarvisMemoriesTable)
+              .where(
+                or(
+                  ilike(jarvisMemoriesTable.title, like),
+                  ilike(jarvisMemoriesTable.content, like),
+                ),
+              )
+              .orderBy(desc(jarvisMemoriesTable.updatedAt))
+              .limit(50)
+          : Promise.resolve([]),
+        wantAssets
+          ? db
+              .select()
+              .from(jarvisKnowledgeAssetsTable)
+              .where(
+                or(
+                  ilike(jarvisKnowledgeAssetsTable.title, like),
+                  ilike(jarvisKnowledgeAssetsTable.summary, like),
+                  ilike(jarvisKnowledgeAssetsTable.content, like),
+                ),
+              )
+              .orderBy(desc(jarvisKnowledgeAssetsTable.updatedAt))
+              .limit(50)
+          : Promise.resolve([]),
+      ]);
+      res.json({
+        query: q,
+        memories,
+        assets,
+        total: memories.length + assets.length,
+      });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/search failed");
+      res.status(500).json({ error: "jarvis_search_failed" });
+    }
+  },
+);
+
+// ── knowledge graph (memory navigation) ──────────────────────────────────────
+
+router.get(
+  "/jarvis/knowledge-graph",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const [categories, assets, memories, decisions, tasks, relationships] =
+        await Promise.all([
+          db
+            .select()
+            .from(jarvisKnowledgeCategoriesTable)
+            .orderBy(desc(jarvisKnowledgeCategoriesTable.createdAt))
+            .limit(300),
+          db
+            .select()
+            .from(jarvisKnowledgeAssetsTable)
+            .orderBy(desc(jarvisKnowledgeAssetsTable.updatedAt))
+            .limit(300),
+          db
+            .select()
+            .from(jarvisMemoriesTable)
+            .orderBy(desc(jarvisMemoriesTable.updatedAt))
+            .limit(300),
+          db
+            .select()
+            .from(jarvisDecisionsTable)
+            .orderBy(desc(jarvisDecisionsTable.createdAt))
+            .limit(300),
+          db
+            .select()
+            .from(jarvisTasksTable)
+            .orderBy(desc(jarvisTasksTable.createdAt))
+            .limit(300),
+          db
+            .select()
+            .from(jarvisKnowledgeRelationshipsTable)
+            .orderBy(desc(jarvisKnowledgeRelationshipsTable.createdAt))
+            .limit(1000),
+        ]);
+      const nodes = [
+        ...categories.map((c) => ({
+          id: c.id,
+          type: "category" as const,
+          label: c.name,
+          meta: { color: c.color, status: c.status },
+        })),
+        ...assets.map((a) => ({
+          id: a.id,
+          type: "asset" as const,
+          label: a.title,
+          meta: { assetType: a.assetType, status: a.status },
+        })),
+        ...memories.map((m) => ({
+          id: m.id,
+          type: "memory" as const,
+          label: m.title,
+          meta: {
+            memoryType: m.memoryType,
+            importance: m.importance,
+            pinned: m.pinned,
+          },
+        })),
+        ...decisions.map((d) => ({
+          id: d.id,
+          type: "decision" as const,
+          label: d.title,
+          meta: { status: d.status },
+        })),
+        ...tasks.map((t) => ({
+          id: t.id,
+          type: "task" as const,
+          label: t.title,
+          meta: { status: t.status, priority: t.priority },
+        })),
+      ];
+      const edges = relationships.map((r) => ({
+        id: r.id,
+        source: { type: r.sourceType, id: r.sourceId },
+        target: { type: r.targetType, id: r.targetId },
+        relationType: r.relationType,
+        note: r.note,
+      }));
+      res.json({
+        nodes,
+        edges,
+        counts: {
+          categories: categories.length,
+          assets: assets.length,
+          memories: memories.length,
+          relationships: relationships.length,
+        },
+        generatedAt: Date.now(),
+      });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/knowledge-graph failed");
+      res.status(500).json({ error: "jarvis_knowledge_graph_failed" });
+    }
+  },
+);
+
+// ── memory dashboard (overview) ──────────────────────────────────────────────
+
+router.get(
+  "/jarvis/memory/overview",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const [memories, assets, categories, relationships] = await Promise.all([
+        db
+          .select()
+          .from(jarvisMemoriesTable)
+          .orderBy(desc(jarvisMemoriesTable.updatedAt)),
+        db
+          .select()
+          .from(jarvisKnowledgeAssetsTable)
+          .orderBy(desc(jarvisKnowledgeAssetsTable.updatedAt)),
+        db.select().from(jarvisKnowledgeCategoriesTable),
+        db
+          .select({
+            relationType: jarvisKnowledgeRelationshipsTable.relationType,
+          })
+          .from(jarvisKnowledgeRelationshipsTable),
+      ]);
+      res.json({
+        counts: {
+          memories: memories.length,
+          assets: assets.length,
+          categories: categories.length,
+          relationships: relationships.length,
+          pinned: memories.filter((m) => m.pinned).length,
+        },
+        memories: {
+          byType: tallyBy(memories, (m) => m.memoryType),
+          byImportance: tallyBy(memories, (m) => m.importance),
+        },
+        assets: {
+          byType: tallyBy(assets, (a) => a.assetType),
+        },
+        relationships: {
+          byType: tallyBy(relationships, (r) => r.relationType),
+        },
+        pinnedMemories: memories.filter((m) => m.pinned).slice(0, 8),
+        recentMemories: memories.slice(0, 8),
+        recentAssets: assets.slice(0, 8),
+        generatedAt: Date.now(),
+      });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/memory/overview failed");
+      res.status(500).json({ error: "jarvis_memory_overview_failed" });
     }
   },
 );

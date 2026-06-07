@@ -25,6 +25,13 @@ import Approvals from "@/pages/Approvals";
 import Timeline from "@/pages/Timeline";
 import Audit from "@/pages/Audit";
 import Settings from "@/pages/Settings";
+import MemoryDashboard from "@/pages/MemoryDashboard";
+import Memories from "@/pages/Memories";
+import Knowledge from "@/pages/Knowledge";
+import Categories from "@/pages/Categories";
+import Relationships from "@/pages/Relationships";
+import Search from "@/pages/Search";
+import Navigation from "@/pages/Navigation";
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
 const basePath = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
@@ -180,6 +187,41 @@ function AppRoutes() {
       <Route path="/approvals">
         <Protected>
           <Approvals />
+        </Protected>
+      </Route>
+      <Route path="/memory">
+        <Protected>
+          <MemoryDashboard />
+        </Protected>
+      </Route>
+      <Route path="/memories">
+        <Protected>
+          <Memories />
+        </Protected>
+      </Route>
+      <Route path="/knowledge">
+        <Protected>
+          <Knowledge />
+        </Protected>
+      </Route>
+      <Route path="/categories">
+        <Protected>
+          <Categories />
+        </Protected>
+      </Route>
+      <Route path="/relationships">
+        <Protected>
+          <Relationships />
+        </Protected>
+      </Route>
+      <Route path="/search">
+        <Protected>
+          <Search />
+        </Protected>
+      </Route>
+      <Route path="/navigation">
+        <Protected>
+          <Navigation />
         </Protected>
       </Route>
       <Route path="/timeline">

@@ -186,6 +186,13 @@ export const jarvisKeys = {
   escalations: ["jarvis", "escalations"] as const,
   approvals: ["jarvis", "approvals"] as const,
   operations: ["jarvis", "operations"] as const,
+  categories: ["jarvis", "knowledge-categories"] as const,
+  assets: ["jarvis", "knowledge-assets"] as const,
+  memories: ["jarvis", "memories"] as const,
+  relationships: ["jarvis", "knowledge-relationships"] as const,
+  search: ["jarvis", "search"] as const,
+  knowledgeGraph: ["jarvis", "knowledge-graph"] as const,
+  memoryOverview: ["jarvis", "memory-overview"] as const,
 };
 
 // ── dashboard ────────────────────────────────────────────────────────────────
@@ -668,6 +675,371 @@ export function useOperations(): UseQueryResult<JarvisOperations> {
   return useQuery({
     queryKey: jarvisKeys.operations,
     queryFn: () => authFetchJson<JarvisOperations>(`${API}/operations`),
+    refetchInterval: 15000,
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sprint 3 — memory & knowledge layer
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface JarvisKnowledgeCategory {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  color: string | null;
+  parentId: string | null;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JarvisKnowledgeAsset {
+  id: string;
+  title: string;
+  summary: string | null;
+  content: string | null;
+  assetType: string;
+  sourceUrl: string | null;
+  categoryId: string | null;
+  businessId: string | null;
+  tags: string[] | null;
+  status: string;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JarvisMemory {
+  id: string;
+  title: string;
+  content: string | null;
+  memoryType: string;
+  importance: string;
+  categoryId: string | null;
+  businessId: string | null;
+  sourceType: string | null;
+  sourceId: string | null;
+  pinned: boolean;
+  tags: string[] | null;
+  status: string;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JarvisKnowledgeRelationship {
+  id: string;
+  sourceType: string;
+  sourceId: string;
+  targetType: string;
+  targetId: string;
+  relationType: string;
+  note: string | null;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ── knowledge categories ─────────────────────────────────────────────────────
+
+export interface CategoryInput {
+  name: string;
+  description?: string | null;
+  color?: string | null;
+  parentId?: string | null;
+  status?: string;
+}
+
+export const useCategories = makeListHook<JarvisKnowledgeCategory>({
+  path: "knowledge-categories",
+  listKey: jarvisKeys.categories,
+  listField: "categories",
+  itemField: "category",
+});
+
+export function useCreateCategory() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (input: CategoryInput) =>
+      authFetchJson<{ category: JarvisKnowledgeCategory }>(
+        `${API}/knowledge-categories`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateCategory() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: ({ id, ...input }: CategoryInput & { id: string }) =>
+      authFetchJson<{ category: JarvisKnowledgeCategory }>(
+        `${API}/knowledge-categories/${id}`,
+        { method: "PUT", body: JSON.stringify(input) },
+      ),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteCategory() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (id: string) =>
+      authFetchJson<{ ok: boolean }>(`${API}/knowledge-categories/${id}`, {
+        method: "DELETE",
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+// ── knowledge assets ─────────────────────────────────────────────────────────
+
+export interface AssetInput {
+  title: string;
+  summary?: string | null;
+  content?: string | null;
+  assetType?: string;
+  sourceUrl?: string | null;
+  categoryId?: string | null;
+  businessId?: string | null;
+  tags?: string[] | null;
+  status?: string;
+}
+
+export const useAssets = makeListHook<JarvisKnowledgeAsset>({
+  path: "knowledge-assets",
+  listKey: jarvisKeys.assets,
+  listField: "assets",
+  itemField: "asset",
+});
+
+export function useCreateAsset() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (input: AssetInput) =>
+      authFetchJson<{ asset: JarvisKnowledgeAsset }>(`${API}/knowledge-assets`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateAsset() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: ({ id, ...input }: AssetInput & { id: string }) =>
+      authFetchJson<{ asset: JarvisKnowledgeAsset }>(`${API}/knowledge-assets/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteAsset() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (id: string) =>
+      authFetchJson<{ ok: boolean }>(`${API}/knowledge-assets/${id}`, {
+        method: "DELETE",
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+// ── memories ─────────────────────────────────────────────────────────────────
+
+export interface MemoryInput {
+  title: string;
+  content?: string | null;
+  memoryType?: string;
+  importance?: string;
+  categoryId?: string | null;
+  businessId?: string | null;
+  sourceType?: string | null;
+  sourceId?: string | null;
+  pinned?: boolean;
+  tags?: string[] | null;
+  status?: string;
+}
+
+export const useMemories = makeListHook<JarvisMemory>({
+  path: "memories",
+  listKey: jarvisKeys.memories,
+  listField: "memories",
+  itemField: "memory",
+});
+
+export function useCreateMemory() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (input: MemoryInput) =>
+      authFetchJson<{ memory: JarvisMemory }>(`${API}/memories`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateMemory() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: ({ id, ...input }: MemoryInput & { id: string }) =>
+      authFetchJson<{ memory: JarvisMemory }>(`${API}/memories/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteMemory() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (id: string) =>
+      authFetchJson<{ ok: boolean }>(`${API}/memories/${id}`, { method: "DELETE" }),
+    onSuccess: invalidate,
+  });
+}
+
+// ── knowledge relationships ──────────────────────────────────────────────────
+
+export type KnowledgeNodeType = "memory" | "asset" | "category" | "decision" | "task";
+
+export interface RelationshipInput {
+  sourceType: KnowledgeNodeType;
+  sourceId: string;
+  targetType: KnowledgeNodeType;
+  targetId: string;
+  relationType?: string;
+  note?: string | null;
+}
+
+export const useRelationships = makeListHook<JarvisKnowledgeRelationship>({
+  path: "knowledge-relationships",
+  listKey: jarvisKeys.relationships,
+  listField: "relationships",
+  itemField: "relationship",
+});
+
+export function useCreateRelationship() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (input: RelationshipInput) =>
+      authFetchJson<{ relationship: JarvisKnowledgeRelationship }>(
+        `${API}/knowledge-relationships`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteRelationship() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (id: string) =>
+      authFetchJson<{ ok: boolean }>(`${API}/knowledge-relationships/${id}`, {
+        method: "DELETE",
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+// ── enterprise search ────────────────────────────────────────────────────────
+
+export interface JarvisSearchResults {
+  query: string;
+  memories: JarvisMemory[];
+  assets: JarvisKnowledgeAsset[];
+  total: number;
+}
+
+export function useSearch(
+  query: string,
+  types?: KnowledgeNodeType[],
+): UseQueryResult<JarvisSearchResults> {
+  const q = query.trim();
+  const typeParam = types && types.length > 0 ? `&types=${types.join(",")}` : "";
+  return useQuery({
+    queryKey: [...jarvisKeys.search, q, typeParam],
+    queryFn: () =>
+      authFetchJson<JarvisSearchResults>(
+        `${API}/search?q=${encodeURIComponent(q)}${typeParam}`,
+      ),
+    enabled: q.length > 0,
+  });
+}
+
+// ── knowledge graph (memory navigation) ──────────────────────────────────────
+
+export interface JarvisGraphNode {
+  id: string;
+  type: KnowledgeNodeType;
+  label: string;
+  meta: Record<string, unknown>;
+}
+
+export interface JarvisGraphEdge {
+  id: string;
+  source: { type: string; id: string };
+  target: { type: string; id: string };
+  relationType: string;
+  note: string | null;
+}
+
+export interface JarvisKnowledgeGraph {
+  nodes: JarvisGraphNode[];
+  edges: JarvisGraphEdge[];
+  counts: {
+    categories: number;
+    assets: number;
+    memories: number;
+    relationships: number;
+  };
+  generatedAt: number;
+}
+
+export function useKnowledgeGraph(): UseQueryResult<JarvisKnowledgeGraph> {
+  return useQuery({
+    queryKey: jarvisKeys.knowledgeGraph,
+    queryFn: () => authFetchJson<JarvisKnowledgeGraph>(`${API}/knowledge-graph`),
+  });
+}
+
+// ── memory dashboard (overview) ──────────────────────────────────────────────
+
+export interface JarvisMemoryOverview {
+  counts: {
+    memories: number;
+    assets: number;
+    categories: number;
+    relationships: number;
+    pinned: number;
+  };
+  memories: {
+    byType: Record<string, number>;
+    byImportance: Record<string, number>;
+  };
+  assets: {
+    byType: Record<string, number>;
+  };
+  relationships: {
+    byType: Record<string, number>;
+  };
+  pinnedMemories: JarvisMemory[];
+  recentMemories: JarvisMemory[];
+  recentAssets: JarvisKnowledgeAsset[];
+  generatedAt: number;
+}
+
+export function useMemoryOverview(): UseQueryResult<JarvisMemoryOverview> {
+  return useQuery({
+    queryKey: jarvisKeys.memoryOverview,
+    queryFn: () => authFetchJson<JarvisMemoryOverview>(`${API}/memory/overview`),
     refetchInterval: 15000,
   });
 }

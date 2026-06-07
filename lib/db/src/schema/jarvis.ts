@@ -1,4 +1,13 @@
-import { pgTable, uuid, varchar, text, timestamp, jsonb } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  uuid,
+  varchar,
+  text,
+  timestamp,
+  jsonb,
+  boolean,
+  type AnyPgColumn,
+} from "drizzle-orm/pg-core";
 
 /**
  * Jarvis Executive Command Center — isolated product schema.
@@ -142,6 +151,84 @@ export const jarvisApprovalsTable = pgTable("jarvis_approvals", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// ── Sprint 3 — memory & knowledge layer ──────────────────────────────────────
+// Executive Memory, Knowledge Repository (assets), Knowledge Categories
+// (hierarchical taxonomy), and Knowledge Relationships (typed graph edges).
+// Relationships are polymorphic (node type + uuid) so any Jarvis node can link to
+// any other; endpoint existence is validated in the route layer, mirroring the
+// audit-log polymorphic pattern. Category/business FKs detach (set null) on
+// parent delete so the memory corpus is never destroyed by a registry edit.
+
+export const jarvisKnowledgeCategoriesTable = pgTable("jarvis_knowledge_categories", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: varchar("name", { length: 200 }).notNull(),
+  slug: varchar("slug", { length: 140 }).notNull().unique(),
+  description: text("description"),
+  color: varchar("color", { length: 32 }),
+  parentId: uuid("parent_id").references(
+    (): AnyPgColumn => jarvisKnowledgeCategoriesTable.id,
+    { onDelete: "set null" },
+  ),
+  status: varchar("status", { length: 32 }).notNull().default("active"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const jarvisKnowledgeAssetsTable = pgTable("jarvis_knowledge_assets", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  title: varchar("title", { length: 200 }).notNull(),
+  summary: text("summary"),
+  content: text("content"),
+  assetType: varchar("asset_type", { length: 32 }).notNull().default("document"),
+  sourceUrl: varchar("source_url", { length: 2048 }),
+  categoryId: uuid("category_id").references(() => jarvisKnowledgeCategoriesTable.id, {
+    onDelete: "set null",
+  }),
+  businessId: uuid("business_id").references(() => jarvisBusinessesTable.id, {
+    onDelete: "set null",
+  }),
+  tags: jsonb("tags").$type<string[]>(),
+  status: varchar("status", { length: 32 }).notNull().default("active"),
+  createdBy: varchar("created_by", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const jarvisMemoriesTable = pgTable("jarvis_memories", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  title: varchar("title", { length: 200 }).notNull(),
+  content: text("content"),
+  memoryType: varchar("memory_type", { length: 32 }).notNull().default("fact"),
+  importance: varchar("importance", { length: 16 }).notNull().default("normal"),
+  categoryId: uuid("category_id").references(() => jarvisKnowledgeCategoriesTable.id, {
+    onDelete: "set null",
+  }),
+  businessId: uuid("business_id").references(() => jarvisBusinessesTable.id, {
+    onDelete: "set null",
+  }),
+  sourceType: varchar("source_type", { length: 64 }),
+  sourceId: varchar("source_id", { length: 255 }),
+  pinned: boolean("pinned").notNull().default(false),
+  tags: jsonb("tags").$type<string[]>(),
+  status: varchar("status", { length: 32 }).notNull().default("active"),
+  createdBy: varchar("created_by", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const jarvisKnowledgeRelationshipsTable = pgTable("jarvis_knowledge_relationships", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  sourceType: varchar("source_type", { length: 64 }).notNull(),
+  sourceId: uuid("source_id").notNull(),
+  targetType: varchar("target_type", { length: 64 }).notNull(),
+  targetId: uuid("target_id").notNull(),
+  relationType: varchar("relation_type", { length: 48 }).notNull().default("relates_to"),
+  note: text("note"),
+  createdBy: varchar("created_by", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export type JarvisBusiness = typeof jarvisBusinessesTable.$inferSelect;
 export type InsertJarvisBusiness = typeof jarvisBusinessesTable.$inferInsert;
 export type JarvisProject = typeof jarvisProjectsTable.$inferSelect;
@@ -162,3 +249,14 @@ export type JarvisEscalation = typeof jarvisEscalationsTable.$inferSelect;
 export type InsertJarvisEscalation = typeof jarvisEscalationsTable.$inferInsert;
 export type JarvisApproval = typeof jarvisApprovalsTable.$inferSelect;
 export type InsertJarvisApproval = typeof jarvisApprovalsTable.$inferInsert;
+export type JarvisKnowledgeCategory = typeof jarvisKnowledgeCategoriesTable.$inferSelect;
+export type InsertJarvisKnowledgeCategory =
+  typeof jarvisKnowledgeCategoriesTable.$inferInsert;
+export type JarvisKnowledgeAsset = typeof jarvisKnowledgeAssetsTable.$inferSelect;
+export type InsertJarvisKnowledgeAsset = typeof jarvisKnowledgeAssetsTable.$inferInsert;
+export type JarvisMemory = typeof jarvisMemoriesTable.$inferSelect;
+export type InsertJarvisMemory = typeof jarvisMemoriesTable.$inferInsert;
+export type JarvisKnowledgeRelationship =
+  typeof jarvisKnowledgeRelationshipsTable.$inferSelect;
+export type InsertJarvisKnowledgeRelationship =
+  typeof jarvisKnowledgeRelationshipsTable.$inferInsert;
