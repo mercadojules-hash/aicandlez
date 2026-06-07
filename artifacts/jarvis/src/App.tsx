@@ -23,6 +23,7 @@ import RoutingRules from "@/pages/RoutingRules";
 import EscalationChains from "@/pages/EscalationChains";
 import CommandConsole from "@/pages/CommandConsole";
 import Operations from "@/pages/Operations";
+import OperationalControl from "@/pages/OperationalControl";
 import Tasks from "@/pages/Tasks";
 import Decisions from "@/pages/Decisions";
 import Escalations from "@/pages/Escalations";
@@ -232,6 +233,11 @@ function AppRoutes() {
       <Route path="/operations">
         <Protected>
           <Operations />
+        </Protected>
+      </Route>
+      <Route path="/operational-control">
+        <Protected>
+          <OperationalControl />
         </Protected>
       </Route>
       <Route path="/tasks">

@@ -242,6 +242,10 @@ export const jarvisKeys = {
   voiceTurns: (id: string) => ["jarvis", "voice-turns", id] as const,
   aicandlezLive: ["jarvis", "aicandlez-live"] as const,
   executiveBriefing: ["jarvis", "executive-briefing"] as const,
+  systems: ["jarvis", "systems"] as const,
+  systemDetail: (id: string) => ["jarvis", "system-detail", id] as const,
+  repositories: ["jarvis", "repositories"] as const,
+  runbooks: ["jarvis", "runbooks"] as const,
 };
 
 // ── dashboard ────────────────────────────────────────────────────────────────
@@ -455,6 +459,223 @@ export function useDeleteBusiness() {
   return useMutation({
     mutationFn: (id: string) =>
       authFetchJson<{ ok: boolean }>(`${API}/businesses/${id}`, { method: "DELETE" }),
+    onSuccess: invalidate,
+  });
+}
+
+// ── operational control layer (Phase 1 — read-only visibility) ───────────────
+// Systems Jarvis must understand (architecture / infrastructure / build), their
+// source repositories (with live GitHub read-only awareness cache), and runbook
+// procedures. Live-awareness fields arrive `null` until a repo is connected and
+// synced — render every null as a dash, never a placeholder value.
+
+export interface JarvisSystem {
+  id: string;
+  businessId: string | null;
+  name: string;
+  slug: string;
+  kind: string;
+  status: string;
+  description: string | null;
+  architecture: string | null;
+  infrastructure: string | null;
+  buildProcess: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JarvisRepository {
+  id: string;
+  systemId: string;
+  businessId: string | null;
+  provider: string;
+  fullName: string;
+  url: string | null;
+  defaultBranch: string | null;
+  description: string | null;
+  lastCommitSha: string | null;
+  lastCommitMessage: string | null;
+  lastCommitAuthor: string | null;
+  lastCommitAt: string | null;
+  openPrCount: number | null;
+  lastWorkflowStatus: string | null;
+  lastWorkflowConclusion: string | null;
+  lastSyncedAt: string | null;
+  syncError: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JarvisRunbook {
+  id: string;
+  systemId: string;
+  businessId: string | null;
+  title: string;
+  kind: string;
+  content: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JarvisSystemDetail {
+  system: JarvisSystem;
+  repositories: JarvisRepository[];
+  runbooks: JarvisRunbook[];
+}
+
+export interface SystemInput {
+  name: string;
+  businessId?: string | null;
+  kind?: string;
+  status?: string;
+  description?: string | null;
+  architecture?: string | null;
+  infrastructure?: string | null;
+  buildProcess?: string | null;
+}
+
+export interface RepositoryInput {
+  systemId: string;
+  provider?: string;
+  fullName: string;
+  url?: string | null;
+  defaultBranch?: string | null;
+  description?: string | null;
+}
+
+export interface RepositoryUpdateInput {
+  provider?: string;
+  fullName?: string;
+  url?: string | null;
+  defaultBranch?: string | null;
+  description?: string | null;
+}
+
+export interface RunbookInput {
+  systemId: string;
+  title: string;
+  kind?: string;
+  content?: string | null;
+}
+
+export interface RunbookUpdateInput {
+  title?: string;
+  kind?: string;
+  content?: string | null;
+}
+
+export const useSystems = makeListHook<JarvisSystem>({
+  path: "systems",
+  listKey: jarvisKeys.systems,
+  listField: "systems",
+  itemField: "system",
+});
+
+export function useSystem(id: string | null): UseQueryResult<JarvisSystemDetail> {
+  return useQuery({
+    queryKey: jarvisKeys.systemDetail(id ?? ""),
+    queryFn: () => authFetchJson<JarvisSystemDetail>(`${API}/systems/${id}`),
+    enabled: !!id,
+  });
+}
+
+export function useCreateSystem() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (input: SystemInput) =>
+      authFetchJson<{ system: JarvisSystem }>(`${API}/systems`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateSystem() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: ({ id, ...input }: SystemInput & { id: string }) =>
+      authFetchJson<{ system: JarvisSystem }>(`${API}/systems/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteSystem() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (id: string) =>
+      authFetchJson<{ ok: boolean }>(`${API}/systems/${id}`, { method: "DELETE" }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useCreateRepository() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (input: RepositoryInput) =>
+      authFetchJson<{ repository: JarvisRepository }>(`${API}/repositories`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateRepository() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: ({ id, ...input }: RepositoryUpdateInput & { id: string }) =>
+      authFetchJson<{ repository: JarvisRepository }>(`${API}/repositories/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteRepository() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (id: string) =>
+      authFetchJson<{ ok: boolean }>(`${API}/repositories/${id}`, {
+        method: "DELETE",
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useCreateRunbook() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (input: RunbookInput) =>
+      authFetchJson<{ runbook: JarvisRunbook }>(`${API}/runbooks`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateRunbook() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: ({ id, ...input }: RunbookUpdateInput & { id: string }) =>
+      authFetchJson<{ runbook: JarvisRunbook }>(`${API}/runbooks/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteRunbook() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (id: string) =>
+      authFetchJson<{ ok: boolean }>(`${API}/runbooks/${id}`, { method: "DELETE" }),
     onSuccess: invalidate,
   });
 }

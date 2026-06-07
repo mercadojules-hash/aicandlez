@@ -32,6 +32,7 @@ import {
   Scale,
   Radio,
   Command,
+  Server,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEffect } from "react";
@@ -48,6 +49,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Command Center", path: "/", icon: Command },
   { label: "Intelligence", path: "/intelligence", icon: Telescope },
   { label: "Businesses", path: "/businesses", icon: Building2 },
+  { label: "Operational Control", path: "/operational-control", icon: Server },
   { label: "Agents", path: "/agents", icon: Bot },
   { label: "Knowledge Graph", path: "/knowledge-graph", icon: Network },
   { label: "Knowledge", path: "/knowledge", icon: BookOpen },

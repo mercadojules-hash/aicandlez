@@ -61,6 +61,10 @@ import {
   simTradesTable,
   simPositionsTable,
   jarvisEmbeddingsTable,
+  // ── Operational Control Layer (Phase 1 — read-only awareness) ──────────────
+  jarvisSystemsTable,
+  jarvisRepositoriesTable,
+  jarvisRunbooksTable,
 } from "@workspace/db";
 import { requireAuth, requireRole } from "../middlewares/requireAuth.js";
 import { agentRuntime } from "../lib/jarvis/runtime.js";
@@ -6327,6 +6331,519 @@ router.post(
     } catch (err) {
       req.log.error({ err }, "POST /jarvis/voice/turn-text failed");
       res.status(500).json({ error: "jarvis_voice_turn_failed" });
+    }
+  },
+);
+
+// ── Operational Control Layer (Phase 1 — read-only visibility) ───────────────
+// Per-business operational dossier: systems Jarvis must understand how to build,
+// deploy, run, monitor, and recover, plus their source repositories and runbook
+// procedures. ALL admin-gated (requireRole) — operational/infra knowledge is
+// sensitive. Every mutation audited. Reads fail-safe (500 + error code, never a
+// throw to the client). GitHub awareness (Phase 1 live integration) writes the
+// repository sync-cache columns separately; manual edits here never touch them.
+
+const systemKindSchema = z.enum([
+  "web",
+  "api",
+  "mobile",
+  "service",
+  "infra",
+  "data",
+  "other",
+]);
+
+const systemBodySchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  businessId: z.string().uuid().optional().nullable(),
+  kind: systemKindSchema.optional(),
+  status: statusSchema.optional(),
+  description: z.string().trim().max(5000).optional().nullable(),
+  architecture: z.string().trim().max(20000).optional().nullable(),
+  infrastructure: z.string().trim().max(20000).optional().nullable(),
+  buildProcess: z.string().trim().max(20000).optional().nullable(),
+});
+const systemUpdateSchema = systemBodySchema.partial();
+
+const repositoryBodySchema = z.object({
+  systemId: z.string().uuid(),
+  provider: z.string().trim().min(1).max(32).optional(),
+  fullName: z.string().trim().min(1).max(320),
+  url: z.string().trim().max(500).optional().nullable(),
+  defaultBranch: z.string().trim().max(160).optional().nullable(),
+  description: z.string().trim().max(5000).optional().nullable(),
+});
+const repositoryUpdateSchema = repositoryBodySchema.omit({ systemId: true }).partial();
+
+const runbookKindSchema = z.enum([
+  "deployment",
+  "rollback",
+  "update",
+  "monitoring",
+  "operational",
+  "disaster_recovery",
+  "other",
+]);
+const runbookBodySchema = z.object({
+  systemId: z.string().uuid(),
+  title: z.string().trim().min(1).max(240),
+  kind: runbookKindSchema.optional(),
+  content: z.string().trim().max(50000).optional().nullable(),
+});
+const runbookUpdateSchema = runbookBodySchema.omit({ systemId: true }).partial();
+
+// Resolve a system to its id + owning business (for child-row denormalization)
+// or null when it does not exist, so a well-formed but unknown UUID returns a
+// 4xx domain error instead of a raw FK 500.
+async function getSystemRef(
+  id: string,
+): Promise<{ id: string; businessId: string | null } | null> {
+  const [row] = await db
+    .select({
+      id: jarvisSystemsTable.id,
+      businessId: jarvisSystemsTable.businessId,
+    })
+    .from(jarvisSystemsTable)
+    .where(eq(jarvisSystemsTable.id, id))
+    .limit(1);
+  return row ?? null;
+}
+
+// Slugs carry a unique constraint; derive a collision-free value without ever
+// 500-ing on a duplicate name.
+async function uniqueSystemSlug(name: string): Promise<string> {
+  const base = slugify(name);
+  let candidate = base;
+  for (let i = 2; i < 50; i++) {
+    const [hit] = await db
+      .select({ id: jarvisSystemsTable.id })
+      .from(jarvisSystemsTable)
+      .where(eq(jarvisSystemsTable.slug, candidate))
+      .limit(1);
+    if (!hit) return candidate;
+    candidate = `${base}-${i}`;
+  }
+  return `${base}-${Date.now().toString(36)}`;
+}
+
+// ── systems ──────────────────────────────────────────────────────────────────
+
+router.get(
+  "/jarvis/systems",
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const businessId =
+        typeof req.query.businessId === "string" ? req.query.businessId : null;
+      const rows = await db
+        .select()
+        .from(jarvisSystemsTable)
+        .where(
+          businessId ? eq(jarvisSystemsTable.businessId, businessId) : undefined,
+        )
+        .orderBy(desc(jarvisSystemsTable.createdAt));
+      res.json({ systems: rows });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/systems failed");
+      res.status(500).json({ error: "jarvis_systems_read_failed" });
+    }
+  },
+);
+
+router.post(
+  "/jarvis/systems",
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = systemBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_system" });
+      return;
+    }
+    if (parsed.data.businessId && !(await businessExists(parsed.data.businessId))) {
+      res.status(400).json({ error: "invalid_business_reference" });
+      return;
+    }
+    try {
+      const [row] = await db
+        .insert(jarvisSystemsTable)
+        .values({
+          name: parsed.data.name,
+          slug: await uniqueSystemSlug(parsed.data.name),
+          businessId: parsed.data.businessId ?? null,
+          kind: parsed.data.kind ?? "service",
+          status: parsed.data.status ?? "active",
+          description: parsed.data.description ?? null,
+          architecture: parsed.data.architecture ?? null,
+          infrastructure: parsed.data.infrastructure ?? null,
+          buildProcess: parsed.data.buildProcess ?? null,
+        })
+        .returning();
+      await audit(req, actor, "create", "system", row.id, { name: row.name });
+      res.status(201).json({ system: row });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/systems failed");
+      res.status(500).json({ error: "jarvis_system_create_failed" });
+    }
+  },
+);
+
+router.get(
+  "/jarvis/systems/:id",
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const id = String(req.params.id);
+      const [system] = await db
+        .select()
+        .from(jarvisSystemsTable)
+        .where(eq(jarvisSystemsTable.id, id))
+        .limit(1);
+      if (!system) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      const repositories = await db
+        .select()
+        .from(jarvisRepositoriesTable)
+        .where(eq(jarvisRepositoriesTable.systemId, id))
+        .orderBy(desc(jarvisRepositoriesTable.createdAt));
+      const runbooks = await db
+        .select()
+        .from(jarvisRunbooksTable)
+        .where(eq(jarvisRunbooksTable.systemId, id))
+        .orderBy(desc(jarvisRunbooksTable.createdAt));
+      res.json({ system, repositories, runbooks });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/systems/:id failed");
+      res.status(500).json({ error: "jarvis_system_read_failed" });
+    }
+  },
+);
+
+router.put(
+  "/jarvis/systems/:id",
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = systemUpdateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_system" });
+      return;
+    }
+    if (parsed.data.businessId && !(await businessExists(parsed.data.businessId))) {
+      res.status(400).json({ error: "invalid_business_reference" });
+      return;
+    }
+    try {
+      const d = parsed.data;
+      const [row] = await db
+        .update(jarvisSystemsTable)
+        .set({
+          ...(d.name !== undefined ? { name: d.name } : {}),
+          ...(d.businessId !== undefined ? { businessId: d.businessId } : {}),
+          ...(d.kind !== undefined ? { kind: d.kind } : {}),
+          ...(d.status !== undefined ? { status: d.status } : {}),
+          ...(d.description !== undefined
+            ? { description: d.description ?? null }
+            : {}),
+          ...(d.architecture !== undefined
+            ? { architecture: d.architecture ?? null }
+            : {}),
+          ...(d.infrastructure !== undefined
+            ? { infrastructure: d.infrastructure ?? null }
+            : {}),
+          ...(d.buildProcess !== undefined
+            ? { buildProcess: d.buildProcess ?? null }
+            : {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(jarvisSystemsTable.id, String(req.params.id)))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await audit(req, actor, "update", "system", row.id, { name: row.name });
+      res.json({ system: row });
+    } catch (err) {
+      req.log.error({ err }, "PUT /jarvis/systems/:id failed");
+      res.status(500).json({ error: "jarvis_system_update_failed" });
+    }
+  },
+);
+
+router.delete(
+  "/jarvis/systems/:id",
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    try {
+      const [row] = await db
+        .delete(jarvisSystemsTable)
+        .where(eq(jarvisSystemsTable.id, String(req.params.id)))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await audit(req, actor, "delete", "system", row.id, { name: row.name });
+      res.json({ ok: true, id: row.id });
+    } catch (err) {
+      req.log.error({ err }, "DELETE /jarvis/systems/:id failed");
+      res.status(500).json({ error: "jarvis_system_delete_failed" });
+    }
+  },
+);
+
+// ── repositories ─────────────────────────────────────────────────────────────
+
+router.get(
+  "/jarvis/repositories",
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const systemId =
+        typeof req.query.systemId === "string" ? req.query.systemId : null;
+      const rows = await db
+        .select()
+        .from(jarvisRepositoriesTable)
+        .where(
+          systemId ? eq(jarvisRepositoriesTable.systemId, systemId) : undefined,
+        )
+        .orderBy(desc(jarvisRepositoriesTable.createdAt));
+      res.json({ repositories: rows });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/repositories failed");
+      res.status(500).json({ error: "jarvis_repositories_read_failed" });
+    }
+  },
+);
+
+router.post(
+  "/jarvis/repositories",
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = repositoryBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_repository" });
+      return;
+    }
+    const system = await getSystemRef(parsed.data.systemId);
+    if (!system) {
+      res.status(400).json({ error: "invalid_system_reference" });
+      return;
+    }
+    try {
+      const [row] = await db
+        .insert(jarvisRepositoriesTable)
+        .values({
+          systemId: system.id,
+          businessId: system.businessId,
+          provider: parsed.data.provider ?? "github",
+          fullName: parsed.data.fullName,
+          url: parsed.data.url ?? null,
+          defaultBranch: parsed.data.defaultBranch ?? null,
+          description: parsed.data.description ?? null,
+        })
+        .returning();
+      await audit(req, actor, "create", "repository", row.id, {
+        fullName: row.fullName,
+      });
+      res.status(201).json({ repository: row });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/repositories failed");
+      res.status(500).json({ error: "jarvis_repository_create_failed" });
+    }
+  },
+);
+
+router.put(
+  "/jarvis/repositories/:id",
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = repositoryUpdateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_repository" });
+      return;
+    }
+    try {
+      const d = parsed.data;
+      const [row] = await db
+        .update(jarvisRepositoriesTable)
+        .set({
+          ...(d.provider !== undefined ? { provider: d.provider } : {}),
+          ...(d.fullName !== undefined ? { fullName: d.fullName } : {}),
+          ...(d.url !== undefined ? { url: d.url ?? null } : {}),
+          ...(d.defaultBranch !== undefined
+            ? { defaultBranch: d.defaultBranch ?? null }
+            : {}),
+          ...(d.description !== undefined
+            ? { description: d.description ?? null }
+            : {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(jarvisRepositoriesTable.id, String(req.params.id)))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await audit(req, actor, "update", "repository", row.id, {
+        fullName: row.fullName,
+      });
+      res.json({ repository: row });
+    } catch (err) {
+      req.log.error({ err }, "PUT /jarvis/repositories/:id failed");
+      res.status(500).json({ error: "jarvis_repository_update_failed" });
+    }
+  },
+);
+
+router.delete(
+  "/jarvis/repositories/:id",
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    try {
+      const [row] = await db
+        .delete(jarvisRepositoriesTable)
+        .where(eq(jarvisRepositoriesTable.id, String(req.params.id)))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await audit(req, actor, "delete", "repository", row.id, {
+        fullName: row.fullName,
+      });
+      res.json({ ok: true, id: row.id });
+    } catch (err) {
+      req.log.error({ err }, "DELETE /jarvis/repositories/:id failed");
+      res.status(500).json({ error: "jarvis_repository_delete_failed" });
+    }
+  },
+);
+
+// ── runbooks ─────────────────────────────────────────────────────────────────
+
+router.get(
+  "/jarvis/runbooks",
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const systemId =
+        typeof req.query.systemId === "string" ? req.query.systemId : null;
+      const rows = await db
+        .select()
+        .from(jarvisRunbooksTable)
+        .where(systemId ? eq(jarvisRunbooksTable.systemId, systemId) : undefined)
+        .orderBy(desc(jarvisRunbooksTable.createdAt));
+      res.json({ runbooks: rows });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/runbooks failed");
+      res.status(500).json({ error: "jarvis_runbooks_read_failed" });
+    }
+  },
+);
+
+router.post(
+  "/jarvis/runbooks",
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = runbookBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_runbook" });
+      return;
+    }
+    const system = await getSystemRef(parsed.data.systemId);
+    if (!system) {
+      res.status(400).json({ error: "invalid_system_reference" });
+      return;
+    }
+    try {
+      const [row] = await db
+        .insert(jarvisRunbooksTable)
+        .values({
+          systemId: system.id,
+          businessId: system.businessId,
+          title: parsed.data.title,
+          kind: parsed.data.kind ?? "operational",
+          content: parsed.data.content ?? null,
+        })
+        .returning();
+      await audit(req, actor, "create", "runbook", row.id, {
+        title: row.title,
+        kind: row.kind,
+      });
+      res.status(201).json({ runbook: row });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/runbooks failed");
+      res.status(500).json({ error: "jarvis_runbook_create_failed" });
+    }
+  },
+);
+
+router.put(
+  "/jarvis/runbooks/:id",
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = runbookUpdateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_runbook" });
+      return;
+    }
+    try {
+      const d = parsed.data;
+      const [row] = await db
+        .update(jarvisRunbooksTable)
+        .set({
+          ...(d.title !== undefined ? { title: d.title } : {}),
+          ...(d.kind !== undefined ? { kind: d.kind } : {}),
+          ...(d.content !== undefined ? { content: d.content ?? null } : {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(jarvisRunbooksTable.id, String(req.params.id)))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await audit(req, actor, "update", "runbook", row.id, {
+        title: row.title,
+        kind: row.kind,
+      });
+      res.json({ runbook: row });
+    } catch (err) {
+      req.log.error({ err }, "PUT /jarvis/runbooks/:id failed");
+      res.status(500).json({ error: "jarvis_runbook_update_failed" });
+    }
+  },
+);
+
+router.delete(
+  "/jarvis/runbooks/:id",
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    try {
+      const [row] = await db
+        .delete(jarvisRunbooksTable)
+        .where(eq(jarvisRunbooksTable.id, String(req.params.id)))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await audit(req, actor, "delete", "runbook", row.id, { title: row.title });
+      res.json({ ok: true, id: row.id });
+    } catch (err) {
+      req.log.error({ err }, "DELETE /jarvis/runbooks/:id failed");
+      res.status(500).json({ error: "jarvis_runbook_delete_failed" });
     }
   },
 );

@@ -1001,3 +1001,99 @@ export type InsertJarvisVoiceSession =
   typeof jarvisVoiceSessionsTable.$inferInsert;
 export type JarvisVoiceTurn = typeof jarvisVoiceTurnsTable.$inferSelect;
 export type InsertJarvisVoiceTurn = typeof jarvisVoiceTurnsTable.$inferInsert;
+
+// ── Operational Control Layer (Phase 1 — read-only visibility foundation) ─────
+// Per-business operational dossier: the systems Jarvis must understand how to
+// build, deploy, run, monitor, and recover. Everything here is manual-entry +
+// (for repos) live read-only synced; NULL → dash in the UI, never fabricated.
+// Fully isolated jarvis_ tables. Removing a system cascades to its repos +
+// runbooks; business detach is set-null so operational history survives a
+// registry edit. Phase 2/3 (approval-gated + autonomous ops) reuse the existing
+// governance spine — these tables only capture knowledge + read-only awareness.
+
+export const jarvisSystemsTable = pgTable(
+  "jarvis_systems",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    businessId: uuid("business_id").references(() => jarvisBusinessesTable.id, {
+      onDelete: "set null",
+    }),
+    name: varchar("name", { length: 200 }).notNull(),
+    slug: varchar("slug", { length: 160 }).notNull().unique(),
+    // web | api | mobile | service | infra | data | other
+    kind: varchar("kind", { length: 32 }).notNull().default("service"),
+    status: varchar("status", { length: 32 }).notNull().default("active"),
+    description: text("description"),
+    // Narrative dossier aspects (manual-entry, advisory; NULL → dash).
+    architecture: text("architecture"),
+    infrastructure: text("infrastructure"),
+    buildProcess: text("build_process"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [index("jarvis_systems_business_idx").on(table.businessId)],
+);
+
+export const jarvisRepositoriesTable = pgTable(
+  "jarvis_repositories",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    systemId: uuid("system_id").references(() => jarvisSystemsTable.id, {
+      onDelete: "cascade",
+    }),
+    businessId: uuid("business_id").references(() => jarvisBusinessesTable.id, {
+      onDelete: "set null",
+    }),
+    provider: varchar("provider", { length: 32 }).notNull().default("github"),
+    // owner/repo for GitHub; free-form locator for other providers.
+    fullName: varchar("full_name", { length: 320 }).notNull(),
+    url: text("url"),
+    defaultBranch: varchar("default_branch", { length: 160 }),
+    description: text("description"),
+    // ── Live read-only awareness cache (written by the GitHub sync; NULL until
+    // connected/synced → dash). Jarvis NEVER writes to the remote repo.
+    lastCommitSha: varchar("last_commit_sha", { length: 64 }),
+    lastCommitMessage: text("last_commit_message"),
+    lastCommitAuthor: varchar("last_commit_author", { length: 200 }),
+    lastCommitAt: timestamp("last_commit_at"),
+    openPrCount: integer("open_pr_count"),
+    lastWorkflowStatus: varchar("last_workflow_status", { length: 48 }),
+    lastWorkflowConclusion: varchar("last_workflow_conclusion", { length: 48 }),
+    lastSyncedAt: timestamp("last_synced_at"),
+    syncError: text("sync_error"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("jarvis_repositories_system_idx").on(table.systemId),
+    index("jarvis_repositories_business_idx").on(table.businessId),
+  ],
+);
+
+export const jarvisRunbooksTable = pgTable(
+  "jarvis_runbooks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    systemId: uuid("system_id").references(() => jarvisSystemsTable.id, {
+      onDelete: "cascade",
+    }),
+    businessId: uuid("business_id").references(() => jarvisBusinessesTable.id, {
+      onDelete: "set null",
+    }),
+    title: varchar("title", { length: 240 }).notNull(),
+    // deployment | rollback | update | monitoring | operational |
+    // disaster_recovery | other
+    kind: varchar("kind", { length: 32 }).notNull().default("operational"),
+    content: text("content"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [index("jarvis_runbooks_system_idx").on(table.systemId)],
+);
+
+export type JarvisSystem = typeof jarvisSystemsTable.$inferSelect;
+export type InsertJarvisSystem = typeof jarvisSystemsTable.$inferInsert;
+export type JarvisRepository = typeof jarvisRepositoriesTable.$inferSelect;
+export type InsertJarvisRepository = typeof jarvisRepositoriesTable.$inferInsert;
+export type JarvisRunbook = typeof jarvisRunbooksTable.$inferSelect;
+export type InsertJarvisRunbook = typeof jarvisRunbooksTable.$inferInsert;
