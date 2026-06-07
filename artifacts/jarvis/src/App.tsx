@@ -1,0 +1,190 @@
+import { Switch, Route, Redirect, Router as WouterRouter } from "wouter";
+import {
+  ClerkProvider,
+  SignIn,
+  SignUp,
+  Show,
+  ClerkLoading,
+  ClerkLoaded,
+} from "@clerk/react";
+import { dark } from "@clerk/themes";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { Layout } from "@/components/Layout";
+import Dashboard from "@/pages/Dashboard";
+import Businesses from "@/pages/Businesses";
+import Projects from "@/pages/Projects";
+import Agents from "@/pages/Agents";
+import Workflows from "@/pages/Workflows";
+import Audit from "@/pages/Audit";
+import Settings from "@/pages/Settings";
+
+const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
+const basePath = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
+
+function FullPageLoader() {
+  return (
+    <div className="fixed inset-0 flex items-center justify-center bg-background">
+      <div className="h-7 w-7 animate-spin rounded-full border-2 border-muted border-t-primary" />
+    </div>
+  );
+}
+
+function MissingKeyError() {
+  return (
+    <div className="fixed inset-0 flex flex-col items-center justify-center gap-3 bg-background font-mono">
+      <div className="text-[11px] tracking-[0.2em] text-muted-foreground">JARVIS</div>
+      <div className="text-sm font-bold text-amber-500">CONFIGURATION REQUIRED</div>
+      <div className="max-w-md rounded border border-border bg-card px-4 py-3 text-center text-[11px] leading-relaxed text-muted-foreground">
+        <code>VITE_CLERK_PUBLISHABLE_KEY</code> is not set. Add it to the
+        environment and restart the dev server.
+      </div>
+    </div>
+  );
+}
+
+const clerkAppearance = {
+  theme: dark,
+  cssLayerName: "clerk",
+  variables: {
+    colorPrimary: "#6366f1",
+    borderRadius: "0.5rem",
+  },
+};
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { refetchOnWindowFocus: false, retry: 1 },
+  },
+});
+
+function SignInPage() {
+  return (
+    <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4">
+      <SignIn
+        routing="path"
+        path={`${basePath}/sign-in`}
+        signUpUrl={`${basePath}/sign-up`}
+        fallbackRedirectUrl={`${basePath}/`}
+      />
+    </div>
+  );
+}
+
+function SignUpPage() {
+  return (
+    <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4">
+      <SignUp
+        routing="path"
+        path={`${basePath}/sign-up`}
+        signInUrl={`${basePath}/sign-in`}
+        fallbackRedirectUrl={`${basePath}/`}
+      />
+    </div>
+  );
+}
+
+function Protected({ children }: { children: React.ReactNode }) {
+  return (
+    <>
+      <ClerkLoading>
+        <FullPageLoader />
+      </ClerkLoading>
+      <ClerkLoaded>
+        <Show when="signed-in">
+          <Layout>{children}</Layout>
+        </Show>
+        <Show when="signed-out">
+          <Redirect to="/sign-in" />
+        </Show>
+      </ClerkLoaded>
+    </>
+  );
+}
+
+function HomeRoute() {
+  return (
+    <>
+      <ClerkLoading>
+        <FullPageLoader />
+      </ClerkLoading>
+      <ClerkLoaded>
+        <Show when="signed-in">
+          <Layout>
+            <Dashboard />
+          </Layout>
+        </Show>
+        <Show when="signed-out">
+          <Redirect to="/sign-in" />
+        </Show>
+      </ClerkLoaded>
+    </>
+  );
+}
+
+function AppRoutes() {
+  return (
+    <Switch>
+      <Route path="/sign-in" component={SignInPage} />
+      <Route path="/sign-in/*" component={SignInPage} />
+      <Route path="/sign-up" component={SignUpPage} />
+      <Route path="/sign-up/*" component={SignUpPage} />
+      <Route path="/" component={HomeRoute} />
+      <Route path="/businesses">
+        <Protected>
+          <Businesses />
+        </Protected>
+      </Route>
+      <Route path="/projects">
+        <Protected>
+          <Projects />
+        </Protected>
+      </Route>
+      <Route path="/agents">
+        <Protected>
+          <Agents />
+        </Protected>
+      </Route>
+      <Route path="/workflows">
+        <Protected>
+          <Workflows />
+        </Protected>
+      </Route>
+      <Route path="/audit">
+        <Protected>
+          <Audit />
+        </Protected>
+      </Route>
+      <Route path="/settings">
+        <Protected>
+          <Settings />
+        </Protected>
+      </Route>
+      <Route>
+        <Redirect to="/" />
+      </Route>
+    </Switch>
+  );
+}
+
+export default function App() {
+  if (!clerkPubKey) return <MissingKeyError />;
+  return (
+    <ClerkProvider
+      publishableKey={clerkPubKey}
+      appearance={clerkAppearance}
+      signInUrl={`${basePath}/sign-in`}
+      signUpUrl={`${basePath}/sign-up`}
+    >
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <WouterRouter base={basePath}>
+            <AppRoutes />
+          </WouterRouter>
+          <Toaster />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ClerkProvider>
+  );
+}

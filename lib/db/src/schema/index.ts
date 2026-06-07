@@ -27,4 +27,5 @@ export * from "./userRiskSettings";
 export * from "./riskThrottleEvents";
 export * from "./platformCostConfig";
 export * from "./usageDaily";
+export * from "./jarvis";
 export * from "../constants/alertKeys";

@@ -74,6 +74,7 @@ import aiCapitalRouter from "./aiCapital.js";
 import systemResourcesRouter from "./systemResources.js";
 import costConfigRouter from "./costConfig.js";
 import usageHistoryRouter from "./usageHistory.js";
+import jarvisRouter from "./jarvis.js";
 import { recordApiRequest, ensureUsageFlusher } from "../lib/usageCounters.js";
 
 const router: IRouter = Router();
@@ -104,6 +105,7 @@ router.use(aiCapitalRouter);
 router.use(systemResourcesRouter);
 router.use(costConfigRouter);
 router.use(usageHistoryRouter);
+router.use(jarvisRouter);
 router.use(runtimeStateRouter);
 router.use(userLiveOrderRouter);
 router.use(userExecutionFunnelRouter);
