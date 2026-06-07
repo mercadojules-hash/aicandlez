@@ -64,6 +64,7 @@ import {
 import { requireAuth, requireRole } from "../middlewares/requireAuth.js";
 import { agentRuntime } from "../lib/jarvis/runtime.js";
 import { agentBus } from "../lib/jarvis/agentBus.js";
+import { recordBusinessMemory } from "../lib/jarvis/memory.js";
 import { AGENT_CATALOG, getHandler } from "../lib/jarvis/registry.js";
 import {
   startWorkflowRun,
@@ -533,6 +534,11 @@ router.post(
         })
         .returning();
       await audit(req, actor, "create", "business", row.id, { name: row.name });
+      // Executive-memory write-hook (fail-safe): mirror the business into the
+      // memory corpus so it is retrievable + embeddable. Never breaks the create.
+      await recordBusinessMemory(row, actor.email ?? actor.userId).catch((err) =>
+        req.log.warn({ err }, "recordBusinessMemory (create) failed"),
+      );
       res.status(201).json({ business: row });
     } catch (err) {
       req.log.error({ err }, "POST /jarvis/businesses failed");
@@ -597,6 +603,11 @@ router.put(
         return;
       }
       await audit(req, actor, "update", "business", row.id, { name: row.name });
+      // Executive-memory write-hook (fail-safe): keep the mirrored memory in sync
+      // with the edited business (idempotent upsert). Never breaks the update.
+      await recordBusinessMemory(row, actor.email ?? actor.userId).catch((err) =>
+        req.log.warn({ err }, "recordBusinessMemory (update) failed"),
+      );
       res.json({ business: row });
     } catch (err) {
       req.log.error({ err }, "PUT /jarvis/businesses/:id failed");

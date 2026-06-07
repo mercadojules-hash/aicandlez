@@ -287,7 +287,18 @@ export const jarvisMemoriesTable = pgTable("jarvis_memories", {
   createdBy: varchar("created_by", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+},
+  (table) => [
+    // One memory per (source_type, source_id) so source-linked mirrors (e.g.
+    // business profiles, promoted findings) upsert atomically instead of racing
+    // SELECT-then-INSERT into duplicates. NULL source pairs stay distinct
+    // (Postgres default), so free-form memories are unconstrained.
+    uniqueIndex("jarvis_memories_source_uq").on(
+      table.sourceType,
+      table.sourceId,
+    ),
+  ],
+);
 
 export const jarvisKnowledgeRelationshipsTable = pgTable("jarvis_knowledge_relationships", {
   id: uuid("id").primaryKey().defaultRandom(),
