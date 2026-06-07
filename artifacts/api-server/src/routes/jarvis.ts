@@ -422,9 +422,9 @@ router.get(
 // Windowed time-series aggregation, period comparison, daily growth snapshots,
 // change/subscription ingestion, and executive report generation — all over the
 // AICandlez/Stripe mirrors via strictly LIVE-only, read-only SELECTs. Writes are
-// confined to jarvis-owned tables. Every handler is admin-gated and fail-safe:
-// the underlying lib never throws, so reads degrade to null/empty rather than
-// 5xx. Mutating endpoints are audited.
+// confined to jarvis-owned tables. Every handler is admin-gated, audited (both
+// reads and mutations, to jarvis_audit_logs), and fail-safe: the underlying lib
+// never throws, so reads degrade to null/empty rather than 5xx.
 
 router.get(
   "/jarvis/historical/period",
@@ -439,6 +439,11 @@ router.get(
       computePeriodStats(win.startMs, win.endMs, win.start, win.end),
       computeDailySeries(win.startMs, win.endMs),
     ]);
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    await audit(req, actor, "historical.period.read", "aicandlez-historical", null, {
+      start: win.start,
+      end: win.end,
+    });
     res.json({ ...stats, series, generatedAt: Date.now() });
   },
 );
@@ -458,6 +463,8 @@ router.get(
       typeof q.compareEnd === "string" ? q.compareEnd : null,
     );
     const comparison = await comparePeriods(cur, prev);
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    await audit(req, actor, "historical.compare.read", "aicandlez-historical", null);
     res.json({ ...comparison, generatedAt: Date.now() });
   },
 );
@@ -472,6 +479,8 @@ router.get(
     const snapshots = await getDailySnapshots(
       Number.isFinite(limit) ? limit : 180,
     );
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    await audit(req, actor, "historical.snapshots.read", "aicandlez-snapshot", null);
     res.json({ snapshots, generatedAt: Date.now() });
   },
 );
@@ -508,6 +517,8 @@ router.get(
     const limit =
       typeof req.query.limit === "string" ? Number(req.query.limit) : 100;
     const events = await getChangeEvents(Number.isFinite(limit) ? limit : 100);
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    await audit(req, actor, "historical.changes.read", "aicandlez-historical", null);
     res.json({ events, generatedAt: Date.now() });
   },
 );
@@ -516,8 +527,10 @@ router.get(
   "/jarvis/historical/subscriptions",
   requireAuth,
   requireRole(ADMIN_ROLES),
-  async (_req: Request, res: Response): Promise<void> => {
+  async (req: Request, res: Response): Promise<void> => {
     const summary = await getSubscriptionSummary();
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    await audit(req, actor, "historical.subscriptions.read", "aicandlez-historical", null);
     res.json({ ...summary, generatedAt: Date.now() });
   },
 );
@@ -555,6 +568,8 @@ router.get(
     const limit =
       typeof req.query.limit === "string" ? Number(req.query.limit) : 50;
     const reports = await listReports(Number.isFinite(limit) ? limit : 50);
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    await audit(req, actor, "historical.reports.list", "jarvis-report", null);
     res.json({ reports, generatedAt: Date.now() });
   },
 );
@@ -569,6 +584,8 @@ router.get(
       res.status(404).json({ error: "report_not_found" });
       return;
     }
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    await audit(req, actor, "historical.report.read", "jarvis-report", report.id);
     res.json({ report });
   },
 );
@@ -586,7 +603,12 @@ router.post(
     const actor = await resolveActor((req as AuthReq).clerkUserId);
     const report = await generateReport({ ...parsed.data, createdBy: actor.userId });
     if (!report) {
-      res.status(503).json({ error: "report_generation_unavailable" });
+      // Fail-safe: never 5xx. Degrade to a null report; UI surfaces a dash/notice.
+      await audit(req, actor, "historical.report.generate", "jarvis-report", null, {
+        degraded: true,
+        withNarrative: !!parsed.data.withNarrative,
+      });
+      res.json({ report: null, degraded: true });
       return;
     }
     await audit(req, actor, "historical.report.generate", "jarvis-report", report.id, {

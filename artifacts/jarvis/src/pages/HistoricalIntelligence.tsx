@@ -234,7 +234,13 @@ export default function HistoricalIntelligence() {
         withNarrative,
       },
       {
-        onSuccess: () => toast.success("Report generated."),
+        onSuccess: (data) => {
+          if (data?.report) {
+            toast.success("Report generated.");
+          } else {
+            toast.error("Report generation unavailable — data degraded.");
+          }
+        },
         onError: () => toast.error("Report generation unavailable."),
       },
     );

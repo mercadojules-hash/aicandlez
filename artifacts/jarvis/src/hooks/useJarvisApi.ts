@@ -3557,10 +3557,13 @@ export function useGenerateReport() {
   const invalidate = useInvalidateAll();
   return useMutation({
     mutationFn: (input: GenerateReportInput) =>
-      authFetchJson<{ report: JarvisReport }>(`${API}/reports`, {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
+      authFetchJson<{ report: JarvisReport | null; degraded?: boolean }>(
+        `${API}/reports`,
+        {
+          method: "POST",
+          body: JSON.stringify(input),
+        },
+      ),
     onSuccess: invalidate,
   });
 }
