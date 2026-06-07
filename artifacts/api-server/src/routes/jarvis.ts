@@ -60,6 +60,7 @@ import {
   // writes them and imports NO AICandlez execution modules. See computeAicandlezLive.
   simTradesTable,
   simPositionsTable,
+  jarvisEmbeddingsTable,
 } from "@workspace/db";
 import { requireAuth, requireRole } from "../middlewares/requireAuth.js";
 import { agentRuntime } from "../lib/jarvis/runtime.js";
@@ -79,8 +80,11 @@ import {
   checkCognitionBudget,
   runIndexerPass,
   getSemanticStatus,
+  getSemanticRetrievalEnabled,
   setSemanticRetrievalEnabled,
   setIndexerTickEnabled,
+  retrieve,
+  think,
 } from "../lib/jarvis/cognition/index.js";
 import { raw } from "express";
 import {
@@ -476,6 +480,170 @@ router.get(
     } catch (err) {
       req.log.error({ err }, "GET /jarvis/executive-briefing failed");
       res.status(500).json({ error: "jarvis_executive_briefing_failed" });
+    }
+  },
+);
+
+// ── executive query (memory Q&A) ─────────────────────────────────────────────
+// Free-text executive question answered over the activated memory system.
+// Retrieval supplies grounded references (lexical now; semantic fuses in once
+// embeddings are funded). Synthesis via think() produces a natural-language
+// answer when the cognition provider is available; otherwise a deterministic
+// extractive answer is assembled from the top references. Admin-gated,
+// fail-safe (never throws; missing data degrades to null → dash in the UI).
+
+const EXEC_QUERY_MAX_LEN = 500;
+
+function execQueryFirstSentence(text: string, max = 240): string {
+  const body = (text ?? "").replace(/\s+/g, " ").trim();
+  if (!body) return "";
+  const stop = body.search(/[.!?](\s|$)/);
+  const cut = stop >= 0 && stop + 1 <= max ? stop + 1 : Math.min(body.length, max);
+  const sliced = body.slice(0, cut).trim();
+  return body.length > cut ? `${sliced}…` : sliced;
+}
+
+function buildExtractiveAnswer(
+  docs: ReadonlyArray<{ title: string; text: string }>,
+): string | null {
+  const top = docs
+    .slice(0, 3)
+    .filter((d) => (d.text ?? "").trim().length > 0);
+  if (top.length === 0) return null;
+  return top
+    .map((d) => `${d.title}: ${execQueryFirstSentence(d.text)}`)
+    .join("\n\n");
+}
+
+router.get(
+  "/jarvis/query",
+  requireAuth,
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const q = String(req.query.q ?? "")
+      .trim()
+      .slice(0, EXEC_QUERY_MAX_LEN);
+
+    let semanticEnabled = false;
+    try {
+      semanticEnabled = await getSemanticRetrievalEnabled();
+    } catch {
+      semanticEnabled = false;
+    }
+
+    if (!q) {
+      res.json({
+        query: "",
+        answer: null,
+        answerSource: "none",
+        retrievalMode: "lexical",
+        semanticEnabled,
+        groundingScore: null,
+        runId: null,
+        references: [],
+        degradedReason: null,
+        generatedAt: Date.now(),
+      });
+      return;
+    }
+
+    try {
+      const actor = await resolveActor((req as AuthReq).clerkUserId);
+
+      // Grounded references — the citation set surfaced to the executive.
+      const retrieval = await retrieve({
+        kind: "briefing",
+        query: q,
+        executiveUserId: actor.userId,
+        maxDocs: 8,
+      });
+      const references = retrieval.docs.map((d) => ({
+        type: d.type,
+        id: d.id,
+        title: d.title,
+        snippet: execQueryFirstSentence(d.text, 280),
+        score: Math.round(d.score * 1000) / 1000,
+        hop: d.hop,
+      }));
+
+      // Honest retrieval-mode label: semantic only when the flag is on AND at
+      // least one embedding vector actually exists (429-degraded ⇒ lexical).
+      let embeddingCount = 0;
+      try {
+        const [row] = await db
+          .select({ c: sql<number>`count(*)::int` })
+          .from(jarvisEmbeddingsTable);
+        embeddingCount = row?.c ?? 0;
+      } catch {
+        embeddingCount = 0;
+      }
+      const retrievalMode =
+        semanticEnabled && embeddingCount > 0 ? "semantic" : "lexical";
+
+      // Synthesized answer (advisory, audited). Any non-"ok" status degrades to
+      // a deterministic extractive answer built from the references.
+      const result = await think({
+        kind: "briefing",
+        query: q,
+        instructions:
+          "Answer the executive's question directly and concisely using ONLY the provided context. If the context does not contain the answer, say so plainly. Do not speculate or invent figures.",
+        createdBy: actor.userId,
+        executiveUserId: actor.userId,
+      });
+
+      let answer: string | null = null;
+      let answerSource: "synthesized" | "extractive" | "none" = "none";
+      let degradedReason: string | null = null;
+
+      if (result.status === "ok" && result.proposal) {
+        const synth =
+          (result.proposal.summary ?? "").trim() ||
+          (result.proposal.content ?? "").trim();
+        if (synth) {
+          answer = synth;
+          answerSource = "synthesized";
+        }
+      }
+      if (answerSource === "none") {
+        const extractive = buildExtractiveAnswer(retrieval.docs);
+        if (extractive) {
+          answer = extractive;
+          answerSource = "extractive";
+        }
+        degradedReason =
+          result.status === "ok"
+            ? null
+            : result.degradedReason ?? "answer synthesis unavailable";
+      }
+
+      res.json({
+        query: q,
+        answer,
+        answerSource,
+        retrievalMode,
+        semanticEnabled,
+        groundingScore: result.status === "ok" ? result.groundingScore : null,
+        runId: result.runId,
+        references,
+        degradedReason,
+        generatedAt: Date.now(),
+      });
+    } catch (err) {
+      // Fail-safe: never 500 a query. Degrade to an empty grounded payload so
+      // the UI shows "no answer" + dashes rather than an error state.
+      req.log.error({ err }, "GET /jarvis/query failed");
+      res.json({
+        query: q,
+        answer: null,
+        answerSource: "none",
+        retrievalMode: "lexical",
+        semanticEnabled,
+        groundingScore: null,
+        runId: null,
+        references: [],
+        degradedReason: "query engine unavailable",
+        generatedAt: Date.now(),
+      });
     }
   },
 );

@@ -44,6 +44,7 @@ export interface NavItem {
 
 export const NAV_ITEMS: NavItem[] = [
   { label: "Briefing", path: "/executive-briefing", icon: FileText },
+  { label: "Executive Query", path: "/executive-query", icon: Sparkles },
   { label: "Command Center", path: "/", icon: Command },
   { label: "Intelligence", path: "/intelligence", icon: Telescope },
   { label: "Businesses", path: "/businesses", icon: Building2 },

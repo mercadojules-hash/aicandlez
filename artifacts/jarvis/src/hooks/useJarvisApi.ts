@@ -336,6 +336,52 @@ export function useExecutiveBriefing(): UseQueryResult<ExecutiveBriefing> {
   });
 }
 
+// ── executive query (memory Q&A) ─────────────────────────────────────────────
+
+export type ExecutiveQueryReferenceType =
+  | "memory"
+  | "asset"
+  | "category"
+  | "decision"
+  | "task";
+
+export interface ExecutiveQueryReference {
+  type: ExecutiveQueryReferenceType;
+  id: string;
+  title: string;
+  snippet: string;
+  score: number;
+  hop: 0 | 1;
+}
+
+export interface ExecutiveQueryResponse {
+  query: string;
+  answer: string | null;
+  answerSource: "synthesized" | "extractive" | "none";
+  retrievalMode: "semantic" | "lexical";
+  semanticEnabled: boolean;
+  groundingScore: number | null;
+  runId: string | null;
+  references: ExecutiveQueryReference[];
+  degradedReason: string | null;
+  generatedAt: number;
+}
+
+export function useExecutiveQuery(
+  q: string,
+): UseQueryResult<ExecutiveQueryResponse> {
+  const term = q.trim();
+  return useQuery({
+    queryKey: ["jarvis", "executive-query", term],
+    queryFn: () =>
+      authFetchJson<ExecutiveQueryResponse>(
+        `${API}/query?q=${encodeURIComponent(term)}`,
+      ),
+    enabled: term.length > 0,
+    staleTime: 60000,
+  });
+}
+
 // ── generic CRUD factory ─────────────────────────────────────────────────────
 
 interface EntityConfig<T> {

@@ -50,6 +50,7 @@ import AgentTrust from "@/pages/AgentTrust";
 import Voice from "@/pages/Voice";
 import JarvisCore from "@/pages/JarvisCore";
 import ExecutiveBriefing from "@/pages/ExecutiveBriefing";
+import ExecutiveQuery from "@/pages/ExecutiveQuery";
 import KnowledgeGraph from "@/pages/KnowledgeGraph";
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
@@ -166,6 +167,11 @@ function AppRoutes() {
       <Route path="/executive-briefing">
         <Protected>
           <ExecutiveBriefing />
+        </Protected>
+      </Route>
+      <Route path="/executive-query">
+        <Protected>
+          <ExecutiveQuery />
         </Protected>
       </Route>
       <Route path="/knowledge-graph">
