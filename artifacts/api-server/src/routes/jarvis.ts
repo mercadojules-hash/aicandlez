@@ -5600,6 +5600,11 @@ const voiceTurnQuerySchema = z.object({
   sessionId: z.string().uuid(),
   mimeType: z.string().trim().min(1).max(128).optional(),
 });
+const voiceTurnTextSchema = z.object({
+  sessionId: z.string().uuid(),
+  transcript: z.string().trim().min(1).max(4000),
+  source: z.enum(["browser-stt", "text"]).optional(),
+});
 
 router.get(
   "/jarvis/voice/settings",
@@ -5796,6 +5801,66 @@ router.post(
       });
     } catch (err) {
       req.log.error({ err }, "POST /jarvis/voice/turn failed");
+      res.status(500).json({ error: "jarvis_voice_turn_failed" });
+    }
+  },
+);
+
+// Text turn — a transcript that was produced in the browser (Web Speech API) or
+// typed by the executive. No audio leaves the browser; the server skips STT and
+// runs the same deterministic intent → capability → readback pipeline. This is
+// the always-available path that keeps Jarvis fully operational with no speech
+// vendor configured. JSON in, readback envelope (with optional TTS audio) out.
+router.post(
+  "/jarvis/voice/turn-text",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = voiceTurnTextSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_voice_turn" });
+      return;
+    }
+    try {
+      const session = await getSession(parsed.data.sessionId);
+      if (!session) {
+        res.status(404).json({ error: "voice_session_not_found" });
+        return;
+      }
+      const outcome = await runVoiceTurn({
+        sessionId: parsed.data.sessionId,
+        transcript: parsed.data.transcript,
+        source: parsed.data.source ?? "text",
+        createdBy: actor.userId,
+        executiveUserId: actor.userId,
+        businessId: session.businessId ?? null,
+      });
+      await audit(req, actor, "voice_turn", "voice_turn", outcome.turnId, {
+        sessionId: outcome.sessionId,
+        intent: outcome.intent,
+        capability: outcome.capability,
+        status: outcome.status,
+        source: parsed.data.source ?? "text",
+      });
+      res.json({
+        turnId: outcome.turnId,
+        sessionId: outcome.sessionId,
+        intent: outcome.intent,
+        capability: outcome.capability,
+        transcript: outcome.transcript,
+        transcriptConfidence: outcome.transcriptConfidence,
+        replyText: outcome.replyText,
+        ttsOk: outcome.ttsOk,
+        audioBase64: outcome.audio ? outcome.audio.toString("base64") : null,
+        audioContentType: outcome.audioContentType,
+        links: outcome.links,
+        cognitionRunId: outcome.cognitionRunId,
+        status: outcome.status,
+        latencyMs: outcome.latencyMs,
+      });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/voice/turn-text failed");
       res.status(500).json({ error: "jarvis_voice_turn_failed" });
     }
   },

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Mic,
   Square,
@@ -8,6 +8,10 @@ import {
   History,
   ShieldAlert,
   Loader2,
+  Send,
+  Keyboard,
+  Cloud,
+  MonitorSmartphone,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
@@ -15,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -29,9 +34,21 @@ import {
   usePurgeVoiceSession,
   useSessionTurns,
   useVoiceTurn,
+  useVoiceTextTurn,
   type JarvisVoiceSession,
   type JarvisVoiceTurnResult,
 } from "@/hooks/useJarvisApi";
+import {
+  supportsBrowserSTT,
+  supportsBrowserTTS,
+  supportsMicrophone,
+  startBrowserRecognition,
+  speakBrowser,
+  cancelBrowserSpeech,
+  type BrowserRecognizer,
+} from "@/lib/voice/speech";
+
+type InputMode = "browser" | "server" | "text";
 
 function intentTone(intent: string | null): string {
   switch (intent) {
@@ -62,7 +79,7 @@ function VoiceDisabledBanner() {
         <div className="text-sm font-semibold">Voice interface is off</div>
         <div className="text-xs text-muted-foreground">
           The executive voice interface is disabled by default. An administrator
-          must enable it before push-to-talk turns can be recorded. Voice is an
+          must enable it before commands can be processed. Voice is an
           input/output surface only — it never bypasses governance.
         </div>
       </div>
@@ -70,16 +87,33 @@ function VoiceDisabledBanner() {
   );
 }
 
-function TurnResultCard({ result }: { result: JarvisVoiceTurnResult }) {
+function TurnResultCard({
+  result,
+  enableBrowserTts,
+}: {
+  result: JarvisVoiceTurnResult;
+  enableBrowserTts: boolean;
+}) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const urlRef = useRef<string | null>(null);
+  // Read back exactly once per turn — guard against incidental re-renders that
+  // would otherwise replay (or overlap) the spoken response.
+  const spokenTurnRef = useRef<string | null>(null);
 
   useEffect(() => {
+    if (spokenTurnRef.current === result.turnId) return;
+    spokenTurnRef.current = result.turnId;
+
+    // Stop any in-flight readback (audio element + browser speech) before the
+    // new turn plays, so rapid successive turns never overlap or stutter.
+    cancelBrowserSpeech();
     if (urlRef.current) {
       URL.revokeObjectURL(urlRef.current);
       urlRef.current = null;
     }
+
     if (result.audioBase64 && result.audioContentType) {
+      // Premium provider returned synthesized audio — play it verbatim.
       try {
         const bytes = Uint8Array.from(atob(result.audioBase64), (c) =>
           c.charCodeAt(0),
@@ -94,14 +128,29 @@ function TurnResultCard({ result }: { result: JarvisVoiceTurnResult }) {
       } catch {
         /* ignore decode errors — text remains */
       }
+    } else if (enableBrowserTts && result.replyText.trim()) {
+      // No server audio — read back with the browser's British voice.
+      speakBrowser(result.replyText);
     }
+  }, [
+    result.turnId,
+    result.audioBase64,
+    result.audioContentType,
+    result.replyText,
+    enableBrowserTts,
+  ]);
+
+  useEffect(() => {
     return () => {
       if (urlRef.current) {
         URL.revokeObjectURL(urlRef.current);
         urlRef.current = null;
       }
+      cancelBrowserSpeech();
     };
-  }, [result.audioBase64, result.audioContentType]);
+  }, []);
+
+  const spokenInBrowser = !result.audioBase64 && enableBrowserTts;
 
   return (
     <Card className="space-y-4 p-5">
@@ -122,7 +171,14 @@ function TurnResultCard({ result }: { result: JarvisVoiceTurnResult }) {
             variant="outline"
             className="border-emerald-500/30 bg-emerald-500/10 font-mono text-emerald-500"
           >
-            <AudioLines className="mr-1 h-3 w-3" /> readback
+            <AudioLines className="mr-1 h-3 w-3" /> premium readback
+          </Badge>
+        ) : spokenInBrowser ? (
+          <Badge
+            variant="outline"
+            className="border-primary/30 bg-primary/10 font-mono text-primary"
+          >
+            <AudioLines className="mr-1 h-3 w-3" /> browser readback
           </Badge>
         ) : (
           <Badge variant="outline" className="font-mono text-muted-foreground">
@@ -171,16 +227,14 @@ function TurnResultCard({ result }: { result: JarvisVoiceTurnResult }) {
       ) : null}
 
       {/* hidden element drives autoplay; controls let the executive replay */}
-      <audio ref={audioRef} controls className="h-8 w-full" />
+      {result.audioBase64 ? (
+        <audio ref={audioRef} controls className="h-8 w-full" />
+      ) : null}
     </Card>
   );
 }
 
-function SessionHistory({
-  sessionId,
-}: {
-  sessionId: string;
-}) {
+function SessionHistory({ sessionId }: { sessionId: string }) {
   const { data, isLoading } = useSessionTurns(sessionId);
 
   if (isLoading) {
@@ -248,22 +302,40 @@ export default function Voice() {
   const endSession = useEndVoiceSession();
   const purgeSession = usePurgeVoiceSession();
   const voiceTurn = useVoiceTurn();
+  const textTurn = useVoiceTextTurn();
 
   const enabled = settings.data?.enabled ?? false;
 
+  // ── Browser capability detection (decides the default input mode) ───────────
+  const caps = useMemo(
+    () => ({
+      browserStt: supportsBrowserSTT(),
+      browserTts: supportsBrowserTTS(),
+      mic: supportsMicrophone(),
+    }),
+    [],
+  );
+
+  const [inputMode, setInputMode] = useState<InputMode>(() =>
+    supportsBrowserSTT() ? "browser" : "text",
+  );
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [lastResult, setLastResult] = useState<JarvisVoiceTurnResult | null>(null);
   const [recording, setRecording] = useState(false);
+  const [textValue, setTextValue] = useState("");
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
+  const recognizerRef = useRef<BrowserRecognizer | null>(null);
 
   useEffect(() => {
     return () => {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((t) => t.stop());
       }
+      recognizerRef.current?.abort();
+      cancelBrowserSpeech();
     };
   }, []);
 
@@ -295,7 +367,8 @@ export default function Voice() {
     }
   }, []);
 
-  async function startRecording() {
+  // ── Server STT (premium): record audio, upload binary ───────────────────────
+  async function startServerRecording() {
     if (!enabled || recording) return;
     const sessionId = await ensureSession();
     if (!sessionId) return;
@@ -341,12 +414,98 @@ export default function Voice() {
     setRecording(true);
   }
 
-  function stopRecording() {
+  function stopServerRecording() {
     if (!recording) return;
     setRecording(false);
     const recorder = mediaRecorderRef.current;
     if (recorder && recorder.state !== "inactive") {
       recorder.stop();
+    }
+  }
+
+  // ── Browser STT: transcribe in-browser, send text turn ──────────────────────
+  async function startBrowserListening() {
+    if (!enabled || recording) return;
+    const sessionId = await ensureSession();
+    if (!sessionId) return;
+
+    cancelBrowserSpeech();
+    const recognizer = startBrowserRecognition({
+      lang: "en-GB",
+      onResult: async (transcript) => {
+        try {
+          const result = await textTurn.mutateAsync({
+            sessionId,
+            transcript,
+            source: "browser-stt",
+          });
+          setLastResult(result);
+          if (result.status !== "ok") {
+            toast.message("Turn completed with a degraded result.", {
+              description: result.replyText.slice(0, 120),
+            });
+          }
+        } catch {
+          toast.error("Voice turn failed.");
+        }
+      },
+      onError: (err) => {
+        setRecording(false);
+        if (err !== "aborted" && err !== "no-speech") {
+          toast.error("Speech recognition failed — try typing instead.");
+        }
+      },
+      onEnd: () => {
+        setRecording(false);
+        recognizerRef.current = null;
+      },
+    });
+
+    if (!recognizer) {
+      toast.error("Speech recognition is unavailable — use text instead.");
+      setInputMode("text");
+      return;
+    }
+    recognizerRef.current = recognizer;
+    setRecording(true);
+  }
+
+  function stopBrowserListening() {
+    if (!recording) return;
+    recognizerRef.current?.stop();
+  }
+
+  // ── Press handlers dispatch by input mode ───────────────────────────────────
+  function onPressStart() {
+    if (inputMode === "server") void startServerRecording();
+    else if (inputMode === "browser") void startBrowserListening();
+  }
+  function onPressEnd() {
+    if (inputMode === "server") stopServerRecording();
+    else if (inputMode === "browser") stopBrowserListening();
+  }
+
+  // ── Text command ────────────────────────────────────────────────────────────
+  async function onSendText() {
+    const value = textValue.trim();
+    if (!enabled || !value || textTurn.isPending) return;
+    const sessionId = await ensureSession();
+    if (!sessionId) return;
+    try {
+      const result = await textTurn.mutateAsync({
+        sessionId,
+        transcript: value,
+        source: "text",
+      });
+      setLastResult(result);
+      setTextValue("");
+      if (result.status !== "ok") {
+        toast.message("Turn completed with a degraded result.", {
+          description: result.replyText.slice(0, 120),
+        });
+      }
+    } catch {
+      toast.error("Command failed.");
     }
   }
 
@@ -374,10 +533,19 @@ export default function Voice() {
     }
   }
 
-  const processing = voiceTurn.isPending;
+  const processing = voiceTurn.isPending || textTurn.isPending;
+  const isVoiceMode = inputMode === "browser" || inputMode === "server";
+  const pttDisabled =
+    !enabled || processing || startSession.isPending || (inputMode === "server" && !caps.mic);
+
+  const modeButtons: { mode: InputMode; label: string; icon: typeof Mic; available: boolean }[] = [
+    { mode: "browser", label: "Browser voice", icon: Mic, available: caps.browserStt },
+    { mode: "server", label: "Premium voice", icon: Cloud, available: caps.mic },
+    { mode: "text", label: "Text", icon: Keyboard, available: true },
+  ];
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="mx-auto w-full max-w-5xl space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary">
@@ -386,8 +554,8 @@ export default function Voice() {
           <div>
             <h1 className="text-xl font-semibold tracking-tight">Voice</h1>
             <p className="text-sm text-muted-foreground">
-              Executive push-to-talk. Read &amp; advisory only — transcripts are
-              retained, audio is never stored.
+              Executive command interface. Read &amp; advisory only — transcripts
+              are retained, audio is never stored.
             </p>
           </div>
         </div>
@@ -409,53 +577,120 @@ export default function Voice() {
 
       {!enabled ? <VoiceDisabledBanner /> : null}
 
-      <Card className="space-y-5 p-6">
-        <div className="flex flex-col items-center gap-4">
-          <button
+      {/* Provider / input-mode selector */}
+      <Card className="flex flex-wrap items-center gap-2 p-3">
+        <MonitorSmartphone className="ml-1 h-4 w-4 text-muted-foreground" />
+        <span className="mr-1 text-xs text-muted-foreground">Input</span>
+        {modeButtons.map(({ mode, label, icon: Icon, available }) => (
+          <Button
+            key={mode}
             type="button"
-            disabled={!enabled || processing || startSession.isPending}
-            onMouseDown={startRecording}
-            onMouseUp={stopRecording}
-            onMouseLeave={stopRecording}
-            onTouchStart={(e) => {
-              e.preventDefault();
-              void startRecording();
-            }}
-            onTouchEnd={(e) => {
-              e.preventDefault();
-              stopRecording();
-            }}
-            className={cn(
-              "flex h-28 w-28 items-center justify-center rounded-full border-2 transition-all",
-              recording
-                ? "scale-105 border-destructive bg-destructive/15 text-destructive shadow-lg shadow-destructive/20"
-                : "border-primary/40 bg-primary/10 text-primary hover:bg-primary/15",
-              (!enabled || processing) && "cursor-not-allowed opacity-50",
-            )}
+            size="sm"
+            variant={inputMode === mode ? "default" : "outline"}
+            disabled={!available}
+            onClick={() => setInputMode(mode)}
+            className="gap-1.5"
           >
-            {processing ? (
-              <Loader2 className="h-10 w-10 animate-spin" />
-            ) : recording ? (
-              <Square className="h-9 w-9" />
-            ) : (
-              <Mic className="h-10 w-10" />
-            )}
-          </button>
-          <div className="text-center">
-            <div className="text-sm font-medium">
-              {processing
-                ? "Processing…"
-                : recording
-                  ? "Listening — release to send"
-                  : "Hold to talk"}
-            </div>
-            <div className="text-xs text-muted-foreground">
-              {activeSessionId
-                ? `Session ${activeSessionId.slice(0, 8)}`
-                : "A session starts on your first turn"}
+            <Icon className="h-3.5 w-3.5" />
+            {label}
+          </Button>
+        ))}
+        <span className="ml-auto mr-1 text-[10px] text-muted-foreground">
+          {inputMode === "server"
+            ? "Premium speech (ElevenLabs) — falls back to text when unconfigured"
+            : inputMode === "browser"
+              ? caps.browserTts
+                ? "Browser speech · British readback"
+                : "Browser speech · text readback"
+              : "Type a command — always available"}
+        </span>
+      </Card>
+
+      <Card className="space-y-5 p-6">
+        {isVoiceMode ? (
+          <div className="flex flex-col items-center gap-4">
+            <button
+              type="button"
+              disabled={pttDisabled}
+              onMouseDown={onPressStart}
+              onMouseUp={onPressEnd}
+              onMouseLeave={onPressEnd}
+              onTouchStart={(e) => {
+                e.preventDefault();
+                onPressStart();
+              }}
+              onTouchEnd={(e) => {
+                e.preventDefault();
+                onPressEnd();
+              }}
+              className={cn(
+                "flex h-28 w-28 items-center justify-center rounded-full border-2 transition-all",
+                recording
+                  ? "scale-105 border-destructive bg-destructive/15 text-destructive shadow-lg shadow-destructive/20"
+                  : "border-primary/40 bg-primary/10 text-primary hover:bg-primary/15",
+                pttDisabled && "cursor-not-allowed opacity-50",
+              )}
+            >
+              {processing ? (
+                <Loader2 className="h-10 w-10 animate-spin" />
+              ) : recording ? (
+                <Square className="h-9 w-9" />
+              ) : (
+                <Mic className="h-10 w-10" />
+              )}
+            </button>
+            <div className="text-center">
+              <div className="text-sm font-medium">
+                {processing
+                  ? "Processing…"
+                  : recording
+                    ? "Listening — release to send"
+                    : "Hold to talk"}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {activeSessionId
+                  ? `Session ${activeSessionId.slice(0, 8)}`
+                  : "A session starts on your first turn"}
+              </div>
             </div>
           </div>
-          {activeSessionId ? (
+        ) : null}
+
+        {/* Text command — shown in text mode, and offered as a quick fallback
+            under the mic so the executive can always type. */}
+        <div className={cn("flex items-center gap-2", isVoiceMode && "pt-1")}>
+          <Input
+            value={textValue}
+            onChange={(e) => setTextValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void onSendText();
+              }
+            }}
+            placeholder={
+              enabled ? "Type a command for Jarvis…" : "Enable voice to send commands"
+            }
+            disabled={!enabled || processing}
+            aria-label="Type a command"
+          />
+          <Button
+            type="button"
+            onClick={onSendText}
+            disabled={!enabled || processing || textValue.trim().length === 0}
+            className="gap-1.5"
+          >
+            {processing ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
+            Send
+          </Button>
+        </div>
+
+        {activeSessionId ? (
+          <div className="flex justify-center">
             <Button
               variant="outline"
               size="sm"
@@ -464,11 +699,13 @@ export default function Voice() {
             >
               End session
             </Button>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
       </Card>
 
-      {lastResult ? <TurnResultCard result={lastResult} /> : null}
+      {lastResult ? (
+        <TurnResultCard result={lastResult} enableBrowserTts={caps.browserTts} />
+      ) : null}
 
       <Card className="space-y-4 p-5">
         <div className="flex items-center gap-2">

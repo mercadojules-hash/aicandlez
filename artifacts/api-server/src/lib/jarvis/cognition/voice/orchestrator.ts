@@ -27,10 +27,23 @@ import { runCapability } from "./capabilities.js";
 import { buildConversationContext } from "./conversation.js";
 import type { VoiceIntent, VoiceCapability, VoiceLink } from "./types.js";
 
+/**
+ * Where the transcript originated. The control plane treats every source
+ * identically — it is recorded only for telemetry / readback hints.
+ *   "audio"      — server-side STT over an uploaded PTT clip (ElevenLabs, premium)
+ *   "browser-stt"— transcript produced in-browser (Web Speech API), text sent up
+ *   "text"       — the executive typed the command (always-available fallback)
+ */
+export type VoiceTurnSource = "audio" | "browser-stt" | "text";
+
 export interface VoiceTurnInput {
   sessionId: string;
-  audio: Buffer;
-  mimeType: string;
+  /** Raw PTT audio for server-side STT. Omit when a transcript is supplied. */
+  audio?: Buffer | null;
+  mimeType?: string;
+  /** Pre-resolved transcript (browser STT or typed). Bypasses server STT. */
+  transcript?: string | null;
+  source?: VoiceTurnSource;
   createdBy: string | null;
   executiveUserId?: string | null;
   businessId?: string | null;
@@ -95,20 +108,37 @@ export async function runVoiceTurn(
     };
   }
 
-  // ── STT (pure I/O) ──────────────────────────────────────────────────────────
-  const stt = await transcribe(input.audio, input.mimeType);
-  costMicros += estimateSttCostMicros();
-  if (!stt.ok || !stt.transcript.trim()) {
+  // ── Resolve transcript — client-supplied text OR server-side STT ────────────
+  // A pre-resolved transcript (browser Web Speech API or a typed command) skips
+  // server STT entirely, so the turn works with NO speech vendor configured. Raw
+  // audio is transcribed via the (premium) ElevenLabs path only when no
+  // transcript is provided. Either way the control plane below is identical.
+  const providedTranscript =
+    typeof input.transcript === "string" ? input.transcript.trim() : "";
+  if (providedTranscript) {
+    transcript = providedTranscript;
+    // Typed text is verbatim (100%); browser STT confidence is not exposed here.
+    transcriptConfidence = input.source === "text" ? 100 : null;
+  } else if (input.audio && input.audio.length > 0) {
+    const stt = await transcribe(input.audio, input.mimeType ?? "audio/webm");
+    costMicros += estimateSttCostMicros();
+    if (stt.ok && stt.transcript.trim()) {
+      transcript = stt.transcript.trim();
+      transcriptConfidence = stt.confidence;
+    } else {
+      error = stt.error;
+    }
+  }
+
+  if (!transcript) {
+    // No usable input from any source — fail-safe to a clarify, never act.
     intent = "clarify";
     status = "stt_failed";
-    error = stt.error;
+    if (!error) error = "no_input";
     replyText =
-      "I couldn't make out what you said. Please hold the button and try again.";
+      "I couldn't make out what you said. Please try again, or type your request.";
   } else {
-    transcript = stt.transcript.trim();
-    transcriptConfidence = stt.confidence;
-
-    // ── Deterministic control plane ─────────────────────────────────────────
+    // ── Deterministic control plane ───────────────────────────────────────────
     const classification = classifyIntent(transcript);
     intent = classification.intent;
     capability = classification.capability;

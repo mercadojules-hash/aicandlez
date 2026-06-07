@@ -2883,3 +2883,29 @@ export function useVoiceTurn() {
     },
   });
 }
+
+// Text turn — a browser-STT transcript or a typed command. No audio leaves the
+// browser; the server skips STT and runs the same deterministic pipeline. This
+// keeps Jarvis fully usable with NO speech vendor configured. JSON via authFetch.
+export function useVoiceTextTurn() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: {
+      sessionId: string;
+      transcript: string;
+      source?: "browser-stt" | "text";
+    }): Promise<JarvisVoiceTurnResult> =>
+      authFetchJson<JarvisVoiceTurnResult>(`${API}/voice/turn-text`, {
+        method: "POST",
+        body: JSON.stringify({
+          sessionId: args.sessionId,
+          transcript: args.transcript,
+          source: args.source ?? "text",
+        }),
+      }),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: jarvisKeys.voiceTurns(vars.sessionId) });
+      qc.invalidateQueries({ queryKey: jarvisKeys.voiceSessions });
+    },
+  });
+}

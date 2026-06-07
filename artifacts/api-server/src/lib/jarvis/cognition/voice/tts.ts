@@ -21,6 +21,7 @@ import {
   TTS_OUTPUT_FORMAT,
   TTS_CONTENT_TYPE,
   TTS_MAX_CHARS,
+  TTS_VOICE_SETTINGS,
   resolveVoiceId,
 } from "./config.js";
 
@@ -92,7 +93,11 @@ export async function synthesize(
         "Content-Type": "application/json",
         Accept: TTS_CONTENT_TYPE,
       },
-      body: JSON.stringify({ text: clean, model_id: TTS_MODEL }),
+      body: JSON.stringify({
+        text: clean,
+        model_id: TTS_MODEL,
+        voice_settings: TTS_VOICE_SETTINGS,
+      }),
       signal: controller.signal,
     });
 

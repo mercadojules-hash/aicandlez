@@ -68,12 +68,32 @@ export const STT_MAX_AUDIO_BYTES = 25 * 1024 * 1024; // 25 MB
 /** Text-to-Speech model + a configurable premade voice. */
 export const TTS_MODEL = "eleven_multilingual_v2";
 export const TTS_TIMEOUT_MS = 30_000;
-/** Default ElevenLabs premade voice ("Rachel"); override with ELEVENLABS_VOICE_ID. */
-export const DEFAULT_TTS_VOICE_ID = "21m00Tcm4TlvDq8ikWAM";
+/**
+ * Default ElevenLabs premade voice for the Jarvis persona: "Daniel" — an
+ * authoritative, refined RP British male (news-presenter timbre). This is the
+ * intended "professional British executive" readback voice, in the spirit of
+ * Iron Man's J.A.R.V.I.S. Override with ELEVENLABS_VOICE_ID (e.g. "George"
+ * `JBFqnCBsd6RMkjVDRZzb` for a warmer British tone). ElevenLabs is the PREMIUM
+ * tier here — when no key is present the client falls back to a browser en-GB
+ * voice, so the persona stays British across both providers.
+ */
+export const DEFAULT_TTS_VOICE_ID = "onwK4e9ZLuTAKqWW03F9";
 export const TTS_OUTPUT_FORMAT = "mp3_44100_128";
 export const TTS_CONTENT_TYPE = "audio/mpeg";
 /** Cap synthesized characters so one readback cannot run away on cost. */
 export const TTS_MAX_CHARS = 5_000;
+
+/**
+ * Voice-design settings tuned for a calm, composed executive delivery: higher
+ * stability keeps the cadence even and unflappable; moderate similarity keeps
+ * the voice's character; a touch of style adds gravitas without theatrics.
+ */
+export const TTS_VOICE_SETTINGS = {
+  stability: 0.6,
+  similarity_boost: 0.8,
+  style: 0.15,
+  use_speaker_boost: true,
+} as const;
 
 export function resolveVoiceId(): string {
   const v = process.env.ELEVENLABS_VOICE_ID;
