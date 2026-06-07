@@ -40,8 +40,13 @@ import {
   jarvisRecommendationsTable,
   jarvisInsightsTable,
   jarvisBriefingsTable,
+  jarvisAgentRunsTable,
+  jarvisAgentMessagesTable,
 } from "@workspace/db";
 import { requireAuth, requireRole } from "../middlewares/requireAuth.js";
+import { agentRuntime } from "../lib/jarvis/runtime.js";
+import { agentBus } from "../lib/jarvis/agentBus.js";
+import { AGENT_CATALOG, getHandler } from "../lib/jarvis/registry.js";
 
 type AuthReq = Request & { clerkUserId: string };
 
@@ -460,6 +465,14 @@ const agentBodySchema = z.object({
   role: z.string().trim().max(120).optional().nullable(),
   description: z.string().trim().max(5000).optional().nullable(),
   status: statusSchema.optional(),
+  // Sprint 5 runtime registry fields. runtimeStatus/lastRun* are runtime-owned
+  // and never accepted from the client.
+  agentType: z.string().trim().min(1).max(48).optional(),
+  capabilities: z.array(z.string().trim().min(1).max(80)).max(40).optional().nullable(),
+  config: z.record(z.string(), z.unknown()).optional().nullable(),
+  enabled: z.boolean().optional(),
+  scheduleSeconds: z.number().int().min(5).max(86_400).optional().nullable(),
+  priority: z.number().int().min(0).max(1000).optional(),
 });
 
 router.get(
@@ -497,6 +510,20 @@ router.post(
           role: parsed.data.role ?? "",
           description: parsed.data.description ?? null,
           status: parsed.data.status ?? "active",
+          ...(parsed.data.agentType !== undefined
+            ? { agentType: parsed.data.agentType }
+            : {}),
+          ...(parsed.data.capabilities !== undefined
+            ? { capabilities: parsed.data.capabilities ?? null }
+            : {}),
+          ...(parsed.data.config !== undefined
+            ? { config: (parsed.data.config as Record<string, unknown>) ?? null }
+            : {}),
+          ...(parsed.data.enabled !== undefined ? { enabled: parsed.data.enabled } : {}),
+          ...(parsed.data.scheduleSeconds !== undefined
+            ? { scheduleSeconds: parsed.data.scheduleSeconds ?? null }
+            : {}),
+          ...(parsed.data.priority !== undefined ? { priority: parsed.data.priority } : {}),
         })
         .returning();
       await audit(req, actor, "create", "agent", row.id, { name: row.name });
@@ -550,6 +577,20 @@ router.put(
             ? { description: parsed.data.description ?? null }
             : {}),
           ...(parsed.data.status !== undefined ? { status: parsed.data.status } : {}),
+          ...(parsed.data.agentType !== undefined
+            ? { agentType: parsed.data.agentType }
+            : {}),
+          ...(parsed.data.capabilities !== undefined
+            ? { capabilities: parsed.data.capabilities ?? null }
+            : {}),
+          ...(parsed.data.config !== undefined
+            ? { config: (parsed.data.config as Record<string, unknown>) ?? null }
+            : {}),
+          ...(parsed.data.enabled !== undefined ? { enabled: parsed.data.enabled } : {}),
+          ...(parsed.data.scheduleSeconds !== undefined
+            ? { scheduleSeconds: parsed.data.scheduleSeconds ?? null }
+            : {}),
+          ...(parsed.data.priority !== undefined ? { priority: parsed.data.priority } : {}),
           updatedAt: new Date(),
         })
         .where(eq(jarvisAgentsTable.id, String(req.params.id)))
@@ -586,6 +627,272 @@ router.delete(
     } catch (err) {
       req.log.error({ err }, "DELETE /jarvis/agents/:id failed");
       res.status(500).json({ error: "jarvis_agent_delete_failed" });
+    }
+  },
+);
+
+// ── agent runtime (Sprint 5) ─────────────────────────────────────────────────
+//
+// A SEPARATE loop/bus from the AICandlez trading engine. OFF by default. The
+// runtime is a single GLOBAL loop, so control-plane mutations (start/stop/run/
+// seed) are admin-gated (requireRole) — any signed-in user could otherwise
+// affect every user's runtime. Read endpoints stay requireAuth. Every mutation
+// is audit-logged. Agents are deterministic + advisory-safe (no destructive
+// autonomy, no external LLM).
+
+const runtimeStartSchema = z.object({
+  tickIntervalMs: z.number().int().min(5_000).max(3_600_000).optional(),
+});
+
+router.get(
+  "/jarvis/runtime/status",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      res.json({ status: agentRuntime.status(), catalog: AGENT_CATALOG });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/runtime/status failed");
+      res.status(500).json({ error: "jarvis_runtime_status_failed" });
+    }
+  },
+);
+
+router.post(
+  "/jarvis/runtime/start",
+  requireAuth,
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = runtimeStartSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_runtime_options" });
+      return;
+    }
+    try {
+      const status = agentRuntime.start({ tickIntervalMs: parsed.data.tickIntervalMs });
+      await audit(req, actor, "start", "agent_runtime", null, {
+        tickIntervalMs: status.tickIntervalMs,
+      });
+      res.json({ status });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/runtime/start failed");
+      res.status(500).json({ error: "jarvis_runtime_start_failed" });
+    }
+  },
+);
+
+router.post(
+  "/jarvis/runtime/stop",
+  requireAuth,
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    try {
+      const status = agentRuntime.stop();
+      await audit(req, actor, "stop", "agent_runtime", null);
+      res.json({ status });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/runtime/stop failed");
+      res.status(500).json({ error: "jarvis_runtime_stop_failed" });
+    }
+  },
+);
+
+router.get(
+  "/jarvis/runtime/activity",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const limit = Math.min(Math.max(Number(req.query.limit) || 200, 1), 500);
+      const { events, cursor } = agentBus.getRecent(limit);
+      res.json({ events, cursor, status: agentRuntime.status() });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/runtime/activity failed");
+      res.status(500).json({ error: "jarvis_runtime_activity_failed" });
+    }
+  },
+);
+
+router.get(
+  "/jarvis/runtime/overview",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const [
+        agents,
+        [totalRuns],
+        runsByStatus,
+        [totalMessages],
+        recentRuns,
+        recentMessages,
+      ] = await Promise.all([
+        db.select().from(jarvisAgentsTable).orderBy(jarvisAgentsTable.priority),
+        db.select({ c: sql<number>`count(*)::int` }).from(jarvisAgentRunsTable),
+        db
+          .select({
+            status: jarvisAgentRunsTable.status,
+            c: sql<number>`count(*)::int`,
+          })
+          .from(jarvisAgentRunsTable)
+          .groupBy(jarvisAgentRunsTable.status),
+        db.select({ c: sql<number>`count(*)::int` }).from(jarvisAgentMessagesTable),
+        db
+          .select()
+          .from(jarvisAgentRunsTable)
+          .orderBy(desc(jarvisAgentRunsTable.startedAt))
+          .limit(20),
+        db
+          .select()
+          .from(jarvisAgentMessagesTable)
+          .orderBy(desc(jarvisAgentMessagesTable.createdAt))
+          .limit(20),
+      ]);
+
+      const handled = new Set(AGENT_CATALOG.map((c) => c.type));
+      const fleet = agents.map((a) => ({
+        ...a,
+        hasHandler: handled.has(a.agentType),
+      }));
+
+      res.json({
+        runtime: agentRuntime.status(),
+        catalog: AGENT_CATALOG,
+        fleet,
+        totals: {
+          agents: agents.length,
+          enabled: agents.filter((a) => a.enabled).length,
+          runs: totalRuns?.c ?? 0,
+          messages: totalMessages?.c ?? 0,
+        },
+        runsByStatus,
+        recentRuns,
+        recentMessages,
+      });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/runtime/overview failed");
+      res.status(500).json({ error: "jarvis_runtime_overview_failed" });
+    }
+  },
+);
+
+router.post(
+  "/jarvis/agents/:id/run",
+  requireAuth,
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    try {
+      const outcome = await agentRuntime.runAgentById(String(req.params.id), "manual");
+      if (!outcome.ok && outcome.runId == null) {
+        const code =
+          outcome.error === "Agent not found" ? 404 : 409;
+        res.status(code).json({ error: outcome.error ?? "agent_run_failed" });
+        return;
+      }
+      await audit(req, actor, "run", "agent", String(req.params.id), {
+        trigger: "manual",
+        runId: outcome.runId,
+        ok: outcome.ok,
+      });
+      res.json({ outcome });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/agents/:id/run failed");
+      res.status(500).json({ error: "jarvis_agent_run_failed" });
+    }
+  },
+);
+
+router.post(
+  "/jarvis/agents/seed-defaults",
+  requireAuth,
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    try {
+      const existing = await db
+        .select({ agentType: jarvisAgentsTable.agentType })
+        .from(jarvisAgentsTable);
+      const present = new Set(existing.map((r) => r.agentType));
+      const toCreate = AGENT_CATALOG.filter((c) => !present.has(c.type));
+      const created: { id: string; name: string; agentType: string }[] = [];
+      for (const c of toCreate) {
+        const [row] = await db
+          .insert(jarvisAgentsTable)
+          .values({
+            name: c.label,
+            role: c.label,
+            description: c.description,
+            status: "active",
+            agentType: c.type,
+            capabilities: c.defaultCapabilities,
+            enabled: false,
+            scheduleSeconds: c.defaultScheduleSeconds,
+            priority: c.defaultPriority,
+          })
+          .returning();
+        if (row) {
+          created.push({ id: row.id, name: row.name, agentType: row.agentType });
+          await audit(req, actor, "seed", "agent", row.id, { agentType: row.agentType });
+        }
+      }
+      res.json({ created, skipped: AGENT_CATALOG.length - toCreate.length });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/agents/seed-defaults failed");
+      res.status(500).json({ error: "jarvis_agent_seed_failed" });
+    }
+  },
+);
+
+router.get(
+  "/jarvis/agent-runs",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 200);
+      const conds = [];
+      if (req.query.agentId) {
+        conds.push(eq(jarvisAgentRunsTable.agentId, String(req.query.agentId)));
+      }
+      if (req.query.status) {
+        conds.push(eq(jarvisAgentRunsTable.status, String(req.query.status)));
+      }
+      const rows = await db
+        .select()
+        .from(jarvisAgentRunsTable)
+        .where(conds.length ? and(...conds) : undefined)
+        .orderBy(desc(jarvisAgentRunsTable.startedAt))
+        .limit(limit);
+      res.json({ runs: rows });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/agent-runs failed");
+      res.status(500).json({ error: "jarvis_agent_runs_read_failed" });
+    }
+  },
+);
+
+router.get(
+  "/jarvis/agent-messages",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 200);
+      const conds = [];
+      if (req.query.status) {
+        conds.push(eq(jarvisAgentMessagesTable.status, String(req.query.status)));
+      }
+      if (req.query.runId) {
+        conds.push(eq(jarvisAgentMessagesTable.runId, String(req.query.runId)));
+      }
+      const rows = await db
+        .select()
+        .from(jarvisAgentMessagesTable)
+        .where(conds.length ? and(...conds) : undefined)
+        .orderBy(desc(jarvisAgentMessagesTable.createdAt))
+        .limit(limit);
+      res.json({ messages: rows });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/agent-messages failed");
+      res.status(500).json({ error: "jarvis_agent_messages_read_failed" });
     }
   },
 );

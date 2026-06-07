@@ -16,6 +16,7 @@ import Dashboard from "@/pages/Dashboard";
 import Businesses from "@/pages/Businesses";
 import Projects from "@/pages/Projects";
 import Agents from "@/pages/Agents";
+import AgentActivity from "@/pages/AgentActivity";
 import Workflows from "@/pages/Workflows";
 import Operations from "@/pages/Operations";
 import Tasks from "@/pages/Tasks";
@@ -162,6 +163,11 @@ function AppRoutes() {
       <Route path="/agents">
         <Protected>
           <Agents />
+        </Protected>
+      </Route>
+      <Route path="/agent-activity">
+        <Protected>
+          <AgentActivity />
         </Protected>
       </Route>
       <Route path="/workflows">

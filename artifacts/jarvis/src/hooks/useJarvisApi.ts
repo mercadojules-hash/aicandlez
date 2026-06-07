@@ -38,6 +38,16 @@ export interface JarvisAgent {
   role: string;
   description: string | null;
   status: string;
+  agentType: string;
+  capabilities: string[] | null;
+  config: Record<string, unknown> | null;
+  enabled: boolean;
+  scheduleSeconds: number | null;
+  priority: number;
+  runtimeStatus: string;
+  lastRunAt: string | null;
+  lastRunStatus: string | null;
+  lastError: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -198,6 +208,11 @@ export const jarvisKeys = {
   insights: ["jarvis", "insights"] as const,
   briefings: ["jarvis", "briefings"] as const,
   intelligenceOverview: ["jarvis", "intelligence-overview"] as const,
+  runtimeStatus: ["jarvis", "runtime-status"] as const,
+  runtimeOverview: ["jarvis", "runtime-overview"] as const,
+  runtimeActivity: ["jarvis", "runtime-activity"] as const,
+  agentRuns: ["jarvis", "agent-runs"] as const,
+  agentMessages: ["jarvis", "agent-messages"] as const,
 };
 
 // ── dashboard ────────────────────────────────────────────────────────────────
@@ -341,6 +356,12 @@ export interface AgentInput {
   role?: string | null;
   description?: string | null;
   status?: string;
+  agentType?: string;
+  capabilities?: string[] | null;
+  config?: Record<string, unknown> | null;
+  enabled?: boolean;
+  scheduleSeconds?: number | null;
+  priority?: number;
 }
 
 export const useAgents = makeListHook<JarvisAgent>({
@@ -1378,5 +1399,217 @@ export function useIntelligenceOverview(): UseQueryResult<JarvisIntelligenceOver
     queryFn: () =>
       authFetchJson<JarvisIntelligenceOverview>(`${API}/intelligence/overview`),
     refetchInterval: 15000,
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sprint 5 — agent runtime & coordination
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface JarvisRuntimeStatus {
+  running: boolean;
+  startedAt: number | null;
+  tickIntervalMs: number;
+  lastTickAt: number | null;
+  tickCount: number;
+  inFlight: string[];
+}
+
+export interface JarvisAgentCatalogEntry {
+  type: string;
+  label: string;
+  description: string;
+  defaultCapabilities: string[];
+  defaultScheduleSeconds: number;
+  defaultPriority: number;
+}
+
+export interface JarvisAgentRun {
+  id: string;
+  agentId: string | null;
+  agentName: string | null;
+  agentType: string | null;
+  trigger: string;
+  status: string;
+  summary: string | null;
+  output: Record<string, unknown> | null;
+  itemsProcessed: number;
+  error: string | null;
+  startedAt: string;
+  finishedAt: string | null;
+  durationMs: number | null;
+}
+
+export interface JarvisAgentMessage {
+  id: string;
+  fromAgentId: string | null;
+  fromAgentName: string | null;
+  toAgentId: string | null;
+  toAgentName: string | null;
+  runId: string | null;
+  messageType: string;
+  subject: string;
+  body: string | null;
+  payload: Record<string, unknown> | null;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JarvisRuntimeOverview {
+  runtime: JarvisRuntimeStatus;
+  catalog: JarvisAgentCatalogEntry[];
+  fleet: (JarvisAgent & { hasHandler: boolean })[];
+  totals: {
+    agents: number;
+    enabled: number;
+    runs: number;
+    messages: number;
+  };
+  runsByStatus: { status: string; c: number }[];
+  recentRuns: JarvisAgentRun[];
+  recentMessages: JarvisAgentMessage[];
+}
+
+export interface JarvisRuntimeActivityEvent {
+  id: string;
+  ts: number;
+  type: string;
+  severity: string;
+  agentId?: string | null;
+  agentName?: string | null;
+  agentType?: string | null;
+  runId?: string | null;
+  message: string;
+  details?: Record<string, unknown>;
+}
+
+export interface JarvisRuntimeActivity {
+  events: JarvisRuntimeActivityEvent[];
+  cursor: number;
+  status: JarvisRuntimeStatus;
+}
+
+export interface JarvisRunOutcome {
+  ok: boolean;
+  runId: string | null;
+  summary?: string;
+  error?: string;
+}
+
+export function useRuntimeStatus(): UseQueryResult<{
+  status: JarvisRuntimeStatus;
+  catalog: JarvisAgentCatalogEntry[];
+}> {
+  return useQuery({
+    queryKey: jarvisKeys.runtimeStatus,
+    queryFn: () =>
+      authFetchJson<{ status: JarvisRuntimeStatus; catalog: JarvisAgentCatalogEntry[] }>(
+        `${API}/runtime/status`,
+      ),
+    refetchInterval: 5000,
+  });
+}
+
+export function useRuntimeOverview(): UseQueryResult<JarvisRuntimeOverview> {
+  return useQuery({
+    queryKey: jarvisKeys.runtimeOverview,
+    queryFn: () => authFetchJson<JarvisRuntimeOverview>(`${API}/runtime/overview`),
+    refetchInterval: 5000,
+  });
+}
+
+export function useRuntimeActivity(limit = 200): UseQueryResult<JarvisRuntimeActivity> {
+  return useQuery({
+    queryKey: [...jarvisKeys.runtimeActivity, limit],
+    queryFn: () =>
+      authFetchJson<JarvisRuntimeActivity>(`${API}/runtime/activity?limit=${limit}`),
+    refetchInterval: 5000,
+  });
+}
+
+export function useAgentRuns(
+  params: { agentId?: string; status?: string; limit?: number } = {},
+): UseQueryResult<JarvisAgentRun[]> {
+  const search = new URLSearchParams();
+  if (params.agentId) search.set("agentId", params.agentId);
+  if (params.status) search.set("status", params.status);
+  if (params.limit) search.set("limit", String(params.limit));
+  const qs = search.toString();
+  return useQuery({
+    queryKey: [...jarvisKeys.agentRuns, params],
+    queryFn: async () => {
+      const data = await authFetchJson<{ runs: JarvisAgentRun[] }>(
+        `${API}/agent-runs${qs ? `?${qs}` : ""}`,
+      );
+      return data.runs ?? [];
+    },
+    refetchInterval: 5000,
+  });
+}
+
+export function useAgentMessages(
+  params: { status?: string; runId?: string; limit?: number } = {},
+): UseQueryResult<JarvisAgentMessage[]> {
+  const search = new URLSearchParams();
+  if (params.status) search.set("status", params.status);
+  if (params.runId) search.set("runId", params.runId);
+  if (params.limit) search.set("limit", String(params.limit));
+  const qs = search.toString();
+  return useQuery({
+    queryKey: [...jarvisKeys.agentMessages, params],
+    queryFn: async () => {
+      const data = await authFetchJson<{ messages: JarvisAgentMessage[] }>(
+        `${API}/agent-messages${qs ? `?${qs}` : ""}`,
+      );
+      return data.messages ?? [];
+    },
+    refetchInterval: 5000,
+  });
+}
+
+export function useStartRuntime() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (input: { tickIntervalMs?: number } = {}) =>
+      authFetchJson<{ status: JarvisRuntimeStatus }>(`${API}/runtime/start`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useStopRuntime() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: () =>
+      authFetchJson<{ status: JarvisRuntimeStatus }>(`${API}/runtime/stop`, {
+        method: "POST",
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useRunAgent() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (id: string) =>
+      authFetchJson<{ outcome: JarvisRunOutcome }>(`${API}/agents/${id}/run`, {
+        method: "POST",
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useSeedDefaultAgents() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: () =>
+      authFetchJson<{
+        created: { id: string; name: string; agentType: string }[];
+        skipped: number;
+      }>(`${API}/agents/seed-defaults`, { method: "POST" }),
+    onSuccess: invalidate,
   });
 }

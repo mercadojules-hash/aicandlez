@@ -46,6 +46,21 @@ export const jarvisAgentsTable = pgTable("jarvis_agents", {
   role: varchar("role", { length: 120 }).notNull().default(""),
   description: text("description"),
   status: varchar("status", { length: 32 }).notNull().default("active"),
+  // ── Sprint 5 — runtime registry expansion ──────────────────────────────────
+  // agentType keys the runtime handler (chief_of_staff/operations/risk/memory/
+  // qa/custom). capabilities + config are advisory metadata. enabled gates the
+  // scheduler; scheduleSeconds=null means manual-only. runtimeStatus + lastRun*
+  // are written by the runtime, not by users.
+  agentType: varchar("agent_type", { length: 48 }).notNull().default("custom"),
+  capabilities: jsonb("capabilities").$type<string[]>(),
+  config: jsonb("config").$type<Record<string, unknown>>(),
+  enabled: boolean("enabled").notNull().default(false),
+  scheduleSeconds: integer("schedule_seconds"),
+  priority: integer("priority").notNull().default(100),
+  runtimeStatus: varchar("runtime_status", { length: 32 }).notNull().default("idle"),
+  lastRunAt: timestamp("last_run_at"),
+  lastRunStatus: varchar("last_run_status", { length: 32 }),
+  lastError: text("last_error"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -316,6 +331,54 @@ export const jarvisBriefingsTable = pgTable("jarvis_briefings", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// ── Agent Runtime & Coordination Layer (Sprint 5) ────────────────────────────
+// jarvis_agent_runs is the execution ledger written by the runtime each time an
+// agent ticks (scheduled/manual/coordinated). jarvis_agent_messages is the
+// Communication Protocol in software — typed messages between agents
+// (request/response/notify/handoff/escalation). Both keep history via
+// `onDelete: "set null"` + denormalized name snapshots so deleting an agent from
+// the registry never destroys its run/coordination history.
+
+export const jarvisAgentRunsTable = pgTable("jarvis_agent_runs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  agentId: uuid("agent_id").references(() => jarvisAgentsTable.id, {
+    onDelete: "set null",
+  }),
+  agentName: varchar("agent_name", { length: 200 }),
+  agentType: varchar("agent_type", { length: 48 }),
+  trigger: varchar("trigger", { length: 32 }).notNull().default("scheduled"),
+  status: varchar("status", { length: 32 }).notNull().default("running"),
+  summary: text("summary"),
+  output: jsonb("output").$type<Record<string, unknown>>(),
+  itemsProcessed: integer("items_processed").notNull().default(0),
+  error: text("error"),
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  finishedAt: timestamp("finished_at"),
+  durationMs: integer("duration_ms"),
+});
+
+export const jarvisAgentMessagesTable = pgTable("jarvis_agent_messages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  fromAgentId: uuid("from_agent_id").references(() => jarvisAgentsTable.id, {
+    onDelete: "set null",
+  }),
+  fromAgentName: varchar("from_agent_name", { length: 200 }),
+  toAgentId: uuid("to_agent_id").references(() => jarvisAgentsTable.id, {
+    onDelete: "set null",
+  }),
+  toAgentName: varchar("to_agent_name", { length: 200 }),
+  runId: uuid("run_id").references(() => jarvisAgentRunsTable.id, {
+    onDelete: "set null",
+  }),
+  messageType: varchar("message_type", { length: 32 }).notNull().default("notify"),
+  subject: varchar("subject", { length: 200 }).notNull(),
+  body: text("body"),
+  payload: jsonb("payload").$type<Record<string, unknown>>(),
+  status: varchar("status", { length: 32 }).notNull().default("pending"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export type JarvisBusiness = typeof jarvisBusinessesTable.$inferSelect;
 export type InsertJarvisBusiness = typeof jarvisBusinessesTable.$inferInsert;
 export type JarvisProject = typeof jarvisProjectsTable.$inferSelect;
@@ -356,3 +419,7 @@ export type JarvisInsight = typeof jarvisInsightsTable.$inferSelect;
 export type InsertJarvisInsight = typeof jarvisInsightsTable.$inferInsert;
 export type JarvisBriefing = typeof jarvisBriefingsTable.$inferSelect;
 export type InsertJarvisBriefing = typeof jarvisBriefingsTable.$inferInsert;
+export type JarvisAgentRun = typeof jarvisAgentRunsTable.$inferSelect;
+export type InsertJarvisAgentRun = typeof jarvisAgentRunsTable.$inferInsert;
+export type JarvisAgentMessage = typeof jarvisAgentMessagesTable.$inferSelect;
+export type InsertJarvisAgentMessage = typeof jarvisAgentMessagesTable.$inferInsert;
