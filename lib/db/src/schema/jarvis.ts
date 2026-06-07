@@ -174,6 +174,18 @@ export const jarvisEscalationsTable = pgTable("jarvis_escalations", {
   }),
   currentLevel: integer("current_level").notNull().default(0),
   nextEscalationAt: timestamp("next_escalation_at"),
+  // ── Sprint 7 — governance hold state (pump skips while pending_approval) ────
+  governanceState: varchar("governance_state", { length: 32 })
+    .notNull()
+    .default("none"),
+  policyEvaluationId: uuid("policy_evaluation_id").references(
+    (): AnyPgColumn => jarvisPolicyEvaluationsTable.id,
+    { onDelete: "set null" },
+  ),
+  approvalId: uuid("approval_id").references(
+    (): AnyPgColumn => jarvisApprovalsTable.id,
+    { onDelete: "set null" },
+  ),
   resolvedAt: timestamp("resolved_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
