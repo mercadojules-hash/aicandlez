@@ -49,6 +49,10 @@ import {
   jarvisEscalationChainsTable,
   jarvisEscalationChainStepsTable,
   jarvisCommandsTable,
+  jarvisPoliciesTable,
+  jarvisPolicyEvaluationsTable,
+  jarvisAgentTrustTable,
+  jarvisBudgetsTable,
 } from "@workspace/db";
 import { requireAuth, requireRole } from "../middlewares/requireAuth.js";
 import { agentRuntime } from "../lib/jarvis/runtime.js";
@@ -60,6 +64,7 @@ import {
   findVerb,
   VERB_REGISTRY,
 } from "../lib/jarvis/orchestrator/index.js";
+import { evaluateGovernance } from "../lib/jarvis/governance/index.js";
 
 type AuthReq = Request & { clerkUserId: string };
 
@@ -4570,6 +4575,617 @@ router.get(
     } catch (err) {
       req.log.error({ err }, "GET /jarvis/orchestration/overview failed");
       res.status(500).json({ error: "jarvis_orchestration_overview_failed" });
+    }
+  },
+);
+
+// ── Sprint 7 — Governance, Policy & Trust ────────────────────────────────────
+//
+// Reads = requireAuth. Control-plane mutations (policies, budgets) =
+// requireRole(admin) — they shape the global loop. Approval decisions are gated
+// dynamically by the linked policy's requireApprovalRole. All mutations are
+// Zod-validated + audited. Surface is `/api/jarvis/*` only; governance is
+// advisory-safe (it only narrows authority) and rides the single S5 tick.
+
+const policyScopeTypeSchema = z.enum([
+  "global",
+  "agent_type",
+  "action",
+  "verb",
+  "category",
+  "workflow",
+]);
+const policyEffectSchema = z.enum(["allow", "deny", "require_approval"]);
+const policyConditionsSchema = z
+  .object({
+    minTrustScore: z.number().int().min(0).max(100).optional(),
+    maxPerWindow: z.number().int().min(0).optional(),
+    windowSeconds: z.number().int().min(1).optional(),
+  })
+  .strict();
+const policyBodySchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  description: z.string().trim().max(2000).nullish(),
+  scopeType: policyScopeTypeSchema.optional(),
+  scopeValue: z.string().trim().max(200).nullish(),
+  effect: policyEffectSchema.optional(),
+  priority: z.number().int().min(0).max(100000).optional(),
+  enabled: z.boolean().optional(),
+  conditions: policyConditionsSchema.nullish(),
+  requireApprovalRole: z.string().trim().min(1).max(32).optional(),
+});
+
+const budgetScopeTypeSchema = z.enum(["global", "agent_type", "action", "verb"]);
+const budgetBodySchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  description: z.string().trim().max(2000).nullish(),
+  scopeType: budgetScopeTypeSchema.optional(),
+  scopeValue: z.string().trim().max(200).nullish(),
+  limitCount: z.number().int().min(0).optional(),
+  windowSeconds: z.number().int().min(1).optional(),
+  enabled: z.boolean().optional(),
+});
+
+const policyTestSchema = z.object({
+  subjectType: z.enum(["command", "delegation", "workflow_step", "escalation"]),
+  agentType: z.string().trim().max(48).nullish(),
+  action: z.string().trim().max(64).nullish(),
+  verb: z.string().trim().max(64).nullish(),
+  category: z.string().trim().max(64).nullish(),
+  workflowName: z.string().trim().max(200).nullish(),
+});
+
+const decisionSchema = z.object({
+  decision: z.enum(["approve", "reject"]),
+  reason: z.string().trim().max(2000).nullish(),
+});
+
+async function resolveActorRole(clerkUserId: string): Promise<string> {
+  try {
+    const [row] = await db
+      .select({ role: usersTable.role })
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, clerkUserId))
+      .limit(1);
+    return row?.role ?? "user";
+  } catch {
+    return "user";
+  }
+}
+
+// ── policies ─────────────────────────────────────────────────────────────────
+router.get(
+  "/jarvis/policies",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const rows = await db
+        .select()
+        .from(jarvisPoliciesTable)
+        .orderBy(
+          desc(jarvisPoliciesTable.priority),
+          asc(jarvisPoliciesTable.createdAt),
+        );
+      res.json({ policies: rows });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/policies failed");
+      res.status(500).json({ error: "jarvis_policies_read_failed" });
+    }
+  },
+);
+
+router.post(
+  "/jarvis/policies/test",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const parsed = policyTestSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_policy_test" });
+      return;
+    }
+    try {
+      const result = await evaluateGovernance({
+        subjectType: parsed.data.subjectType,
+        subjectId: "00000000-0000-0000-0000-000000000000",
+        agentId: null,
+        agentType: parsed.data.agentType ?? null,
+        action: parsed.data.action ?? null,
+        verb: parsed.data.verb ?? null,
+        category: parsed.data.category ?? null,
+        workflowName: parsed.data.workflowName ?? null,
+      });
+      res.json({ result });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/policies/test failed");
+      res.status(500).json({ error: "jarvis_policy_test_failed" });
+    }
+  },
+);
+
+router.post(
+  "/jarvis/policies",
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = policyBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_policy" });
+      return;
+    }
+    const d = parsed.data;
+    try {
+      const [row] = await db
+        .insert(jarvisPoliciesTable)
+        .values({
+          name: d.name,
+          description: d.description ?? null,
+          scopeType: d.scopeType ?? "global",
+          scopeValue: d.scopeValue ?? null,
+          effect: d.effect ?? "allow",
+          priority: d.priority ?? 100,
+          enabled: d.enabled ?? true,
+          conditions: d.conditions ?? null,
+          requireApprovalRole: d.requireApprovalRole ?? "admin",
+          createdBy: actor.email ?? actor.userId,
+        })
+        .returning();
+      await audit(req, actor, "create", "policy", row.id, { name: row.name });
+      res.status(201).json({ policy: row });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/policies failed");
+      res.status(500).json({ error: "jarvis_policy_create_failed" });
+    }
+  },
+);
+
+router.get(
+  "/jarvis/policies/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const [row] = await db
+        .select()
+        .from(jarvisPoliciesTable)
+        .where(eq(jarvisPoliciesTable.id, String(req.params.id)))
+        .limit(1);
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      res.json({ policy: row });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/policies/:id failed");
+      res.status(500).json({ error: "jarvis_policy_read_failed" });
+    }
+  },
+);
+
+router.put(
+  "/jarvis/policies/:id",
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = policyBodySchema.partial().safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_policy" });
+      return;
+    }
+    const d = parsed.data;
+    try {
+      const [row] = await db
+        .update(jarvisPoliciesTable)
+        .set({
+          ...(d.name !== undefined ? { name: d.name } : {}),
+          ...(d.description !== undefined
+            ? { description: d.description ?? null }
+            : {}),
+          ...(d.scopeType !== undefined ? { scopeType: d.scopeType } : {}),
+          ...(d.scopeValue !== undefined
+            ? { scopeValue: d.scopeValue ?? null }
+            : {}),
+          ...(d.effect !== undefined ? { effect: d.effect } : {}),
+          ...(d.priority !== undefined ? { priority: d.priority } : {}),
+          ...(d.enabled !== undefined ? { enabled: d.enabled } : {}),
+          ...(d.conditions !== undefined
+            ? { conditions: d.conditions ?? null }
+            : {}),
+          ...(d.requireApprovalRole !== undefined
+            ? { requireApprovalRole: d.requireApprovalRole }
+            : {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(jarvisPoliciesTable.id, String(req.params.id)))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await audit(req, actor, "update", "policy", row.id, { name: row.name });
+      res.json({ policy: row });
+    } catch (err) {
+      req.log.error({ err }, "PUT /jarvis/policies/:id failed");
+      res.status(500).json({ error: "jarvis_policy_update_failed" });
+    }
+  },
+);
+
+router.delete(
+  "/jarvis/policies/:id",
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    try {
+      const [row] = await db
+        .delete(jarvisPoliciesTable)
+        .where(eq(jarvisPoliciesTable.id, String(req.params.id)))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await audit(req, actor, "delete", "policy", row.id, { name: row.name });
+      res.json({ ok: true, id: row.id });
+    } catch (err) {
+      req.log.error({ err }, "DELETE /jarvis/policies/:id failed");
+      res.status(500).json({ error: "jarvis_policy_delete_failed" });
+    }
+  },
+);
+
+// ── budgets ──────────────────────────────────────────────────────────────────
+router.get(
+  "/jarvis/budgets",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const rows = await db
+        .select()
+        .from(jarvisBudgetsTable)
+        .orderBy(asc(jarvisBudgetsTable.createdAt));
+      res.json({ budgets: rows });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/budgets failed");
+      res.status(500).json({ error: "jarvis_budgets_read_failed" });
+    }
+  },
+);
+
+router.post(
+  "/jarvis/budgets",
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = budgetBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_budget" });
+      return;
+    }
+    const d = parsed.data;
+    try {
+      const [row] = await db
+        .insert(jarvisBudgetsTable)
+        .values({
+          name: d.name,
+          description: d.description ?? null,
+          scopeType: d.scopeType ?? "global",
+          scopeValue: d.scopeValue ?? null,
+          limitCount: d.limitCount ?? 0,
+          windowSeconds: d.windowSeconds ?? 3600,
+          enabled: d.enabled ?? true,
+          createdBy: actor.email ?? actor.userId,
+        })
+        .returning();
+      await audit(req, actor, "create", "budget", row.id, { name: row.name });
+      res.status(201).json({ budget: row });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/budgets failed");
+      res.status(500).json({ error: "jarvis_budget_create_failed" });
+    }
+  },
+);
+
+router.get(
+  "/jarvis/budgets/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const [row] = await db
+        .select()
+        .from(jarvisBudgetsTable)
+        .where(eq(jarvisBudgetsTable.id, String(req.params.id)))
+        .limit(1);
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      res.json({ budget: row });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/budgets/:id failed");
+      res.status(500).json({ error: "jarvis_budget_read_failed" });
+    }
+  },
+);
+
+router.put(
+  "/jarvis/budgets/:id",
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = budgetBodySchema.partial().safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_budget" });
+      return;
+    }
+    const d = parsed.data;
+    try {
+      const [row] = await db
+        .update(jarvisBudgetsTable)
+        .set({
+          ...(d.name !== undefined ? { name: d.name } : {}),
+          ...(d.description !== undefined
+            ? { description: d.description ?? null }
+            : {}),
+          ...(d.scopeType !== undefined ? { scopeType: d.scopeType } : {}),
+          ...(d.scopeValue !== undefined
+            ? { scopeValue: d.scopeValue ?? null }
+            : {}),
+          ...(d.limitCount !== undefined ? { limitCount: d.limitCount } : {}),
+          ...(d.windowSeconds !== undefined
+            ? { windowSeconds: d.windowSeconds }
+            : {}),
+          ...(d.enabled !== undefined ? { enabled: d.enabled } : {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(jarvisBudgetsTable.id, String(req.params.id)))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await audit(req, actor, "update", "budget", row.id, { name: row.name });
+      res.json({ budget: row });
+    } catch (err) {
+      req.log.error({ err }, "PUT /jarvis/budgets/:id failed");
+      res.status(500).json({ error: "jarvis_budget_update_failed" });
+    }
+  },
+);
+
+router.delete(
+  "/jarvis/budgets/:id",
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    try {
+      const [row] = await db
+        .delete(jarvisBudgetsTable)
+        .where(eq(jarvisBudgetsTable.id, String(req.params.id)))
+        .returning();
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      await audit(req, actor, "delete", "budget", row.id, { name: row.name });
+      res.json({ ok: true, id: row.id });
+    } catch (err) {
+      req.log.error({ err }, "DELETE /jarvis/budgets/:id failed");
+      res.status(500).json({ error: "jarvis_budget_delete_failed" });
+    }
+  },
+);
+
+// ── policy evaluations (read-only audit trail) ───────────────────────────────
+router.get(
+  "/jarvis/policy-evaluations",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const rows = await db
+        .select()
+        .from(jarvisPolicyEvaluationsTable)
+        .orderBy(desc(jarvisPolicyEvaluationsTable.createdAt))
+        .limit(200);
+      res.json({ evaluations: rows });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/policy-evaluations failed");
+      res.status(500).json({ error: "jarvis_policy_evaluations_read_failed" });
+    }
+  },
+);
+
+router.get(
+  "/jarvis/policy-evaluations/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const [row] = await db
+        .select()
+        .from(jarvisPolicyEvaluationsTable)
+        .where(eq(jarvisPolicyEvaluationsTable.id, String(req.params.id)))
+        .limit(1);
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      res.json({ evaluation: row });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/policy-evaluations/:id failed");
+      res.status(500).json({ error: "jarvis_policy_evaluation_read_failed" });
+    }
+  },
+);
+
+// ── agent trust (read-only scorecards) ───────────────────────────────────────
+router.get(
+  "/jarvis/agent-trust",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const rows = await db
+        .select()
+        .from(jarvisAgentTrustTable)
+        .orderBy(desc(jarvisAgentTrustTable.score));
+      res.json({ trust: rows });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/agent-trust failed");
+      res.status(500).json({ error: "jarvis_agent_trust_read_failed" });
+    }
+  },
+);
+
+router.get(
+  "/jarvis/agent-trust/:id",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const [row] = await db
+        .select()
+        .from(jarvisAgentTrustTable)
+        .where(eq(jarvisAgentTrustTable.id, String(req.params.id)))
+        .limit(1);
+      if (!row) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      res.json({ trust: row });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/agent-trust/:id failed");
+      res.status(500).json({ error: "jarvis_agent_trust_detail_read_failed" });
+    }
+  },
+);
+
+// ── approval decision (resume / block a held subject) ────────────────────────
+// Gated dynamically by the linked policy's requireApprovalRole. Separation of
+// duties: only humans (admin / requireApprovalRole) resolve approvals; the
+// governance-resume pass then continues or blocks the held subject.
+router.post(
+  "/jarvis/approvals/:id/decision",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = decisionSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_decision" });
+      return;
+    }
+    try {
+      const [approval] = await db
+        .select()
+        .from(jarvisApprovalsTable)
+        .where(eq(jarvisApprovalsTable.id, String(req.params.id)))
+        .limit(1);
+      if (!approval) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+
+      // Resolve the required approval role from the linked policy (default admin).
+      let requiredRole = "admin";
+      if (approval.policyId) {
+        const [policy] = await db
+          .select({ role: jarvisPoliciesTable.requireApprovalRole })
+          .from(jarvisPoliciesTable)
+          .where(eq(jarvisPoliciesTable.id, approval.policyId))
+          .limit(1);
+        if (policy?.role) requiredRole = policy.role;
+      }
+      const allowedRoles =
+        requiredRole === "super-admin"
+          ? ["super-admin"]
+          : ["admin", "super-admin"];
+      const role = await resolveActorRole((req as AuthReq).clerkUserId);
+      if (!allowedRoles.includes(role)) {
+        res.status(403).json({ error: "Forbidden" });
+        return;
+      }
+
+      if (approval.status !== "pending") {
+        res.status(409).json({ error: "already_decided", status: approval.status });
+        return;
+      }
+
+      const newStatus = parsed.data.decision === "approve" ? "approved" : "rejected";
+      const [row] = await db
+        .update(jarvisApprovalsTable)
+        .set({
+          status: newStatus,
+          decidedBy: actor.email ?? actor.userId,
+          decidedAt: new Date(),
+          decisionReason: parsed.data.reason ?? null,
+          updatedAt: new Date(),
+        })
+        .where(eq(jarvisApprovalsTable.id, String(req.params.id)))
+        .returning();
+      await audit(req, actor, "decision", "approval", row.id, {
+        decision: parsed.data.decision,
+        autoGenerated: row.autoGenerated,
+      });
+      res.json({ approval: row });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/approvals/:id/decision failed");
+      res.status(500).json({ error: "jarvis_approval_decision_failed" });
+    }
+  },
+);
+
+// ── governance overview (dashboard read) ─────────────────────────────────────
+router.get(
+  "/jarvis/governance/overview",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const [
+        decisionBreakdown,
+        pendingApprovals,
+        budgets,
+        trustLeaderboard,
+        recentEvaluations,
+      ] = await Promise.all([
+        db
+          .select({
+            decision: jarvisPolicyEvaluationsTable.decision,
+            c: sql<number>`count(*)::int`,
+          })
+          .from(jarvisPolicyEvaluationsTable)
+          .groupBy(jarvisPolicyEvaluationsTable.decision),
+        db
+          .select()
+          .from(jarvisApprovalsTable)
+          .where(
+            and(
+              eq(jarvisApprovalsTable.autoGenerated, true),
+              eq(jarvisApprovalsTable.status, "pending"),
+            ),
+          )
+          .orderBy(desc(jarvisApprovalsTable.createdAt))
+          .limit(25),
+        db
+          .select()
+          .from(jarvisBudgetsTable)
+          .orderBy(asc(jarvisBudgetsTable.createdAt)),
+        db
+          .select()
+          .from(jarvisAgentTrustTable)
+          .orderBy(desc(jarvisAgentTrustTable.score))
+          .limit(10),
+        db
+          .select()
+          .from(jarvisPolicyEvaluationsTable)
+          .orderBy(desc(jarvisPolicyEvaluationsTable.createdAt))
+          .limit(25),
+      ]);
+      res.json({
+        decisionBreakdown,
+        pendingApprovals,
+        budgets,
+        trustLeaderboard,
+        recentEvaluations,
+        generatedAt: Date.now(),
+      });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/governance/overview failed");
+      res.status(500).json({ error: "jarvis_governance_overview_failed" });
     }
   },
 );

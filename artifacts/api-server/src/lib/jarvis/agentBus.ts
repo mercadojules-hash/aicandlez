@@ -28,7 +28,14 @@ export type AgentEventType =
   | "command_dispatched"
   | "command_completed"
   | "escalation_advanced"
-  | "routing_decision";
+  | "routing_decision"
+  // ── Sprint 7 — governance events ──────────────────────────────────────────
+  | "governance_allowed"
+  | "governance_denied"
+  | "governance_held"
+  | "governance_resumed"
+  | "trust_recomputed"
+  | "budget_reset";
 
 export type AgentEventSeverity = "info" | "success" | "warn" | "error";
 

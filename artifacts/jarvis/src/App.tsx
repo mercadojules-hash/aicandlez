@@ -42,6 +42,10 @@ import Findings from "@/pages/Findings";
 import Recommendations from "@/pages/Recommendations";
 import Insights from "@/pages/Insights";
 import Briefings from "@/pages/Briefings";
+import Governance from "@/pages/Governance";
+import Policies from "@/pages/Policies";
+import Budgets from "@/pages/Budgets";
+import AgentTrust from "@/pages/AgentTrust";
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
 const basePath = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
@@ -247,6 +251,26 @@ function AppRoutes() {
       <Route path="/briefings">
         <Protected>
           <Briefings />
+        </Protected>
+      </Route>
+      <Route path="/governance">
+        <Protected>
+          <Governance />
+        </Protected>
+      </Route>
+      <Route path="/policies">
+        <Protected>
+          <Policies />
+        </Protected>
+      </Route>
+      <Route path="/budgets">
+        <Protected>
+          <Budgets />
+        </Protected>
+      </Route>
+      <Route path="/agent-trust">
+        <Protected>
+          <AgentTrust />
         </Protected>
       </Route>
       <Route path="/memory">

@@ -11,6 +11,7 @@ import {
 import { and, asc, eq } from "drizzle-orm";
 import { logger } from "../../logger.js";
 import { agentBus } from "../agentBus.js";
+import { gateSubject } from "./governanceGate.js";
 import type { OrchestrationRunner } from "./types.js";
 
 /**
@@ -121,8 +122,14 @@ export async function advanceWorkflowRun(
   const succeeded = new Set(
     steps.filter((s) => s.status === "succeeded").map((s) => s.stepKey),
   );
+  // A step parked by governance (held) or in-flight (running) pauses the run —
+  // it neither finalizes nor fails until the auto-approval is resolved.
+  const paused = steps.filter(
+    (s) => s.status === "held" || s.status === "running",
+  );
   const pending = steps.filter((s) => s.status === "pending");
   if (pending.length === 0) {
+    if (paused.length > 0) return; // awaiting approval / in-flight
     await finalizeWorkflow(run.id, "succeeded", null);
     return;
   }
@@ -131,6 +138,7 @@ export async function advanceWorkflowRun(
     (s.dependsOn ?? []).every((dep) => succeeded.has(dep)),
   );
   if (!ready) {
+    if (paused.length > 0) return; // pending steps blocked behind a held/running step
     // No step is runnable and none is in-flight → unresolvable dependency graph.
     await finalizeWorkflow(
       run.id,
@@ -148,6 +156,47 @@ async function executeStep(
   step: JarvisWorkflowStepRow,
   runner: OrchestrationRunner,
 ): Promise<void> {
+  // Governance gate (pre-execution). deny → fail the step (workflow fails);
+  // require_approval → park the step in "held" so advanceWorkflowRun pauses the
+  // whole run until a human resolves the auto-approval.
+  const gate = await gateSubject(
+    {
+      subjectType: "workflow_step",
+      subjectId: step.id,
+      agentType: step.agentType ?? null,
+      action: step.action ?? null,
+      workflowName: run.workflowName ?? null,
+    },
+    `Workflow "${run.workflowName ?? ""}" step "${step.stepKey}"`,
+    step.governanceState,
+  );
+  if (!gate.proceed) {
+    if (gate.decision === "deny") {
+      const finishedAt = new Date();
+      await db
+        .update(jarvisWorkflowStepsTable)
+        .set({
+          status: "failed",
+          error: gate.result?.reason ?? "blocked by governance",
+          finishedAt,
+        })
+        .where(eq(jarvisWorkflowStepsTable.id, step.id));
+      agentBus.emitEvent({
+        type: "workflow_step",
+        severity: "error",
+        runId: run.id,
+        message: `Workflow "${run.workflowName ?? ""}" step "${step.stepKey}" denied by governance`,
+        details: { stepKey: step.stepKey, reason: gate.result?.reason },
+      });
+    } else {
+      await db
+        .update(jarvisWorkflowStepsTable)
+        .set({ status: "held" })
+        .where(eq(jarvisWorkflowStepsTable.id, step.id));
+    }
+    return;
+  }
+
   const startedAt = new Date();
   await db
     .update(jarvisWorkflowStepsTable)

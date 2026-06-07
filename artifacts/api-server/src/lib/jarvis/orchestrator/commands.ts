@@ -9,6 +9,7 @@ import { asc, eq, isNotNull } from "drizzle-orm";
 import { logger } from "../../logger.js";
 import { agentBus } from "../agentBus.js";
 import { resolveAgentByType, startWorkflowRun } from "./engine.js";
+import { gateSubject } from "./governanceGate.js";
 import type { OrchestrationRunner } from "./types.js";
 
 /**
@@ -361,6 +362,41 @@ export async function pumpCommands(runner: OrchestrationRunner): Promise<number>
       .limit(10);
     for (const cmd of received) {
       try {
+        // Governance gate (pre-dispatch). deny → reject with reason;
+        // require_approval → park out of the "received" queue ("held") until a
+        // human resolves the auto-approval (resume pass flips it back).
+        const spec = findVerb(cmd.verb);
+        if (spec) {
+          const gate = await gateSubject(
+            {
+              subjectType: "command",
+              subjectId: cmd.id,
+              verb: cmd.verb ?? null,
+              action: spec.action ?? cmd.verb ?? null,
+              agentType: spec.agentType ?? null,
+            },
+            `Command "${cmd.verb ?? "?"}"`,
+            cmd.governanceState,
+          );
+          if (!gate.proceed) {
+            if (gate.decision === "deny") {
+              await db
+                .update(jarvisCommandsTable)
+                .set({
+                  status: "rejected",
+                  error: gate.result?.reason ?? "blocked by governance",
+                  updatedAt: new Date(),
+                })
+                .where(eq(jarvisCommandsTable.id, cmd.id));
+            } else {
+              await db
+                .update(jarvisCommandsTable)
+                .set({ status: "held", updatedAt: new Date() })
+                .where(eq(jarvisCommandsTable.id, cmd.id));
+            }
+            continue;
+          }
+        }
         await processCommand(cmd, runner);
         processed += 1;
       } catch (err) {

@@ -28,6 +28,8 @@ import {
   Sparkles,
   FileText,
   Telescope,
+  ShieldCheck,
+  Scale,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -58,6 +60,10 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Recommendations", path: "/recommendations", icon: Lightbulb },
   { label: "Insights", path: "/insights", icon: Sparkles },
   { label: "Briefings", path: "/briefings", icon: FileText },
+  { label: "Governance", path: "/governance", icon: ShieldCheck },
+  { label: "Policies", path: "/policies", icon: Scale },
+  { label: "Budgets", path: "/budgets", icon: Gauge },
+  { label: "Agent Trust", path: "/agent-trust", icon: ShieldCheck },
   { label: "Memory", path: "/memory", icon: Gauge },
   { label: "Executive Memory", path: "/memories", icon: Brain },
   { label: "Knowledge", path: "/knowledge", icon: BookOpen },

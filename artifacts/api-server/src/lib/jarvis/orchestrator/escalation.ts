@@ -10,6 +10,7 @@ import { and, asc, eq, isNotNull, lte } from "drizzle-orm";
 import { logger } from "../../logger.js";
 import { agentBus } from "../agentBus.js";
 import { resolveAgentByType } from "./engine.js";
+import { gateSubject } from "./governanceGate.js";
 
 /**
  * Escalation-chain engine. An open escalation bound to a chain carries a
@@ -71,15 +72,45 @@ export async function advanceEscalation(esc: JarvisEscalation): Promise<void> {
     }
   }
 
+  // Governance gate (pre-advance). Either decision pauses advancing by clearing
+  // nextEscalationAt so the pump stops re-selecting it; gateSubject already
+  // stamped governanceState (denied / pending_approval). The escalation stays
+  // open — a human closes it or the resume pass re-arms an approved one.
+  const gate = await gateSubject(
+    {
+      subjectType: "escalation",
+      subjectId: esc.id,
+      agentId,
+      agentType: nextStep.agentType ?? null,
+      action: "escalate",
+    },
+    `Escalation: ${esc.title}`,
+    esc.governanceState,
+  );
+  if (!gate.proceed) {
+    await db
+      .update(jarvisEscalationsTable)
+      .set({ nextEscalationAt: null, updatedAt: new Date() })
+      .where(eq(jarvisEscalationsTable.id, esc.id));
+    return;
+  }
+
   const nextAt = new Date(
     Date.now() + (nextStep.slaSeconds ?? DEFAULT_SLA_SECONDS) * 1000,
   );
+  // Reset governanceState to the "none" sentinel on advance. Escalations are
+  // RECURRENT subjects (the same row advances through multiple levels), so an
+  // "approved" re-entry must be consumed exactly once: resetting forces the NEXT
+  // level advance to be re-evaluated fresh by gateSubject. Without this, a single
+  // human approval would permanently bypass policy/trust/budget for every later
+  // advance — governance widening over time, violating monotonic narrowing.
   await db
     .update(jarvisEscalationsTable)
     .set({
       currentLevel: nextLevel,
       nextEscalationAt: nextAt,
       assigneeAgentId: agentId,
+      governanceState: "none",
       updatedAt: new Date(),
     })
     .where(eq(jarvisEscalationsTable.id, esc.id));

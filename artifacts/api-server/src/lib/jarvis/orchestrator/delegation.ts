@@ -7,6 +7,7 @@ import {
 import { and, asc, eq, inArray, isNotNull, lt } from "drizzle-orm";
 import { logger } from "../../logger.js";
 import { agentBus } from "../agentBus.js";
+import { gateSubject } from "./governanceGate.js";
 import type { OrchestrationRunner } from "./types.js";
 
 /**
@@ -93,6 +94,47 @@ export async function executeDelegation(
       message: `Delegation declined (no target agent): ${d.objective}`,
       details: { delegationId: d.id, status: "declined" },
     });
+    return;
+  }
+
+  // Governance gate (pre-execution). deny → decline with reason;
+  // require_approval → park in "held" until a human resolves the auto-approval.
+  const gate = await gateSubject(
+    {
+      subjectType: "delegation",
+      subjectId: d.id,
+      agentId: agent.id,
+      agentType: agent.agentType,
+      action: d.action ?? null,
+    },
+    `Delegation: ${d.objective}`,
+    d.governanceState,
+  );
+  if (!gate.proceed) {
+    if (gate.decision === "deny") {
+      await db
+        .update(jarvisDelegationsTable)
+        .set({
+          status: "declined",
+          error: gate.result?.reason ?? "blocked by governance",
+          updatedAt: new Date(),
+        })
+        .where(eq(jarvisDelegationsTable.id, d.id));
+      agentBus.emitEvent({
+        type: "delegation_executed",
+        severity: "warn",
+        agentId: agent.id,
+        agentName: agent.name,
+        agentType: agent.agentType,
+        message: `Delegation denied by governance: ${d.objective}`,
+        details: { delegationId: d.id, status: "declined", reason: gate.result?.reason },
+      });
+    } else {
+      await db
+        .update(jarvisDelegationsTable)
+        .set({ status: "held", updatedAt: new Date() })
+        .where(eq(jarvisDelegationsTable.id, d.id));
+    }
     return;
   }
 

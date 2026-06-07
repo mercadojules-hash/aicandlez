@@ -10,6 +10,7 @@ import { agentBus } from "./agentBus.js";
 import { buildContext } from "./context.js";
 import { getHandler } from "./registry.js";
 import { orchestrator } from "./orchestrator/index.js";
+import { recordRunOutcome } from "./governance/index.js";
 import type { AgentRunResult, AgentTrigger, OrchestrationExtra } from "./types.js";
 
 /**
@@ -253,6 +254,17 @@ class AgentRuntime {
         message: `${agent.name}: ${result.summary}`,
         details: { itemsProcessed: result.itemsProcessed, durationMs },
       });
+      // Governance trust signal (additive, fail-soft — never breaks the run).
+      try {
+        await recordRunOutcome({
+          agentId: agent.id,
+          agentName: agent.name,
+          agentType: agent.agentType,
+          ok: true,
+        });
+      } catch (trustErr) {
+        logger.warn({ trustErr, agent: agent.id }, "jarvis trust record (ok) failed");
+      }
       return { ok: true, runId, summary: result.summary, result };
     } catch (err) {
       const finishedAt = new Date();
@@ -282,6 +294,17 @@ class AgentRuntime {
         message: `${agent.name} failed: ${msg}`,
       });
       logger.error({ err, agent: agent.id }, "jarvis agent run failed");
+      // Governance trust signal (additive, fail-soft — never breaks the run).
+      try {
+        await recordRunOutcome({
+          agentId: agent.id,
+          agentName: agent.name,
+          agentType: agent.agentType,
+          ok: false,
+        });
+      } catch (trustErr) {
+        logger.warn({ trustErr, agent: agent.id }, "jarvis trust record (fail) failed");
+      }
       return { ok: false, runId, error: msg };
     } finally {
       this.inFlight.delete(agent.id);
