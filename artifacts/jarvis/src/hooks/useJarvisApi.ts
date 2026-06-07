@@ -3365,8 +3365,8 @@ export interface HistoricalSnapshot {
   grossProfitUsd: number;
   grossLossUsd: number;
   profitFactor: number | null;
-  activeTrades: number;
-  openTradeValueUsd: number;
+  activeTrades: number | null;
+  openTradeValueUsd: number | null;
   degraded: boolean;
   createdAt: string;
   updatedAt: string;

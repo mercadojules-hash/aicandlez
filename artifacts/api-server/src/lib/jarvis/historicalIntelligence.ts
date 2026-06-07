@@ -427,7 +427,10 @@ export async function captureDailySnapshot(
   let degraded = false;
   let coreDegraded = false;
   let stats: PeriodStats;
-  let openAgg: { active: number; notional: number } = { active: 0, notional: 0 };
+  let openAgg: { active: number | null; notional: number | null } = {
+    active: 0,
+    notional: 0,
+  };
   try {
     stats = await computePeriodStats(null, endMs, null, date);
     degraded = stats.degraded;
@@ -459,6 +462,8 @@ export async function captureDailySnapshot(
         notional: Number(openRows[0]?.notional ?? 0),
       };
     } catch {
+      // Open-position read failed — leave as null (→ dash), never fabricate 0.
+      openAgg = { active: null, notional: null };
       degraded = true;
     }
   }
@@ -546,8 +551,10 @@ export async function backfillDailySnapshots(): Promise<{ days: number; degraded
         grossProfitUsd: cumGrossProfit,
         grossLossUsd: cumGrossLoss,
         profitFactor: cumGrossLoss > 0 ? cumGrossProfit / cumGrossLoss : null,
-        activeTrades: 0,
-        openTradeValueUsd: 0,
+        // Historical open-position state is non-reconstructable → null (dash),
+        // never fabricated as 0.
+        activeTrades: null,
+        openTradeValueUsd: null,
         degraded: false,
       };
       await db

@@ -464,24 +464,28 @@ export default function HistoricalIntelligence() {
                         ) : null}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
-                        {fmtUsd(s.cumulativeRealizedPnlUsd)}
+                        {s.degraded ? DASH : fmtUsd(s.cumulativeRealizedPnlUsd)}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
-                        {fmtNum(s.closedTrades)}
+                        {s.degraded ? DASH : fmtNum(s.closedTrades)}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
-                        {fmtPct(s.winRate, true)}
+                        {s.degraded ? DASH : fmtPct(s.winRate, true)}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
-                        {s.profitFactor == null
+                        {s.degraded || s.profitFactor == null
                           ? DASH
                           : s.profitFactor.toFixed(2)}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
-                        {fmtNum(s.activeTrades)}
+                        {s.degraded || s.activeTrades == null
+                          ? DASH
+                          : fmtNum(s.activeTrades)}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
-                        {fmtUsd(s.openTradeValueUsd)}
+                        {s.degraded || s.openTradeValueUsd == null
+                          ? DASH
+                          : fmtUsd(s.openTradeValueUsd)}
                       </TableCell>
                     </TableRow>
                   ))}

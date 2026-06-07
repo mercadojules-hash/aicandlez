@@ -1131,9 +1131,11 @@ export const jarvisAicandlezDailySnapshotsTable = pgTable(
     grossLossUsd: real("gross_loss_usd").notNull().default(0),
     // gross_profit / gross_loss (NULL when no losses yet → dash).
     profitFactor: real("profit_factor"),
-    // Open LIVE positions snapshot at capture time.
-    activeTrades: integer("active_trades").notNull().default(0),
-    openTradeValueUsd: real("open_trade_value_usd").notNull().default(0),
+    // Open LIVE positions snapshot at capture time. Point-in-time only — NULL
+    // for backfilled historical days (non-reconstructable) and when the open-
+    // position read fails (→ dash, never fabricated as 0).
+    activeTrades: integer("active_trades"),
+    openTradeValueUsd: real("open_trade_value_usd"),
     // True when the read failed and the row was written degraded (all dashes).
     degraded: boolean("degraded").notNull().default(false),
     createdAt: timestamp("created_at").defaultNow().notNull(),
