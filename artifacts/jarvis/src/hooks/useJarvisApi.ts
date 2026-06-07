@@ -18,6 +18,8 @@ export interface JarvisBusiness {
   slug: string;
   description: string | null;
   status: string;
+  monthlyRevenue: number | null;
+  healthStatus: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -238,6 +240,8 @@ export const jarvisKeys = {
   voiceSettings: ["jarvis", "voice-settings"] as const,
   voiceSessions: ["jarvis", "voice-sessions"] as const,
   voiceTurns: (id: string) => ["jarvis", "voice-turns", id] as const,
+  aicandlezLive: ["jarvis", "aicandlez-live"] as const,
+  executiveBriefing: ["jarvis", "executive-briefing"] as const,
 };
 
 // ── dashboard ────────────────────────────────────────────────────────────────
@@ -247,6 +251,88 @@ export function useJarvisDashboard(): UseQueryResult<JarvisDashboard> {
     queryKey: jarvisKeys.dashboard,
     queryFn: () => authFetchJson<JarvisDashboard>(`${API}/dashboard`),
     refetchInterval: 15000,
+  });
+}
+
+// ── AICandlez live integration (READ-ONLY) ───────────────────────────────────
+// Platform-wide LIVE trading metrics surfaced inside Jarvis. Every value is
+// computed from real broker fills only (never paper/simulated). Fields that are
+// not reliably derivable from trade tables (equity, cash, ROI, alerts) arrive as
+// `null` and MUST render as a dash — never substitute paper/estimated values.
+
+export interface AicandlezLiveMetrics {
+  equityUSD: number | null;
+  cashUSD: number | null;
+  roiPct: number | null;
+  openTradeValueUSD: number | null;
+  activeTrades: number | null;
+  realizedPnLUSD: number | null;
+  winRate: number | null;
+  profitFactor: number | null;
+  closedTrades: number | null;
+  wins: number | null;
+  losses: number | null;
+  grossProfitUSD: number | null;
+  grossLossUSD: number | null;
+  alerts: number | null;
+}
+
+export interface AicandlezRecentClose {
+  id: string;
+  symbol: string;
+  side: string;
+  exchange: string | null;
+  sizeUSD: number;
+  realizedPnL: number;
+  realizedPnLPct: number;
+  closeReason: string | null;
+  exitTime: number;
+}
+
+export interface AicandlezLiveFeed {
+  source: "aicandlez-live";
+  scope: "platform";
+  degraded: boolean;
+  metrics: AicandlezLiveMetrics;
+  recentCloses: AicandlezRecentClose[];
+  generatedAt: number;
+}
+
+export function useAicandlezLive(): UseQueryResult<AicandlezLiveFeed> {
+  return useQuery({
+    queryKey: jarvisKeys.aicandlezLive,
+    queryFn: () => authFetchJson<AicandlezLiveFeed>(`${API}/integrations/aicandlez`),
+    refetchInterval: 15000,
+  });
+}
+
+// ── executive briefing ("Good Morning Jules") ────────────────────────────────
+
+export interface ExecutiveBriefing {
+  counts: {
+    businesses: number;
+    projects: number;
+    activeAgents: number;
+  };
+  businesses: JarvisBusiness[];
+  criticalItems: {
+    openEscalations: JarvisEscalation[];
+    pendingApprovals: JarvisApproval[];
+    openFindings: JarvisFinding[];
+  };
+  upcomingPriorities: {
+    tasks: JarvisTask[];
+    decisions: JarvisDecision[];
+  };
+  aicandlez: AicandlezLiveFeed;
+  generatedAt: number;
+}
+
+export function useExecutiveBriefing(): UseQueryResult<ExecutiveBriefing> {
+  return useQuery({
+    queryKey: jarvisKeys.executiveBriefing,
+    queryFn: () => authFetchJson<ExecutiveBriefing>(`${API}/executive-briefing`),
+    refetchInterval: 30000,
   });
 }
 
@@ -283,6 +369,8 @@ export interface BusinessInput {
   name: string;
   description?: string | null;
   status?: string;
+  monthlyRevenue?: number | null;
+  healthStatus?: string | null;
 }
 
 export const useBusinesses = makeListHook<JarvisBusiness>({

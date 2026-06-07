@@ -17,7 +17,7 @@
  *   PUT    /jarvis/settings                  (admin) — upsert keys (role-gated)
  */
 import { Router, type IRouter, type Request, type Response } from "express";
-import { eq, desc, asc, sql, ilike, or, and } from "drizzle-orm";
+import { eq, desc, asc, sql, ilike, or, and, isNull, isNotNull } from "drizzle-orm";
 import { z } from "zod/v4";
 import {
   db,
@@ -54,6 +54,12 @@ import {
   jarvisAgentTrustTable,
   jarvisBudgetsTable,
   jarvisCognitionRunsTable,
+  // ── AICandlez live integration (READ-ONLY) ─────────────────────────────────
+  // These trading tables are imported for a strictly read-only, live-only
+  // (exchange IS NOT NULL) aggregate feed surfaced inside Jarvis. Jarvis NEVER
+  // writes them and imports NO AICandlez execution modules. See computeAicandlezLive.
+  simTradesTable,
+  simPositionsTable,
 } from "@workspace/db";
 import { requireAuth, requireRole } from "../middlewares/requireAuth.js";
 import { agentRuntime } from "../lib/jarvis/runtime.js";
@@ -207,12 +213,284 @@ router.get(
   },
 );
 
+// ── AICandlez integration (READ-ONLY live feed) ──────────────────────────────
+// Platform-wide LIVE (operator/CEO) view computed exclusively from rows where
+// `exchange IS NOT NULL` (real broker fills). Paper/simulated rows are NEVER
+// included. Reconciled trades (reconciliation_tag IS NOT NULL) are excluded from
+// realized P&L per the AICandlez realized-ledger rule. Equity / cash / ROI /
+// alerts are NOT reliably derivable from these tables (they require live
+// exchange-balance polling, which lives in the AICandlez engine and is outside
+// Jarvis' read-only boundary), so they are returned as null → rendered as a dash.
+// This function NEVER throws; on any error it returns a degraded all-null shape.
+
+interface AicandlezLiveMetrics {
+  equityUSD: number | null;
+  cashUSD: number | null;
+  roiPct: number | null;
+  openTradeValueUSD: number | null;
+  activeTrades: number | null;
+  realizedPnLUSD: number | null;
+  winRate: number | null;
+  profitFactor: number | null;
+  closedTrades: number | null;
+  wins: number | null;
+  losses: number | null;
+  grossProfitUSD: number | null;
+  grossLossUSD: number | null;
+  alerts: number | null;
+}
+
+interface AicandlezRecentClose {
+  id: string;
+  symbol: string;
+  side: string;
+  exchange: string | null;
+  sizeUSD: number;
+  realizedPnL: number;
+  realizedPnLPct: number;
+  closeReason: string | null;
+  exitTime: number;
+}
+
+interface AicandlezLiveFeed {
+  source: "aicandlez-live";
+  scope: "platform";
+  degraded: boolean;
+  metrics: AicandlezLiveMetrics;
+  recentCloses: AicandlezRecentClose[];
+  generatedAt: number;
+}
+
+const EMPTY_AICANDLEZ_METRICS: AicandlezLiveMetrics = {
+  equityUSD: null,
+  cashUSD: null,
+  roiPct: null,
+  openTradeValueUSD: null,
+  activeTrades: null,
+  realizedPnLUSD: null,
+  winRate: null,
+  profitFactor: null,
+  closedTrades: null,
+  wins: null,
+  losses: null,
+  grossProfitUSD: null,
+  grossLossUSD: null,
+  alerts: null,
+};
+
+async function computeAicandlezLive(req: Request): Promise<AicandlezLiveFeed> {
+  try {
+    const liveClosedWhere = and(
+      isNotNull(simTradesTable.exchange),
+      isNull(simTradesTable.reconciliationTag),
+    );
+
+    const [closedAgg, openAgg, recentRows] = await Promise.all([
+      db
+        .select({
+          closed: sql<number>`(count(*))::int`,
+          wins: sql<number>`(count(*) filter (where ${simTradesTable.realizedPnL} > 0))::int`,
+          losses: sql<number>`(count(*) filter (where ${simTradesTable.realizedPnL} < 0))::int`,
+          realized: sql<number>`coalesce(sum(${simTradesTable.realizedPnL}), 0)`,
+          grossProfit: sql<number>`coalesce(sum(${simTradesTable.realizedPnL}) filter (where ${simTradesTable.realizedPnL} > 0), 0)`,
+          grossLoss: sql<number>`coalesce(abs(sum(${simTradesTable.realizedPnL}) filter (where ${simTradesTable.realizedPnL} < 0)), 0)`,
+        })
+        .from(simTradesTable)
+        .where(liveClosedWhere),
+      db
+        .select({
+          active: sql<number>`(count(*))::int`,
+          notional: sql<number>`coalesce(sum(${simPositionsTable.sizeUSD}), 0)`,
+        })
+        .from(simPositionsTable)
+        .where(isNotNull(simPositionsTable.exchange)),
+      db
+        .select({
+          id: simTradesTable.id,
+          symbol: simTradesTable.symbol,
+          side: simTradesTable.side,
+          exchange: simTradesTable.exchange,
+          sizeUSD: simTradesTable.sizeUSD,
+          realizedPnL: simTradesTable.realizedPnL,
+          realizedPnLPct: simTradesTable.realizedPnLPct,
+          closeReason: simTradesTable.closeReason,
+          exitTime: simTradesTable.exitTime,
+        })
+        .from(simTradesTable)
+        .where(liveClosedWhere)
+        .orderBy(desc(simTradesTable.exitTime))
+        .limit(10),
+    ]);
+
+    const c = closedAgg[0];
+    const o = openAgg[0];
+    const wins = c?.wins ?? 0;
+    const losses = c?.losses ?? 0;
+    const decided = wins + losses;
+    const grossProfit = Number(c?.grossProfit ?? 0);
+    const grossLoss = Number(c?.grossLoss ?? 0);
+
+    return {
+      source: "aicandlez-live",
+      scope: "platform",
+      degraded: false,
+      metrics: {
+        // Not reliably derivable from trade tables → dash.
+        equityUSD: null,
+        cashUSD: null,
+        roiPct: null,
+        alerts: null,
+        openTradeValueUSD: Number(o?.notional ?? 0),
+        activeTrades: o?.active ?? 0,
+        realizedPnLUSD: Number(c?.realized ?? 0),
+        winRate: decided > 0 ? wins / decided : null,
+        profitFactor: grossLoss > 0 ? grossProfit / grossLoss : null,
+        closedTrades: c?.closed ?? 0,
+        wins,
+        losses,
+        grossProfitUSD: grossProfit,
+        grossLossUSD: grossLoss,
+      },
+      recentCloses: recentRows.map((r) => ({
+        id: r.id,
+        symbol: r.symbol,
+        side: r.side,
+        exchange: r.exchange,
+        sizeUSD: Number(r.sizeUSD),
+        realizedPnL: Number(r.realizedPnL),
+        realizedPnLPct: Number(r.realizedPnLPct),
+        closeReason: r.closeReason,
+        exitTime: Number(r.exitTime),
+      })),
+      generatedAt: Date.now(),
+    };
+  } catch (err) {
+    req.log.error({ err }, "computeAicandlezLive failed — returning degraded feed");
+    return {
+      source: "aicandlez-live",
+      scope: "platform",
+      degraded: true,
+      metrics: { ...EMPTY_AICANDLEZ_METRICS },
+      recentCloses: [],
+      generatedAt: Date.now(),
+    };
+  }
+}
+
+router.get(
+  "/jarvis/integrations/aicandlez",
+  requireAuth,
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const feed = await computeAicandlezLive(req);
+    res.json(feed);
+  },
+);
+
+// ── executive briefing ───────────────────────────────────────────────────────
+// "Good Morning Jules" landing aggregate: registry snapshot + counts + critical
+// items (open escalations / pending approvals / open high findings) + upcoming
+// priorities (due/open tasks, proposed decisions) + embedded AICandlez live
+// snapshot. Admin-gated, fail-safe (never throws; partial data degrades to
+// empty arrays).
+
+router.get(
+  "/jarvis/executive-briefing",
+  requireAuth,
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const [
+        businesses,
+        [projectCount],
+        [activeAgentCount],
+        openEscalations,
+        pendingApprovals,
+        openFindings,
+        upcomingTasks,
+        proposedDecisions,
+        aicandlez,
+      ] = await Promise.all([
+        db
+          .select()
+          .from(jarvisBusinessesTable)
+          .orderBy(desc(jarvisBusinessesTable.monthlyRevenue), asc(jarvisBusinessesTable.name)),
+        db.select({ c: sql<number>`count(*)::int` }).from(jarvisProjectsTable),
+        db
+          .select({ c: sql<number>`count(*)::int` })
+          .from(jarvisAgentsTable)
+          .where(eq(jarvisAgentsTable.status, "active")),
+        db
+          .select()
+          .from(jarvisEscalationsTable)
+          .where(eq(jarvisEscalationsTable.status, "open"))
+          .orderBy(desc(jarvisEscalationsTable.createdAt))
+          .limit(8),
+        db
+          .select()
+          .from(jarvisApprovalsTable)
+          .where(eq(jarvisApprovalsTable.status, "pending"))
+          .orderBy(desc(jarvisApprovalsTable.createdAt))
+          .limit(8),
+        db
+          .select()
+          .from(jarvisFindingsTable)
+          .where(eq(jarvisFindingsTable.status, "open"))
+          .orderBy(desc(jarvisFindingsTable.createdAt))
+          .limit(8),
+        db
+          .select()
+          .from(jarvisTasksTable)
+          .where(or(eq(jarvisTasksTable.status, "todo"), eq(jarvisTasksTable.status, "in_progress")))
+          .orderBy(asc(jarvisTasksTable.dueAt), desc(jarvisTasksTable.createdAt))
+          .limit(8),
+        db
+          .select()
+          .from(jarvisDecisionsTable)
+          .where(eq(jarvisDecisionsTable.status, "proposed"))
+          .orderBy(desc(jarvisDecisionsTable.createdAt))
+          .limit(8),
+        computeAicandlezLive(req),
+      ]);
+
+      res.json({
+        counts: {
+          businesses: businesses.length,
+          projects: projectCount?.c ?? 0,
+          activeAgents: activeAgentCount?.c ?? 0,
+        },
+        businesses,
+        criticalItems: {
+          openEscalations,
+          pendingApprovals,
+          openFindings,
+        },
+        upcomingPriorities: {
+          tasks: upcomingTasks,
+          decisions: proposedDecisions,
+        },
+        aicandlez,
+        generatedAt: Date.now(),
+      });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/executive-briefing failed");
+      res.status(500).json({ error: "jarvis_executive_briefing_failed" });
+    }
+  },
+);
+
 // ── businesses ───────────────────────────────────────────────────────────────
 
 const businessBodySchema = z.object({
   name: z.string().trim().min(1).max(200),
   description: z.string().trim().max(5000).optional().nullable(),
   status: statusSchema.optional(),
+  // Executive registry metadata (manual-entry, advisory). null clears it.
+  monthlyRevenue: z.number().finite().min(0).max(1e12).optional().nullable(),
+  healthStatus: z
+    .enum(["healthy", "watch", "critical"])
+    .optional()
+    .nullable(),
 });
 
 router.get(
@@ -250,6 +528,8 @@ router.post(
           slug: slugify(parsed.data.name),
           description: parsed.data.description ?? null,
           status: parsed.data.status ?? "active",
+          monthlyRevenue: parsed.data.monthlyRevenue ?? null,
+          healthStatus: parsed.data.healthStatus ?? null,
         })
         .returning();
       await audit(req, actor, "create", "business", row.id, { name: row.name });
@@ -302,6 +582,12 @@ router.put(
             ? { description: parsed.data.description ?? null }
             : {}),
           ...(parsed.data.status !== undefined ? { status: parsed.data.status } : {}),
+          ...(parsed.data.monthlyRevenue !== undefined
+            ? { monthlyRevenue: parsed.data.monthlyRevenue }
+            : {}),
+          ...(parsed.data.healthStatus !== undefined
+            ? { healthStatus: parsed.data.healthStatus }
+            : {}),
           updatedAt: new Date(),
         })
         .where(eq(jarvisBusinessesTable.id, String(req.params.id)))

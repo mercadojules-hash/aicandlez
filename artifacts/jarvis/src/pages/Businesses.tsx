@@ -4,8 +4,18 @@ import {
   useCreateBusiness,
   useUpdateBusiness,
   useDeleteBusiness,
-  type JarvisBusiness,
 } from "@/hooks/useJarvisApi";
+
+function parseRevenue(s: string | undefined): number | null {
+  if (!s || !s.trim()) return null;
+  const n = Number(s.replace(/[,$\s]/g, ""));
+  return Number.isFinite(n) ? n : null;
+}
+
+function formatRevenue(v: number | null | undefined): string {
+  if (v == null || !Number.isFinite(v)) return "—";
+  return `$${v.toLocaleString()}`;
+}
 
 export default function Businesses() {
   const { data, isLoading, isError } = useBusinesses();
@@ -32,6 +42,20 @@ export default function Businesses() {
             <span className="line-clamp-1 text-muted-foreground">{r.description ?? "—"}</span>
           ),
         },
+        {
+          key: "monthlyRevenue",
+          label: "Monthly Rev.",
+          render: (r) => (
+            <span className="font-mono text-muted-foreground">{formatRevenue(r.monthlyRevenue)}</span>
+          ),
+        },
+        {
+          key: "healthStatus",
+          label: "Health",
+          render: (r) => (
+            <span className="font-mono uppercase text-muted-foreground">{r.healthStatus ?? "—"}</span>
+          ),
+        },
         { key: "status", label: "Status", render: (r) => <StatusBadge status={r.status} /> },
       ]}
       fields={[
@@ -48,17 +72,49 @@ export default function Businesses() {
             { label: "Archived", value: "archived" },
           ],
         },
+        {
+          name: "monthlyRevenue",
+          label: "Monthly Revenue (USD)",
+          placeholder: "e.g. 50000 — leave blank if unknown",
+        },
+        {
+          name: "healthStatus",
+          label: "Health",
+          type: "select",
+          defaultValue: "",
+          options: [
+            { label: "—", value: "" },
+            { label: "Healthy", value: "healthy" },
+            { label: "Watch", value: "watch" },
+            { label: "Critical", value: "critical" },
+          ],
+        },
       ]}
       toFormValues={(r) => ({
         name: r.name,
         description: r.description ?? "",
         status: r.status,
+        monthlyRevenue: r.monthlyRevenue != null ? String(r.monthlyRevenue) : "",
+        healthStatus: r.healthStatus ?? "",
       })}
       onCreate={(v) =>
-        create.mutateAsync({ name: v.name, description: v.description || null, status: v.status })
+        create.mutateAsync({
+          name: v.name,
+          description: v.description || null,
+          status: v.status,
+          monthlyRevenue: parseRevenue(v.monthlyRevenue),
+          healthStatus: v.healthStatus || null,
+        })
       }
       onUpdate={(id, v) =>
-        update.mutateAsync({ id, name: v.name, description: v.description || null, status: v.status })
+        update.mutateAsync({
+          id,
+          name: v.name,
+          description: v.description || null,
+          status: v.status,
+          monthlyRevenue: parseRevenue(v.monthlyRevenue),
+          healthStatus: v.healthStatus || null,
+        })
       }
       onDelete={(id) => remove.mutateAsync(id)}
     />

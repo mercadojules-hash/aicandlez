@@ -1,0 +1,223 @@
+JARVIS VISUAL INTERFACE V2 – EXECUTIVE OPERATING SYSTEM
+
+Jarvis Voice V1 is complete.
+
+The next phase is the visual transformation of Jarvis into a world-class Executive Operating System.
+
+Objective:
+
+Create a visually stunning, premium, futuristic interface that feels like the evolution of Iron Man's Jarvis, while remaining professional and practical for daily business operations.
+
+Guiding Principle:
+
+Functionality first.
+Visuals second.
+
+Do not create a gimmick or movie prop.
+
+Create an Executive Command Center that a CEO would actually use every day.
+
+DESIGN LANGUAGE
+
+Visual Style:
+
+* Premium
+* Futuristic
+* Minimalist
+* Executive
+* High-end technology
+* Dark mode first
+* Cinematic but professional
+
+Inspirations:
+
+* Iron Man Jarvis
+* F.R.I.D.A.Y.
+* Modern Bloomberg Terminal
+* Palantir
+* Tesla Mission Control
+* NASA Command Centers
+* High-end AI operating systems
+
+Avoid:
+
+* Gaming aesthetics
+* Excessive neon
+* Clutter
+* Flashy animations without purpose
+* Sci-fi gimmicks
+
+PRIMARY SCREEN
+
+Center Stage:
+
+Jarvis Core
+
+Features:
+
+* Animated central orb
+* Listening state
+* Thinking state
+* Speaking state
+* Idle state
+* Executive alert state
+
+The orb should feel alive and intelligent.
+
+VOICE INTERFACE
+
+Below Jarvis Core:
+
+* Voice waveform visualization
+* Live transcript
+* Executive command entry
+* Conversation history
+
+BUSINESS COMMAND CENTER
+
+Left Side:
+
+Business Registry
+
+Display:
+
+* AICandlez
+* MixtapePSD
+* Natura AI
+* Natura Holistic
+* SEO Dashboard
+* Future Businesses
+
+Show:
+
+* Status
+* Revenue
+* Health
+* Alerts
+
+EXECUTIVE INTELLIGENCE PANEL
+
+Right Side:
+
+Display:
+
+* Critical Alerts
+* Agent Reports
+* Active Projects
+* Strategic Priorities
+* Recommendations
+
+EXECUTIVE BRIEFING SCREEN
+
+Dedicated page:
+
+"Good Morning Jules"
+
+Display:
+
+* Total Business Revenue
+* Active Projects
+* Critical Alerts
+* Active Agents
+* Upcoming Priorities
+* AICandlez Performance
+* Natura AI Status
+* MixtapePSD Status
+
+This should become the first screen seen every day.
+
+AGENT VISUALIZATION
+
+Create a dedicated Agents page.
+
+Display:
+
+* Agent Name
+* Status
+* Current Task
+* Last Activity
+* Assigned Business
+
+Future-ready for:
+
+* Multi-agent orchestration
+* Swarm operations
+* Autonomous execution
+
+KNOWLEDGE GRAPH VISUALIZATION
+
+Create a dedicated Knowledge Graph page.
+
+Display relationships between:
+
+* Businesses
+* Projects
+* Agents
+* Workflows
+* Decisions
+* Memory
+
+This should visually demonstrate Jarvis's intelligence network.
+
+AICANDLEZ INTEGRATION
+
+Dedicated AICandlez panel displaying:
+
+* Current Equity
+* Cash Balance
+* Open Trade Value
+* Active Trades
+* ROI
+* Win Rate
+* Profit Factor
+* Current Alerts
+
+No paper trading references.
+
+No simulated balances.
+
+Only live production data.
+
+ANIMATION REQUIREMENTS
+
+Animations must be:
+
+* Smooth
+* Lightweight
+* Professional
+
+Use:
+
+* Subtle motion
+* Particle effects
+* Orb pulsing
+* Waveform movement
+* Data transitions
+
+Avoid:
+
+* Heavy GPU usage
+* Excessive effects
+* Anything that impacts performance
+
+RESPONSIVE DESIGN
+
+Must function on:
+
+* Desktop
+* Laptop
+* Tablet
+
+Desktop experience should be prioritized.
+
+FINAL GOAL
+
+When someone sees Jarvis for the first time, the reaction should be:
+
+"This is not a chatbot."
+
+"This is an Executive Operating System."
+
+Jarvis should feel like the command center for multiple businesses, agents, projects, and decisions.
+
+Build Version 1 of the visual experience with scalability in mind for future autonomous operations.

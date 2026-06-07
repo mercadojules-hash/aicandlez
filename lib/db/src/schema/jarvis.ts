@@ -7,6 +7,7 @@ import {
   jsonb,
   boolean,
   integer,
+  real,
   index,
   uniqueIndex,
   vector,
@@ -27,6 +28,12 @@ export const jarvisBusinessesTable = pgTable("jarvis_businesses", {
   slug: varchar("slug", { length: 140 }).notNull().unique(),
   description: text("description"),
   status: varchar("status", { length: 32 }).notNull().default("active"),
+  // ── Executive registry metadata (manual-entry, advisory) ───────────────────
+  // Optional CEO-set display values for the executive briefing / business
+  // registry. NULL → rendered as a dash. AICandlez performance is sourced live
+  // from the read-only trading feed instead of these columns. Never fabricated.
+  monthlyRevenue: real("monthly_revenue"),
+  healthStatus: varchar("health_status", { length: 32 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

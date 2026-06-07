@@ -11,6 +11,15 @@ the engine if EVERY ingress point is wired separately:
 2. the route's call into the service (`synthesizeBriefing({ ... })`),
 3. the frontend request interface (`GenerateBriefingInput` in `useJarvisApi.ts`).
 
+Same trap for a CRUD entity field (e.g. `monthlyRevenue`/`healthStatus` on
+`jarvis_businesses`): DB column + server Zod body + client `*Input` type is NOT
+enough — for entities edited through the generic `RegistryView` form you must
+also add the field to `fields[]`, `toFormValues`, AND `onCreate`/`onUpdate` in
+the page (e.g. `Businesses.tsx`), or the column is unreachable from the UI while
+tsc stays green. Also keep enum vocab identical across server Zod and UI
+branches (server is SoT: business health = `healthy|watch|critical`, NOT
+`warning`) or valid values render with no styling.
+
 **Why:** because the field is OPTIONAL everywhere, `tsc` stays green even when the
 ingress drops it — the type just defaults to `undefined`/`null`. A passing
 typecheck is NOT evidence the feature is reachable from the API surface. This was

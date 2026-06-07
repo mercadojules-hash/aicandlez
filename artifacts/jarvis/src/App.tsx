@@ -48,6 +48,9 @@ import Policies from "@/pages/Policies";
 import Budgets from "@/pages/Budgets";
 import AgentTrust from "@/pages/AgentTrust";
 import Voice from "@/pages/Voice";
+import JarvisCore from "@/pages/JarvisCore";
+import ExecutiveBriefing from "@/pages/ExecutiveBriefing";
+import KnowledgeGraph from "@/pages/KnowledgeGraph";
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
 const basePath = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
@@ -141,7 +144,7 @@ function HomeRoute() {
       <ClerkLoaded>
         <Show when="signed-in">
           <Layout>
-            <Dashboard />
+            <JarvisCore />
           </Layout>
         </Show>
         <Show when="signed-out">
@@ -160,6 +163,21 @@ function AppRoutes() {
       <Route path="/sign-up" component={SignUpPage} />
       <Route path="/sign-up/*" component={SignUpPage} />
       <Route path="/" component={HomeRoute} />
+      <Route path="/executive-briefing">
+        <Protected>
+          <ExecutiveBriefing />
+        </Protected>
+      </Route>
+      <Route path="/knowledge-graph">
+        <Protected>
+          <KnowledgeGraph />
+        </Protected>
+      </Route>
+      <Route path="/dashboard">
+        <Protected>
+          <Dashboard />
+        </Protected>
+      </Route>
       <Route path="/businesses">
         <Protected>
           <Businesses />
