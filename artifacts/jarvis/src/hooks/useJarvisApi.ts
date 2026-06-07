@@ -1424,6 +1424,7 @@ export interface GenerateBriefingInput {
   period?: string;
   audience?: string;
   businessId?: string | null;
+  executiveUserId?: string | null;
 }
 
 export interface GenerateBriefingResult {

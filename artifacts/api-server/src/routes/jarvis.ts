@@ -3721,6 +3721,7 @@ const generateBriefingSchema = z.object({
   period: z.string().trim().min(1).max(32).optional(),
   audience: z.string().trim().min(1).max(64).optional(),
   businessId: z.string().uuid().optional().nullable(),
+  executiveUserId: z.string().uuid().optional().nullable(),
 });
 
 // Synthesize a DRAFT briefing via cognition. Admin-gated + globally toggled OFF
@@ -3751,6 +3752,7 @@ router.post(
         audience: parsed.data.audience ?? null,
         businessId: parsed.data.businessId ?? null,
         createdBy: actor.email ?? actor.userId,
+        executiveUserId: parsed.data.executiveUserId ?? null,
       });
       if (result.ok && result.briefing) {
         await audit(req, actor, "create", "briefing", result.briefing.id, {

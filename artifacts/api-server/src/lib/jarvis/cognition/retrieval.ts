@@ -408,7 +408,8 @@ function personalBoost(doc: RawDoc, input: ThinkInput): number {
   return f;
 }
 
-const rrfWeight = (rank: number): number => 1 / (RRF_K + rank);
+// `rank` is 0-based (forEach index); standard RRF uses 1-based rank, so +1.
+const rrfWeight = (rank: number): number => 1 / (RRF_K + rank + 1);
 
 /**
  * Fuse two rank lists with RRF, apply boosts (recency/importance/pinned +
