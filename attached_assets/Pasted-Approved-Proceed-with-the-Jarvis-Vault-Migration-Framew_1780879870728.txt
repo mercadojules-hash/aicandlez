@@ -1,0 +1,192 @@
+Approved.
+
+Proceed with the Jarvis Vault Migration Framework.
+
+This is now the highest-priority initiative.
+
+Objective:
+
+Prepare Jarvis for full Vault portability and eventual migration from Replit-dependent infrastructure to a self-owned external Vault environment.
+
+This phase is NOT a feature build.
+
+This phase is a portability, backup, migration, recovery, and sovereignty initiative.
+
+Requirements:
+
+1. Jarvis Vault Export Engine
+
+Design and build a complete export system capable of packaging:
+
+* Executive Memory
+* Historical Intelligence
+* Operational Control
+* Sovereignty Layer
+* Code Grounding
+* Creative Intelligence
+* Brand Profiles
+* Creative Campaigns
+* Creative Assets metadata
+* Knowledge Graph
+* Agent Registry
+* Project Registry
+* Workflow Registry
+* Decisions
+* Tasks
+* Findings
+* Reports
+* Embeddings metadata
+* Governance records
+* Audit records
+
+Export must preserve:
+
+* relationships
+* references
+* source paths
+* identifiers
+* timestamps
+* business associations
+
+without data loss.
+
+2. Jarvis Vault Import Engine
+
+Design and build a matching import system capable of restoring:
+
+* complete jarvis_ namespace
+* graph relationships
+* embeddings
+* campaigns
+* creative assets metadata
+* governance state
+
+Support:
+
+* clean restore
+* incremental restore
+* validation restore
+
+3. Embedding Migration Strategy
+
+Provide support for:
+
+* pgvector migration
+* embedding preservation
+* optional re-embedding
+* model-version tracking
+
+Maintain cognition continuity after migration.
+
+4. Creative Asset Migration
+
+Create migration support for:
+
+* Vision assets
+* Phoenix assets
+* Brand assets
+* Future media assets
+
+Preserve:
+
+* storageKey mappings
+* campaign relationships
+* governance state
+* approval state
+
+5. Object Storage Migration
+
+Design support for migration away from Replit App Storage.
+
+Evaluate:
+
+* External Drive
+* S3-compatible storage
+* MinIO
+* Self-hosted object storage
+
+Goal:
+
+Storage backend becomes portable.
+
+6. Vault Package Format
+
+Create a formal Vault Package specification.
+
+Include:
+
+* manifest
+* checksums
+* versioning
+* schema version
+* migration version
+* integrity verification
+
+7. Validation Framework
+
+Implement validation reports capable of confirming:
+
+* row counts
+* relationship integrity
+* embedding integrity
+* asset integrity
+* campaign integrity
+* governance integrity
+
+before and after migration.
+
+8. Disaster Recovery
+
+Support:
+
+* full backup
+* full restore
+* point-in-time recovery planning
+* corruption detection
+* recovery verification
+
+9. Sovereignty Requirements
+
+Maintain all existing invariants:
+
+* jarvis_ tables only
+* no trading modifications
+* no execution authority
+* admin-gated
+* audited
+* fail-safe
+* additive only
+
+10. Deliverables
+
+Upon completion provide:
+
+A. Vault Readiness %
+
+B. Updated Sovereignty %
+
+C. Updated Export Readiness %
+
+D. Updated Operational Readiness %
+
+E. Updated Engineering Readiness %
+
+F. Remaining blockers preventing:
+
+* External Drive deployment
+* Vault migration
+* Long-term operation independent of Replit
+
+Classify remaining items as:
+
+* Critical blockers
+* Recommended improvements
+* Nice-to-have enhancements
+
+Final Question:
+
+When this framework is complete, can Jarvis be fully exported, reconstructed, and operated from a self-owned Vault environment without loss of intelligence, memory, governance, history, or creative assets?
+
+Do not begin unrelated feature work.
+
+Focus exclusively on Vault portability, migration, recovery, and sovereignty readiness.

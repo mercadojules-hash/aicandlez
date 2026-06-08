@@ -159,6 +159,15 @@ import {
   searchCode,
   getCodeIndexStats,
 } from "../lib/jarvis/sovereignty/codeIndex.js";
+import {
+  exportVault,
+  importVault,
+  validateVaultPackage,
+  vaultReadiness,
+  defaultVaultStorage,
+  type RestoreMode,
+  type VaultPackage,
+} from "../lib/jarvis/vault/index.js";
 
 type AuthReq = Request & { clerkUserId: string };
 
@@ -8179,6 +8188,193 @@ router.get(
       totalFiles: stats.totalFiles,
     });
     res.json({ ...stats, generatedAt: Date.now() });
+  },
+);
+
+// ── Vault Migration Framework (admin-only, audited, additive) ────────────────
+// Portability / backup / migration / recovery / sovereignty for the entire
+// jarvis_ namespace. NO trading surface, no execution authority, no schema/
+// secret changes. Every handler is fail-safe (degrades, never crashes the API).
+
+const restoreModeSchema = z.enum(["validate", "incremental", "clean"]);
+
+/** Resolve a vault package from the request: inline `package` or `storageKey`. */
+async function readVaultPackage(body: {
+  package?: unknown;
+  storageKey?: unknown;
+}): Promise<{ pkg: VaultPackage | null; error: string | null }> {
+  if (body.package && typeof body.package === "object") {
+    return { pkg: body.package as VaultPackage, error: null };
+  }
+  if (typeof body.storageKey === "string" && body.storageKey.length > 0) {
+    const bytes = await defaultVaultStorage().get(body.storageKey);
+    if (!bytes) return { pkg: null, error: "could not read package from storageKey" };
+    try {
+      return { pkg: JSON.parse(bytes.toString("utf8")) as VaultPackage, error: null };
+    } catch {
+      return { pkg: null, error: "stored package is not valid JSON" };
+    }
+  }
+  return { pkg: null, error: "provide `package` (inline) or `storageKey`" };
+}
+
+router.post(
+  "/jarvis/vault/export",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const includeBinaries = req.body?.includeBinaries === true;
+    const inline = req.body?.inline === true;
+    const persist = req.body?.persist !== false;
+
+    const result = await exportVault({
+      createdBy: actor.email,
+      includeBinaries,
+      maxBinaryBytes:
+        typeof req.body?.maxBinaryBytes === "number"
+          ? req.body.maxBinaryBytes
+          : undefined,
+    });
+
+    if (!result.ok || !result.pkg || !result.manifest) {
+      await audit(req, actor, "vault.export.failed", "vault", null, {
+        error: result.error,
+      });
+      res.status(500).json({ ok: false, error: result.error ?? "export failed" });
+      return;
+    }
+
+    const serialized = Buffer.from(JSON.stringify(result.pkg), "utf8");
+    const sizeBytes = serialized.length;
+    let storageKey: string | null = null;
+    if (persist) {
+      storageKey = await defaultVaultStorage().put(serialized, "application/json");
+    }
+
+    await audit(req, actor, "vault.export", "vault", storageKey, {
+      rowCount: result.manifest.rowCount,
+      tableCount: Object.keys(result.manifest.tableCounts).length,
+      payloadChecksum: result.manifest.payloadChecksum,
+      includeBinaries,
+      persisted: Boolean(storageKey),
+      sizeBytes,
+    });
+
+    res.json({
+      ok: true,
+      manifest: result.manifest,
+      storageKey,
+      sizeBytes,
+      // Return the package inline when not persisted, or when explicitly asked.
+      package: inline || !storageKey ? result.pkg : undefined,
+      generatedAt: Date.now(),
+    });
+  },
+);
+
+router.post(
+  "/jarvis/vault/validate",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const { pkg, error } = await readVaultPackage(req.body ?? {});
+    if (!pkg) {
+      res.status(400).json({ ok: false, error });
+      return;
+    }
+    const report = validateVaultPackage(pkg);
+    await audit(req, actor, "vault.validate", "vault", null, {
+      ok: report.ok,
+      rowCount: report.rowCount,
+      failedChecks: report.checks.filter((c) => !c.ok).map((c) => c.name),
+    });
+    res.json({ ok: true, report, generatedAt: Date.now() });
+  },
+);
+
+router.post(
+  "/jarvis/vault/import",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsedMode = restoreModeSchema.safeParse(req.body?.mode);
+    if (!parsedMode.success) {
+      res.status(400).json({ ok: false, error: "mode must be validate|incremental|clean" });
+      return;
+    }
+    const mode: RestoreMode = parsedMode.data;
+    const { pkg, error } = await readVaultPackage(req.body ?? {});
+    if (!pkg) {
+      res.status(400).json({ ok: false, error });
+      return;
+    }
+
+    const result = await importVault(pkg, mode, { confirm: req.body?.confirm === true });
+
+    await audit(req, actor, `vault.import.${mode}`, "vault", null, {
+      ok: result.ok,
+      mode,
+      totalApplied: result.totalApplied,
+      validationOk: result.validation?.ok,
+      error: result.error,
+    });
+
+    res.status(result.ok ? 200 : 400).json({ ok: result.ok, result, generatedAt: Date.now() });
+  },
+);
+
+router.get(
+  "/jarvis/vault/readiness",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const report = await vaultReadiness();
+    await audit(req, actor, "vault.readiness", "vault", null, {
+      vaultReadinessPct: report.vaultReadinessPct,
+      canFullyOperateFromVault: report.canFullyOperateFromVault,
+      blockers: report.blockers.length,
+    });
+    res.json({ ok: true, report, generatedAt: Date.now() });
+  },
+);
+
+router.get(
+  "/jarvis/vault/download",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const key = typeof req.query.key === "string" ? req.query.key : "";
+    if (!key.startsWith("/objects/")) {
+      res.status(400).json({ ok: false, error: "key must be an /objects/ pointer" });
+      return;
+    }
+    try {
+      const svc = new ObjectStorageService();
+      const file = await svc.getObjectEntityFile(key);
+      await audit(req, actor, "vault.download", "vault", key, {});
+      const download = await svc.downloadObject(file);
+      res.setHeader(
+        "Content-Type",
+        download.headers.get("Content-Type") ?? "application/json",
+      );
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="jarvis-vault.json"`,
+      );
+      const ab = await download.arrayBuffer();
+      res.send(Buffer.from(ab));
+    } catch (err) {
+      if (err instanceof ObjectNotFoundError) {
+        res.status(404).json({ ok: false, error: "package not found" });
+        return;
+      }
+      res.status(500).json({ ok: false, error: "download failed" });
+    }
   },
 );
 
