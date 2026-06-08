@@ -1,0 +1,110 @@
+We have completed a forensic review of the Jarvis Gold Master export.
+
+Current findings:
+
+* The Gold Master contains:
+
+  * Vault exports ✅
+  * Database schema/migrations ✅
+  * Documentation ✅
+  * Frontend source ✅
+  * Backend Jarvis libraries ✅
+  * Backend routes ✅
+
+However, the package is NOT currently runnable as a standalone local installation.
+
+Evidence:
+
+1. Only one package.json exists:
+
+   * 03-jarvis-source/frontend/package.json
+
+2. The frontend package.json references workspace dependencies:
+
+   "@workspace/api-client-react": "workspace:*"
+
+   and multiple dependencies using:
+
+   "catalog:"
+
+3. There is NO:
+
+   * root package.json
+   * pnpm-workspace.yaml
+   * workspace catalog configuration
+   * api-client-react package
+   * api-client package
+   * server package.json
+   * runnable backend bootstrap
+   * Express/Fastify startup entrypoint
+   * complete monorepo structure
+
+As a result:
+
+* Jarvis cannot currently be installed or started locally.
+* pnpm install will fail because workspace packages are missing.
+* The export appears to contain source code and data, but not the complete runnable workspace.
+
+What we need:
+
+Please generate a COMPLETE STANDALONE JARVIS DESKTOP RECOVERY PACKAGE that can run independently of Replit.
+
+Required contents:
+
+1. Full monorepo root
+
+   * root package.json
+   * pnpm-workspace.yaml
+   * catalog definitions
+   * lock files
+
+2. Every workspace package referenced by Jarvis
+
+   * api-client-react
+   * api-client
+   * db package
+   * shared utilities
+   * logger package
+   * auth package
+   * any other @workspace/* dependency
+
+3. Runnable backend
+
+   * server package.json
+   * startup scripts
+   * backend entrypoint
+   * Express/Fastify bootstrap
+   * environment examples
+
+4. Local deployment package
+
+   * Mac installation instructions
+   * local PostgreSQL instructions
+   * local Ollama instructions
+   * startup commands
+
+5. Verification
+
+   * After extraction, a user should be able to run:
+
+     pnpm install
+     pnpm dev
+
+   without requiring Replit.
+
+Goal:
+
+Produce a true standalone Jarvis Desktop Edition that is fully recoverable and operable if Replit disappears tomorrow.
+
+Before exporting, verify:
+
+* No unresolved @workspace/* references remain.
+* No catalog references remain unresolved.
+* All required package.json files are included.
+* The package can be installed on a clean Mac using only the supplied files.
+
+Please return:
+
+1. A completeness report.
+2. Missing dependency report.
+3. A new ZIP containing the fully runnable standalone workspace.
