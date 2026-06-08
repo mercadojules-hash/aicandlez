@@ -120,6 +120,43 @@ without vector similarity.
 
 ---
 
+## Loading a knowledge collection (TXT / Markdown import)
+
+To populate the Jarvis Brain from a folder of plain-text files (for example an
+exported Open WebUI knowledge collection of `.txt` files), use the bundled
+importer. There is no separate UI for this — it is a one-shot script:
+
+```bash
+# From the project root, with .env in place:
+pnpm import:knowledge -- /absolute/path/to/Jarvis-Test
+
+# Also mirror each file into the executive memory corpus:
+pnpm import:knowledge -- /path/to/Jarvis-Test --memories
+
+# Assets only, skip embedding generation:
+pnpm import:knowledge -- /path/to/Jarvis-Test --no-embed
+```
+
+What it does:
+
+1. Each file → one row in `jarvis_knowledge_assets` (title from the first line,
+   full text as content). Rows are keyed by a UNIQUE `source_path`, so re-running
+   **upserts** instead of duplicating — safe to run repeatedly.
+2. With `--memories`, also mirrors each file into `jarvis_memories`.
+3. Unless `--no-embed`, runs the cognition indexer to compute vector embeddings
+   into `jarvis_embeddings` and enables semantic retrieval. This step needs
+   `OPENAI_API_KEY`; without it the import still succeeds and Executive Query
+   answers in **lexical** mode (only vector similarity is unavailable).
+
+Flags: `--memories`, `--no-embed`, `--tag=<tag>`, `--source-prefix=<p>`,
+`--ext=.txt,.md`.
+
+> `importVault` (the Vault restore route) is **not** the right tool for raw
+> files — it only restores a previously exported Jarvis namespace dump. Use this
+> importer for arbitrary TXT/Markdown folders.
+
+---
+
 ## How desktop mode differs from the cloud build
 
 - **Authentication is removed.** A local shim authorizes every request as a

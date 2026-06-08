@@ -14,7 +14,8 @@
     "build": "pnpm --filter @workspace/jarvis run build",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --if-present run typecheck",
-    "db:bootstrap": "bash scripts/setup.sh"
+    "db:bootstrap": "bash scripts/setup.sh",
+    "import:knowledge": "dotenv -e .env -- pnpm --filter @workspace/jarvis-server exec tsx src/scripts/importKnowledge.ts"
   },
   "devDependencies": {
     "@types/node": "catalog:",
