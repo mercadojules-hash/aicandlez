@@ -209,3 +209,9 @@ id = "gFlejk8L3qIeooyNiBJJ7"
 uri = "file://.local/gold-master/Jarvis-Gold-Master-2026-06-08.zip"
 type = "unspecified"
 title = "Jarvis Gold Master — 2026-06-08 (complete archive)"
+
+[[outputs]]
+id = "HvdW8yAWzlssLdo-FWuES"
+uri = "file://.local/owner-recovery/Jarvis-Owner-Recovery-Package.zip"
+type = "unspecified"
+title = "Jarvis Owner Recovery Package (credential map — fill values locally)"
