@@ -242,11 +242,16 @@ export function SignalRow({ spec, breakdown }: Props) {
     [spec.symbol, breakdown],
   );
 
-  // Confidence (engine → fallback per-symbol stable value)
-  const conf = useMemo(() => {
-    if (breakdown?.avgConfidence) return Math.round(breakdown.avgConfidence);
-    return 58 + (h % 38); // 58-95
-  }, [breakdown, h]);
+  // Confidence (engine only — NO synthetic fallback). When the engine has no
+  // live avgConfidence for this symbol (idle / halted / awaiting signals) we
+  // render an explicit inactive state ("—") instead of fabricating a number.
+  // Finite check (not truthy) so a real 0% confidence is preserved, not
+  // overwritten. Display-only: nothing here feeds gating / routing / execution.
+  const confActive = Number.isFinite(breakdown?.avgConfidence);
+  const conf = useMemo(
+    () => (confActive ? Math.round(breakdown!.avgConfidence) : 0),
+    [confActive, breakdown],
+  );
 
   // ── TEMP OBSERVABILITY (additive, display-only) ───────────────────────────
   // Per-user min-confidence + raw volume %, surfaced on the customer-only
@@ -799,7 +804,9 @@ export function SignalRow({ spec, breakdown }: Props) {
     firePaper(side, sl, tp);
   };
   const change24hPos = change24h >= 0;
-  const confColor  = conf >= 78 ? N.BRAND : conf >= 62 ? N.BRAND_DEEP : N.WARN;
+  const confColor  = !confActive
+    ? N.TEXT_3
+    : conf >= 78 ? N.BRAND : conf >= 62 ? N.BRAND_DEEP : N.WARN;
 
   // ── Phase 3 — AI Insights drawer (customer-only) ────────────────────────
   // The drawer renders ONLY when the viewer is NOT an admin/operator, so
@@ -1118,7 +1125,7 @@ export function SignalRow({ spec, breakdown }: Props) {
               fontFamily: N.FONT_MONO,
               textShadow: `0 0 4px ${confColor}80`,
             }}>
-            {conf}
+            {confActive ? conf : "—"}
           </span>
         </div>
         {insightsEnabled && (
