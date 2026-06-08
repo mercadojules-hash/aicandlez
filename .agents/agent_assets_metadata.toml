@@ -221,3 +221,27 @@ id = "Ra3U1QASvC9kDB1qAziW6"
 uri = "file://.local/reports/AICandlez-Profitability-Investigation-2026-06-08.md"
 type = "text"
 title = "AICandlez Profitability Investigation & Optimization Report (2026-06-08)"
+
+[[outputs]]
+id = "3MFwa9lcY2pAYi9422v_C"
+uri = "file://exports/jarvis/out/Jarvis-Desktop-Source-2026-06-08.zip"
+type = "unspecified"
+title = "Jarvis Desktop — Source (frontend + backend + schema)"
+
+[[outputs]]
+id = "PiVGlyQQYdE6Gk0Wfsmpg"
+uri = "file://exports/jarvis/out/Jarvis-Database-Package-2026-06-08.zip"
+type = "unspecified"
+title = "Jarvis Database Package (schema + pgvector + migrations)"
+
+[[outputs]]
+id = "GiyrvxJo-P9AOe1Vd1obp"
+uri = "file://exports/jarvis/out/Jarvis-Desktop-Deployment-Package-2026-06-08.zip"
+type = "unspecified"
+title = "Jarvis Desktop Deployment Package (Mac setup + Ollama)"
+
+[[outputs]]
+id = "ZL58ABm9Tc6tA25umdlTz"
+uri = "file://exports/jarvis/out/Jarvis-Dependency-Inventory-2026-06-08.zip"
+type = "unspecified"
+title = "Jarvis Dependency Inventory (deps + Replit couplings)"
