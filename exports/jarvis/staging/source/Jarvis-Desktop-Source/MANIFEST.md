@@ -1,7 +1,12 @@
-# Jarvis Desktop — Source Package
+# Jarvis Desktop — Source Package (Complete)
 
-Generated 2026-06-08. Complete runnable source for Jarvis Executive Command
-Center, organized for the standalone (Replit-free) repository layout.
+Generated 2026-06-08. Complete portable source for Jarvis Executive Command
+Center, organized for the standalone (Replit-free) repository layout. This is the
+**Complete** edition: the Jarvis-specific code plus all portable shared backend
+scaffolding (logger, auth middleware + guards, full `@workspace/db` client).
+
+Verified: **0 unresolved relative imports** across 230 TS/TSX files; the only
+workspace dependency is `@workspace/db`, which is included in full.
 
 ## Layout
 
@@ -12,6 +17,14 @@ Jarvis-Desktop-Source/
 │   │   └── src/{pages,components,hooks,lib}
 │   └── server/                  # Backend (Jarvis subset of api-server)
 │       ├── routes/jarvis.ts     # 216 endpoints under /api/jarvis/*
+│       ├── middlewares/
+│       │   └── requireAuth.ts   # Clerk auth middleware (shared)
+│       ├── lib/                  # Portable shared backend utilities
+│       │   ├── logger.ts        # pino logger
+│       │   ├── sessionTracker.ts
+│       │   ├── userStatusGuard.ts
+│       │   ├── objectStorage.ts # Replit App Storage (REPLACE w/ local adapter)
+│       │   └── objectAcl.ts     # storage ACL helper (paired w/ objectStorage)
 │       └── lib/jarvis/          # 72 files, ~24k LOC
 │           ├── agents/          # Agent system
 │           ├── cognition/       # Cognition + provider selection
@@ -30,7 +43,7 @@ Jarvis-Desktop-Source/
 ```
 
 ## What is included
-- ✅ Jarvis frontend (full `src` tree)
+- ✅ Jarvis frontend (full `src` tree + vite/tsconfig/package.json — self-contained)
 - ✅ Jarvis backend libraries (all 9 subsystems)
 - ✅ Jarvis routes (`jarvis.ts`)
 - ✅ Agent system (`lib/jarvis/agents`)
@@ -39,7 +52,11 @@ Jarvis-Desktop-Source/
 - ✅ Executive memory components (`lib/jarvis/cognition`, `jarvis_memories`,
   `jarvis_embeddings`)
 - ✅ Voice components (`lib/jarvis/cognition/voice`, `pages/Voice.tsx`)
-- ✅ Database schema files (`packages/db/schema`)
+- ✅ **Shared backend scaffolding** (NEW): `logger.ts`, `requireAuth.ts`,
+  `sessionTracker.ts`, `userStatusGuard.ts`, `objectStorage.ts`, `objectAcl.ts`
+- ✅ **Complete `@workspace/db` package** (NEW): db client (`src/index.ts`),
+  full schema barrel (all tables), constants, `package.json`, `tsconfig.json`,
+  `drizzle.config.ts`, migrations
 
 ## What is intentionally excluded
 - `node_modules/`, `dist/`, build caches, `.replit-artifact/`

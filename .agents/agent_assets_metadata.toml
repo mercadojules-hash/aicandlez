@@ -245,3 +245,9 @@ id = "ZL58ABm9Tc6tA25umdlTz"
 uri = "file://exports/jarvis/out/Jarvis-Dependency-Inventory-2026-06-08.zip"
 type = "unspecified"
 title = "Jarvis Dependency Inventory (deps + Replit couplings)"
+
+[[outputs]]
+id = "YeDcNTGvqKr6csq1klugT"
+uri = "file://exports/jarvis/out/Jarvis-Desktop-Source-Complete-2026-06-08.zip"
+type = "unspecified"
+title = "Jarvis Desktop — Source COMPLETE (Jarvis code + shared scaffolding + full @workspace/db)"
