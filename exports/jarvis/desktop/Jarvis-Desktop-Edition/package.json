@@ -1,0 +1,26 @@
+{
+  "name": "jarvis-desktop-edition",
+  "version": "1.0.0",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@10.26.1",
+  "scripts": {
+    "dev": "dotenv -e .env -- concurrently --kill-others-on-fail --names \"api,web\" --prefix-colors \"green,cyan\" \"pnpm --filter @workspace/jarvis-server run dev\" \"pnpm --filter @workspace/jarvis run dev\"",
+    "dev:api": "pnpm --filter @workspace/jarvis-server run dev",
+    "dev:web": "pnpm --filter @workspace/jarvis run dev",
+    "build": "pnpm --filter @workspace/jarvis run build",
+    "typecheck:libs": "tsc --build",
+    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --if-present run typecheck",
+    "db:bootstrap": "bash scripts/setup.sh"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/pg": "^8.20.0",
+    "concurrently": "^9.1.2",
+    "dotenv-cli": "^8.0.0",
+    "typescript": "~5.9.2"
+  }
+}

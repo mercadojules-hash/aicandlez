@@ -251,3 +251,21 @@ id = "YeDcNTGvqKr6csq1klugT"
 uri = "file://exports/jarvis/out/Jarvis-Desktop-Source-Complete-2026-06-08.zip"
 type = "unspecified"
 title = "Jarvis Desktop — Source COMPLETE (Jarvis code + shared scaffolding + full @workspace/db)"
+
+[[outputs]]
+id = "wJqNh5pnaIsdNiW3J4bSK"
+uri = "file://exports/jarvis/desktop/Jarvis-Desktop-Edition.zip"
+type = "unspecified"
+title = "Jarvis Desktop Edition — recovery ZIP"
+
+[[outputs]]
+id = "qxD7iVZw7D5oBIEvedrfn"
+uri = "file://exports/jarvis/desktop/COMPLETENESS_REPORT.md"
+type = "text"
+title = "Completeness Report"
+
+[[outputs]]
+id = "AIzNVI-IRr0j2OfHhnnb1"
+uri = "file://exports/jarvis/desktop/MISSING_DEPENDENCY_REPORT.md"
+type = "text"
+title = "Missing-Dependency Report"
