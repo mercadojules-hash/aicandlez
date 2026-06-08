@@ -1,0 +1,81 @@
+Priority shift.
+
+Do not continue new AICandlez optimization work right now.
+
+Before we lose time or trigger more costs, update Jarvis memory with the latest AICandlez findings and proceed with the Jarvis Vault export.
+
+Step 1 — Update Jarvis Memory
+
+Add the latest AICandlez findings into Jarvis Executive Memory / Historical Intelligence:
+
+1. Confidence Display Finding
+
+* Admin 80–95 confidence values were synthetic fallback values when the engine was idle.
+* Customer 30–50 values are closer to real engine confidence.
+* SignalRow display fix was implemented so missing confidence now shows "—" instead of fabricated values.
+
+2. Stop-Loss Finding
+
+* SL = 2% remains active.
+* Emergency stop-loss backstop was added at approximately 3% to prevent null/stale/missed-stop positions from riding to max hold at -4% to -5%.
+* TP, trailing, sizing, confidence, max hold were not changed.
+
+3. Profit Capture Finding
+
+* Production is currently running TP = 10% and trailing = 5%, not TP = 5% and trailing = 3%.
+* TP and trailing are operational, but rarely trigger because most winners do not reach those levels.
+* Some fast movers exceeded +10% and still exited as MAX_HOLD, suggesting a price-feed / monitor reliability issue.
+* Profit capture is currently the largest remaining AICandlez issue.
+* Jarvis should monitor TP exits, trailing exits, MAX_HOLD exits, profit factor, average winner, and missed profit-capture events going forward.
+
+4. Current Recommendation Stored In Memory
+
+* Do not change TP/trailing blindly.
+* First priority after export is for Jarvis to monitor and report on:
+
+  * TP exits
+  * trailing exits
+  * max-hold exits
+  * average winner
+  * average loser
+  * profit factor
+  * missed TP opportunities
+  * price-feed reliability
+* Future investigation: final authoritative TP/trailing check before MAX_HOLD close.
+
+Step 2 — Create Jarvis Vault Export
+
+Proceed with the first production Jarvis Vault export.
+
+Use:
+
+* includeBinaries: true
+* persist: true
+
+Then:
+
+1. Validate the package.
+2. Generate readiness report.
+3. Provide storageKey.
+4. Provide payloadChecksum.
+5. Provide package size.
+6. Provide row counts by table.
+7. Confirm report.ok === true.
+8. Confirm no secret values are included.
+9. Confirm creative binaries are included or accounted for.
+10. Provide the exact download command.
+11. Provide the exact folder structure for my external drive.
+
+Step 3 — Operator Checklist
+
+Give me a final step-by-step checklist to:
+
+* Download the Vault package
+* Save it to my external drive
+* Save readiness report
+* Save manifest/checksum
+* Save schema/migration copy
+* Save env variable name template only
+* Confirm no secrets are copied
+
+No more feature work until the Vault export is complete.

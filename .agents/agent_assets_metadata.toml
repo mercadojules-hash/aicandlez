@@ -155,3 +155,33 @@ id = "YyPrliPOtSGeLAVfj2IsP"
 uri = "file://exports/zero-pnl-trades.csv"
 type = "table"
 title = "Zero-P&L trade forensics (241 prod rows)"
+
+[[outputs]]
+id = "MTfU-RJdZdEHXmxIkPqAY"
+uri = "file://.local/exports/jarvis-vault-first-export.json"
+type = "unspecified"
+title = "Jarvis Vault — First Production Export (full package)"
+
+[[outputs]]
+id = "kr_SzzEFVR7fLwW2q2woo"
+uri = "file://.local/exports/jarvis-vault-manifest.json"
+type = "unspecified"
+title = "Vault Manifest (checksums + row counts)"
+
+[[outputs]]
+id = "TA5yyZbQGrqKaNaoFnkOd"
+uri = "file://.local/exports/jarvis-vault-readiness.json"
+type = "unspecified"
+title = "Vault Readiness Report"
+
+[[outputs]]
+id = "U4txJr5yI8a5DJGNJRXHp"
+uri = "file://.local/exports/CHECKSUM.txt"
+type = "text"
+title = "Checksums + verify commands"
+
+[[outputs]]
+id = "tmDnjUq14qbtfrIJREITH"
+uri = "file://.local/exports/ENV-VARS-TEMPLATE.txt"
+type = "text"
+title = "Env-var NAME template (no values)"
