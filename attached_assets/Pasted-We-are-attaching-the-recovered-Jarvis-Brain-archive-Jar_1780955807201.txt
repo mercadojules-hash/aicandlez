@@ -1,0 +1,108 @@
+We are attaching the recovered Jarvis Brain archive:
+
+Jarvis-Test.zip
+
+Current Status:
+
+SUCCESSFUL:
+
+* Jarvis Desktop Edition running locally
+* PostgreSQL connected
+* Database schema loaded
+* 266 Knowledge Assets imported
+* 266 Memories imported
+* Knowledge Search working
+
+CURRENT ISSUES:
+
+* Executive Query returns generic responses instead of reasoning from imported knowledge.
+* Business Registry is empty.
+* Project Registry is empty.
+* Agent Registry appears mostly empty.
+* Voice session loads but transcription is not functioning.
+* Knowledge Graph is not populated from imported documents.
+* No semantic embeddings generated yet.
+
+Objectives:
+
+1. Build a full ingestion pipeline for Jarvis-Test.zip.
+
+The importer should automatically identify and populate:
+
+* Agents
+* Businesses
+* Projects
+* Knowledge Assets
+* Memories
+* Strategic Documents
+* Governance Documents
+* Sprint Packages
+* Knowledge Graph Nodes
+* Relationships
+
+2. Populate database tables automatically instead of storing everything only as text documents.
+
+Examples:
+
+Agent Registry TXT files → jarvis_agents
+
+Business Registry TXT files → jarvis_businesses
+
+Project Registry TXT files → jarvis_projects
+
+Executive Memory TXT files → jarvis_memories
+
+Knowledge Documents → jarvis_knowledge_assets
+
+Relationships → Knowledge Graph
+
+3. Executive Query must use:
+
+* Knowledge Assets
+* Memories
+* Businesses
+* Projects
+* Agents
+
+instead of only generic fallback responses.
+
+4. Knowledge Graph should visualize imported entities and relationships.
+
+5. Validate Agent Registry.
+
+The current system only appears to expose approximately 5 agents.
+
+Expected architecture should include systems such as:
+
+* Jarvis Executive
+* Prometheus
+* Vision
+* Athena
+* Sentinel
+* Oracle
+* Strategist
+* Intelligence
+* Governance
+* Operations
+* Risk
+* Portfolio
+* Communications
+* Memory
+
+and any additional agents found in the imported brain.
+
+6. Provide a concise implementation report after completion.
+
+Do NOT generate large diagnostic reports.
+
+Provide only:
+
+* What was fixed
+* What tables were populated
+* Agent count
+* Business count
+* Project count
+* Knowledge Graph count
+* Remaining blockers
+
+We want engineering work completed first before downloading a new build.

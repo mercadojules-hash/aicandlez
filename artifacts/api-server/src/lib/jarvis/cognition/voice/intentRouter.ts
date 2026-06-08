@@ -89,6 +89,15 @@ const RULES: CapabilityRule[] = [
 const MUTATION_PATTERN =
   /\b(create|delete|remove|update|edit|change|modify|send|email|execute|launch|approve|reject|publish|assign|delegate|buy|sell|trade|transfer|pay|cancel)\b/i;
 
+// Informational / definitional question forms. When NO capability keyword matched
+// and the request is not a mutation, a natural-language question about an entity
+// ("what is X?", "who is X?", "tell me about X", "define X") should ATTEMPT
+// knowledge retrieval before falling back to clarification — the retrieval handler
+// itself degrades gracefully ("I couldn't find anything") if the corpus is silent.
+// Tested against the RAW transcript because cleanQuery strips leading "what is/are".
+const INFORMATIONAL_PATTERN =
+  /^(?:what|whats|what's|who|whos|who's|whose|where|when|why|how|which)\b|\b(?:tell me about|what do (?:you|we) know about|do you know|explain|describe|define|info(?:rmation)? (?:on|about)|details? (?:on|about)|more (?:on|about))\b/i;
+
 const FILLER_PATTERN =
   /^(?:ok(?:ay)?|hey|hi|yo|please|jarvis|so|um+|uh+|well|can you|could you|would you|will you|tell me|show me|give me|get me|i want to|i'd like to|let'?s|pull up|bring up|what(?:'s| is| are)?)\s+/i;
 
@@ -145,6 +154,20 @@ export function classifyIntent(transcript: string): IntentClassification {
         reason:
           "Voice is read-only in this version — I can't make changes. " +
           "I can look things up or brief you instead.",
+      };
+    }
+    // Natural-language question about an entity ("what is AICandlez?", "who is X",
+    // "tell me about Y") with a substantive topic ⇒ ATTEMPT knowledge retrieval
+    // before clarifying. The handler degrades gracefully if the corpus is silent,
+    // so this never asserts an answer it doesn't have — it just stops sending real
+    // questions to the clarify dead-end.
+    if (INFORMATIONAL_PATTERN.test(raw) && query.length >= 3) {
+      return {
+        intent: "knowledge_search",
+        capability: "knowledge_search",
+        confidence: 45,
+        query,
+        reason: null,
       };
     }
     return {
