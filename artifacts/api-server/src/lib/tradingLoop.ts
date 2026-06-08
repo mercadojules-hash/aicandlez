@@ -318,6 +318,22 @@ export const LIVE_STOP_CATASTROPHIC_MULT = parseLiveStopKnob(
 //    [0, catastrophic) effectively; floored at 0, capped at 5.
 export const LIVE_STOP_IMMEDIATE_FRACTION = parseLiveStopKnob(
   "LIVE_STOP_IMMEDIATE_FRACTION", process.env.LIVE_STOP_IMMEDIATE_FRACTION, 0.25, 0, 5);
+// 6. Absolute emergency stop (entry-relative, stop-INDEPENDENT backstop). The
+//    five knobs above all compute the trigger RELATIVE to the position's stored
+//    stopLoss price and live inside `if (p.stopLoss !== null)`. A position that
+//    reaches the engine with NO synthetic stop (null), a stale/wrong stop, or a
+//    breach that never registers as `rawBreach` therefore has NO fast exit and
+//    can only be caught by the price-independent max-hold ceiling — riding to
+//    -4%/-5% before closing (the MAX_HOLD losers in the prod audit). This knob is
+//    a final safety net measured DIRECTLY from entry: once a LIVE position's raw
+//    loss from entry reaches this %, it force-closes immediately, regardless of
+//    whether a stop is set, bypassing grace + confirmation. It is purely additive
+//    (only acts when no other exit fired) so it never changes the normal 2% stop,
+//    TP, trailing, max-hold, sizing, or paper. Floored at 2.5% so it can never
+//    undercut the configured 2% stop or the stabilization window's intent, capped
+//    at 5% so it can never be set looser than the catastrophic tier. Default 3%.
+export const LIVE_STOP_EMERGENCY_PCT = parseLiveStopKnob(
+  "LIVE_STOP_EMERGENCY_PCT", process.env.LIVE_STOP_EMERGENCY_PCT, 3.0, 2.5, 5);
 if (liveStopEnvWarnings.length > 0) {
   logger.warn(
     { tag: "LIVE_STOP_ENV_INVALID", warnings: liveStopEnvWarnings },
@@ -2241,7 +2257,7 @@ async function runHardStopMonitor() {
       // ── Exit decision (priority: SL → TP → trailing → max-hold) ──────────────
       let reason: "STOP_LOSS" | "TAKE_PROFIT" | "TRAILING_STOP" | "MAX_HOLD" | null = null;
       // Which LIVE stop-loss tier fired (for trigger-vs-execution diagnostics).
-      let slTier: "IMMEDIATE" | "CATASTROPHIC" | "CONFIRMED" | null = null;
+      let slTier: "IMMEDIATE" | "CATASTROPHIC" | "CONFIRMED" | "EMERGENCY" | null = null;
       let trailPct:   number | null = null;
       let trailStop:  number | null = null;
       let trailArmed = false;
@@ -2308,6 +2324,28 @@ async function runHardStopMonitor() {
             }
           } else {
             // No breach this tick — reset the confirmation streak.
+            liveStopBreachStreak.delete(p.positionId);
+          }
+        }
+        // ── Absolute emergency stop (LIVE backstop, stop-INDEPENDENT) ───────────
+        // Final capital-protection net measured DIRECTLY from entry, NOT from the
+        // stored stopLoss price. The relative SL tiers above all live inside
+        // `if (p.stopLoss !== null)`, so a position that arrives with a null /
+        // stale stop, or whose breach never registers, has no fast exit and only
+        // the price-independent max-hold ceiling catches it — letting the loss run
+        // to -4%/-5% (the MAX_HOLD losers in the prod stop-loss audit). This fires
+        // the moment raw loss from entry reaches LIVE_STOP_EMERGENCY_PCT (default
+        // 3%, floored at 2.5% so it can never undercut the normal 2% stop or the
+        // stabilization window). Purely additive: gated on `reason === null`, so it
+        // only acts when no normal exit fired — the 2% stop still owns ordinary
+        // exits, and TP / trailing / max-hold / sizing / paper are untouched.
+        if (reason === null && isLive && p.entryPrice > 0) {
+          const lossPct = isBuy
+            ? ((p.entryPrice - price) / p.entryPrice) * 100
+            : ((price - p.entryPrice) / p.entryPrice) * 100;
+          if (lossPct >= LIVE_STOP_EMERGENCY_PCT) {
+            reason = "STOP_LOSS";
+            slTier = "EMERGENCY";
             liveStopBreachStreak.delete(p.positionId);
           }
         }
