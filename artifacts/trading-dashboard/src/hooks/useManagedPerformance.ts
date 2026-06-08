@@ -140,7 +140,12 @@ export function useManagedPerformance() {
     refetchInterval:      30_000,
     refetchOnWindowFocus: true,
     staleTime:            10_000,
-    retry:                false,
+    // A live customer's snapshot includes a real broker-balance poll; a single
+    // slow cycle should self-heal, not blank the headline surface. Two quick
+    // retries absorb a transient blip before the panel surfaces any banner, and
+    // React Query keeps the last-good `data` across a failed background refetch
+    // so the panel keeps rendering real numbers (the banner is gated on `!data`).
+    retry:                2,
   });
 }
 

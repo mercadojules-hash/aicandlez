@@ -6341,6 +6341,16 @@ export function PortalCustomerShell({ operatorPreview = false }: { operatorPrevi
            positioning back to normal flow and re-cap the scroll body to a
            viewport-relative height with internal scroll, so a tall card list
            doesn't collapse (absolute → 0 height) or run multi-thousand-px. */
+        /* Tablet/phone scroll-trap fix (customer /portal only). The desktop
+           fill-to-rail trick caps each column's .blotter-scroll and gives it an
+           internal overflow-y. Stacked above the rail on small screens, those
+           capped inner scrollers swallow the touch/wheel gesture and never
+           chain to the page, so LIVE TRADES / TRADE HISTORY below the matrix
+           become unreachable ("page barely scrolls"). Below 1024px we drop the
+           inner scroll entirely: panels grow to natural height and the PAGE
+           body is the single scroll context, so the rail beneath is always
+           reachable. All cards already render (no slice). Scoped to
+           .cd-customer-battlefield-matrix, so /command stays byte-identical. */
         @media (max-width: 1024px) {
           .cd-customer-battlefield-matrix > .cd-customer-majors-panel,
           .cd-customer-battlefield-matrix > .cd-customer-alts-panel,
@@ -6350,7 +6360,8 @@ export function PortalCustomerShell({ operatorPreview = false }: { operatorPrevi
           }
           .cd-customer-battlefield-matrix .blotter-scroll {
             flex: 0 0 auto;
-            max-height: calc(100dvh - 200px) !important;
+            max-height: none !important;
+            overflow-y: visible !important;
           }
         }
         @media (max-width: 720px) {
@@ -6358,7 +6369,8 @@ export function PortalCustomerShell({ operatorPreview = false }: { operatorPrevi
             flex-direction: column;
           }
           .cd-customer-battlefield-matrix .blotter-scroll {
-            max-height: 1080px !important;
+            max-height: none !important;
+            overflow-y: visible !important;
             min-height: 0 !important;
           }
         }

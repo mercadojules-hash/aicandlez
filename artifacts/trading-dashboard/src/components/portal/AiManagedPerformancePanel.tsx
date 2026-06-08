@@ -405,7 +405,7 @@ export const AiManagedPerformancePanel = memo(function AiManagedPerformancePanel
         </div>
       )}
 
-      {isError && !isLoading && (
+      {isError && !isLoading && !data && (
         <div style={{ padding: "16px 12px", fontSize: 11, color: T.AMBER }}>
           Managed performance unavailable — retrying.
         </div>

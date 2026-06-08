@@ -163,6 +163,15 @@ interface LiveBalanceAgg {
 }
 const liveBalanceCache = new Map<string, { at: number; agg: LiveBalanceAgg }>();
 const LIVE_BALANCE_TTL_MS = 20_000;
+// Per-connection broker-poll ceiling. `loadBalanceForRow` swallows broker
+// ERRORS (returns ok:false) but a broker HANG resolves neither — without this
+// bound a single slow/rate-limited exchange would block the entire
+// managed-performance response until the client/proxy aborts, blanking the
+// whole panel (incl. the virtual KPIs + era stats that need no broker call).
+// On timeout we degrade THIS connection to a dashed live block (balanceError)
+// while every fast connection + all non-live KPIs still return. Display-only —
+// execution / risk / sizing never read this path.
+const LIVE_BALANCE_POLL_TIMEOUT_MS = 8_000;
 
 async function loadLiveBalanceAgg(userId: string): Promise<LiveBalanceAgg> {
   const cached = liveBalanceCache.get(userId);
@@ -189,9 +198,14 @@ async function loadLiveBalanceAgg(userId: string): Promise<LiveBalanceAgg> {
     connRows.map(async (row) => {
       if (row.status !== "active") return;
       activeConnCount++;
-      const snap = await loadBalanceForRow(userId, row);
-      if (!snap.ok) {
-        if (error == null) error = snap.error ?? "balance_unavailable";
+      const snap = await Promise.race([
+        loadBalanceForRow(userId, row),
+        new Promise<null>((resolve) =>
+          setTimeout(() => resolve(null), LIVE_BALANCE_POLL_TIMEOUT_MS),
+        ),
+      ]);
+      if (!snap || !snap.ok) {
+        if (error == null) error = snap?.error ?? "balance_timeout";
         return;
       }
       exchanges.push(row.exchange);
