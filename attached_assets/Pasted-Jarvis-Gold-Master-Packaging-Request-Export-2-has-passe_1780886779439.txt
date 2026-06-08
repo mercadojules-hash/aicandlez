@@ -1,0 +1,107 @@
+Jarvis Gold Master Packaging Request
+
+Export #2 has passed validation and now contains the latest Executive Memory and AICandlez findings.
+
+Please create a complete Jarvis Gold Master archive and provide a single downloadable ZIP.
+
+Archive name:
+
+Jarvis-Gold-Master-2026-06-08.zip
+
+Include:
+
+1. Current Vault Backup
+
+* Jarvis Vault Export #2 (current authoritative export)
+* Export #2 Manifest
+* Export #2 Readiness Report
+* Checksums and verification file
+* Environment Variable Name Template
+
+2. Prior Backup
+
+* Jarvis Vault Export #1
+* Export #1 Manifest
+* Export #1 Readiness Report (if available)
+
+3. Jarvis Source
+
+Include all Jarvis-related source code and supporting modules:
+
+* Executive Memory
+* Executive Intelligence
+* Historical Intelligence
+* Sovereignty Layer
+* Creative Intelligence Division
+
+  * Prometheus
+  * Vision
+  * Phoenix
+* Vault Framework
+* Cognition Layer
+* Knowledge Graph
+* Agent Registry
+* Business Registry
+* Governance Framework
+
+4. Schema and Restore Assets
+
+* Jarvis schema
+* Drizzle migrations
+* Any Jarvis-specific SQL deploy records
+* Vault architecture documentation
+* Restore documentation
+
+5. Documentation
+
+* Jarvis Constitution
+* Jarvis Operating Manual
+* Executive Memory Architecture
+* Knowledge Graph Framework
+* Workflow Framework
+* Communication Protocol
+* Decision Framework
+* Escalation Framework
+* Strategic Framework
+* Sovereignty documentation
+* Creative Intelligence documentation
+* Vault architecture documentation
+* Relevant runbooks
+
+6. Restore Guide
+
+Create:
+
+README-RESTORE-FIRST.txt
+
+Include:
+
+* Restoration sequence
+* Database requirements
+* pgvector requirements
+* Object-storage requirements
+* Required environment variable names only
+* Vault import process
+* Validation process
+
+7. Validation
+
+Before delivering the ZIP:
+
+* Verify ZIP integrity
+* Verify file count
+* Verify archive size
+* Verify Export #2 payload checksum
+* Verify no secret values are included
+
+Provide:
+
+* ZIP size
+* Total file count
+* Export #2 checksum
+* Total Jarvis table count
+* Total Jarvis row count
+
+Goal:
+
+Create a complete Jarvis Gold Master archive suitable for long-term storage on an external drive and future restoration independent of Replit.

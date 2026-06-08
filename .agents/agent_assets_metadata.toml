@@ -203,3 +203,9 @@ id = "33YtYk9TARk0TxPhlNiZ0"
 uri = "file://.local/exports/jarvis-vault-second-readiness.json"
 type = "unspecified"
 title = "Export #2 Readiness Report"
+
+[[outputs]]
+id = "gFlejk8L3qIeooyNiBJJ7"
+uri = "file://.local/gold-master/Jarvis-Gold-Master-2026-06-08.zip"
+type = "unspecified"
+title = "Jarvis Gold Master — 2026-06-08 (complete archive)"
