@@ -160,7 +160,7 @@ title = "Zero-P&L trade forensics (241 prod rows)"
 id = "MTfU-RJdZdEHXmxIkPqAY"
 uri = "file://.local/exports/jarvis-vault-first-export.json"
 type = "unspecified"
-title = "Jarvis Vault — First Production Export (full package)"
+title = "Jarvis Vault — Export #1 (prior, for reference)"
 
 [[outputs]]
 id = "kr_SzzEFVR7fLwW2q2woo"
@@ -178,10 +178,28 @@ title = "Vault Readiness Report"
 id = "U4txJr5yI8a5DJGNJRXHp"
 uri = "file://.local/exports/CHECKSUM.txt"
 type = "text"
-title = "Checksums + verify commands"
+title = "Checksums + verify commands (both exports)"
 
 [[outputs]]
 id = "tmDnjUq14qbtfrIJREITH"
 uri = "file://.local/exports/ENV-VARS-TEMPLATE.txt"
 type = "text"
 title = "Env-var NAME template (no values)"
+
+[[outputs]]
+id = "XhSMwn1qmn9DQGNn4RguR"
+uri = "file://.local/exports/jarvis-vault-second-export.json"
+type = "unspecified"
+title = "Jarvis Vault — Export #2 (CURRENT, with latest findings)"
+
+[[outputs]]
+id = "ZMLfLJB-M3e4DVgShwUzf"
+uri = "file://.local/exports/jarvis-vault-second-manifest.json"
+type = "unspecified"
+title = "Export #2 Manifest (checksums + row counts)"
+
+[[outputs]]
+id = "33YtYk9TARk0TxPhlNiZ0"
+uri = "file://.local/exports/jarvis-vault-second-readiness.json"
+type = "unspecified"
+title = "Export #2 Readiness Report"
