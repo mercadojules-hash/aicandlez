@@ -1,0 +1,148 @@
+AICANDLEZ PROFITABILITY OPTIMIZATION — PHASE 0 + CONTROLLED TEST
+
+BACKGROUND
+
+The profitability investigation has been completed.
+
+Key findings:
+
+• Risk control is working.
+• Large losses have been significantly reduced.
+• Average loser approximately -1.8%.
+• Profit factor approximately 1.12.
+• TP = 10% only triggers on approximately 6.9% of trades.
+• Approximately 88.8% of winners never reach 5%.
+• Average winner approximately 2.5%.
+• Median winner approximately 1.3%.
+• Trailing stop is rarely activated.
+• Stop loss is the largest P&L drain.
+• Higher confidence bands appear to perform better.
+• Effective production hold time appears closer to 1 hour despite documented 6 hour max hold.
+
+OBJECTIVE
+
+Improve profitability without sacrificing the ability to capture larger momentum trades.
+
+Avoid over-optimization.
+
+Avoid killing trade frequency.
+
+Avoid eliminating rare high-profit runners.
+
+PHASE 0 — APPROVED
+
+Implement immediately:
+
+1. MFE Tracking
+
+   * Maximum Favorable Excursion
+   * Record peak unrealized profit reached
+   * Timestamp when peak occurred
+
+2. MAE Tracking
+
+   * Maximum Adverse Excursion
+   * Record worst unrealized drawdown
+   * Timestamp when it occurred
+
+3. Effective Exit Telemetry
+
+   * Record actual TP
+   * Actual SL
+   * Actual trailing settings
+   * Actual max hold
+   * Exit reason
+
+4. Time-to-Peak Tracking
+
+   * Time required to reach peak profit
+
+No behavior changes in Phase 0.
+
+PHASE 1 — CONTROLLED TEST CONFIGURATION
+
+Prepare a test configuration but DO NOT DEPLOY until approved.
+
+Proposed Test Profile Alpha:
+
+Current:
+TP = 10%
+SL = 2%
+Confidence ≈ Current
+
+Test:
+TP = 4%
+SL = 2%
+Confidence Floor = 55
+
+Leave unchanged:
+
+• Max Hold
+• Trailing Stop
+• Trailing Activation
+• MTF Logic
+• Risk Controls
+
+Reasoning:
+
+We want to improve trade quality while maintaining enough trade frequency.
+
+A TP of 4% remains large enough to capture meaningful winners while being substantially more realistic than 10%.
+
+A confidence floor of 55 should remove lower-quality trades while avoiding the severe trade reduction likely caused by moving directly to 60-70+.
+
+REQUIRED ANALYSIS
+
+Before deployment provide:
+
+1. Backtest using existing trade dataset.
+
+Compare:
+
+CURRENT CONFIGURATION
+
+vs
+
+TEST PROFILE ALPHA
+
+Report:
+
+• Trade count
+• Win rate
+• Loss rate
+• Average winner
+• Average loser
+• Profit factor
+• Net P&L
+• TP hit rate
+• Stop-loss frequency
+
+ADDITIONAL QUESTION
+
+Determine:
+
+What percentage of total profits came from trades that exceeded:
+
+• 5%
+• 7%
+• 10%
+
+This is critical.
+
+We need to understand whether rare high-profit runners contribute a disproportionate percentage of total profits.
+
+If so, future TP changes may require dynamic profit targets rather than fixed targets.
+
+NO DEPLOYMENT YET
+
+Provide findings first.
+
+After review we will determine whether to:
+
+• Deploy TP 4%
+• Raise confidence floor
+• Adjust trailing logic
+• Modify max hold
+• Implement dynamic profit capture
+
+Once report is complete, Jarvis Executive Memory will be updated and Phase 2 will be planned.

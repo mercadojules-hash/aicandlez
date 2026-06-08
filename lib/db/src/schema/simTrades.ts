@@ -62,6 +62,28 @@ export const simTradesTable = pgTable("sim_trades", {
   // open-side `sim_positions.sandbox` flag so closed trades can carry the
   // TESTNET pill in the Portal trade-history feed.
   sandbox:                boolean("sandbox").notNull().default(false),
+  // ── Phase 0 profitability telemetry (measurement-only; added 2026-06-08) ───
+  // MFE = Maximum Favorable Excursion (peak unrealized profit reached); MAE =
+  // Maximum Adverse Excursion (worst unrealized drawdown). Sampled each
+  // risk-monitor tick, GROSS of fees (a price-path concept). `*Usd` in USD,
+  // `*Pct` as percent of entry price, `*At` as absolute epoch-ms of the
+  // peak/trough; `timeToPeakMs` = mfeAt − entryTime (how long until the favorable
+  // peak). `eff*` = the effective exit config the position lived under at close,
+  // resolved per-exchange → account → env → default (TP/SL/trailing % and
+  // max-hold hours). ALL NULL for trades closed before these columns existed and
+  // for closes that never received a price sample (e.g. process restart
+  // mid-trade). These columns NEVER affect trading behaviour — observability only.
+  mfeUsd:             real("mfe_usd"),
+  mfePct:             real("mfe_pct"),
+  mfeAt:              bigint("mfe_at", { mode: "number" }),
+  maeUsd:             real("mae_usd"),
+  maePct:             real("mae_pct"),
+  maeAt:              bigint("mae_at", { mode: "number" }),
+  timeToPeakMs:       bigint("time_to_peak_ms", { mode: "number" }),
+  effTakeProfitPct:   real("eff_take_profit_pct"),
+  effStopLossPct:     real("eff_stop_loss_pct"),
+  effTrailingStopPct: real("eff_trailing_stop_pct"),
+  effMaxHoldHours:    real("eff_max_hold_hours"),
   // Operator reconciliation marker. NULL = an ordinary, trusted record that
   // counts toward realized P&L. Non-NULL = flagged by the account
   // reconciliation tool and EXCLUDED from the recomputed realized ledger

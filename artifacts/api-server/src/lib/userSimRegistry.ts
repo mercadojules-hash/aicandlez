@@ -17,6 +17,8 @@ import {
 import { CATALOG_BY_ID } from "../services/exchanges/catalog.js";
 import { recordPerformanceFee, resolveFeePolicy } from "./feeLedger.js";
 import { resolveCorrelation } from "./executionTelemetry.js";
+import { resolveExitConfig } from "./exitConfig.js";
+import { getExcursion, clearExcursion } from "./excursionTracker.js";
 
 // Synchronous equity proxy used by close-path instrumentation. Equity here =
 // cashBalance + Σ position.sizeUSD (entry notional). It is NOT a live MTM —
@@ -123,6 +125,24 @@ export interface UserSimTrade {
   platformFeeUSD?: number;
   platformFeeRate?: number;
   platformFeeSkipReason?: string;
+  // ── Phase 0 profitability telemetry (measurement only) ────────────────────
+  // MFE = peak unrealized profit reached; MAE = worst unrealized drawdown.
+  // Sampled each risk-monitor tick from the live ticker, GROSS of fees. `*At`
+  // are absolute epoch-ms; `timeToPeakMs` = mfeAt − entryTime. `eff*` capture
+  // the effective exit config (per-exchange → account → env → default) the
+  // position lived under at close. Undefined → persisted NULL (never sampled /
+  // closed before this existed). None of these affect trading behaviour.
+  mfeUsd?: number;
+  mfePct?: number;
+  mfeAt?: number;
+  maeUsd?: number;
+  maePct?: number;
+  maeAt?: number;
+  timeToPeakMs?: number;
+  effTakeProfitPct?: number;
+  effStopLossPct?: number;
+  effTrailingStopPct?: number;
+  effMaxHoldHours?: number;
 }
 
 interface UserSimAccount {
@@ -471,6 +491,18 @@ export async function finalizeClose(args: {
       exitFeeBroker:          trade.exitFeeBroker ?? null,
       exitFeeBrokerCurrency:  trade.exitFeeBrokerCurrency ?? null,
       sandbox:                trade.sandbox === true,
+      // Phase 0 measurement-only telemetry.
+      mfeUsd:             trade.mfeUsd ?? null,
+      mfePct:             trade.mfePct ?? null,
+      mfeAt:              trade.mfeAt ?? null,
+      maeUsd:             trade.maeUsd ?? null,
+      maePct:             trade.maePct ?? null,
+      maeAt:              trade.maeAt ?? null,
+      timeToPeakMs:       trade.timeToPeakMs ?? null,
+      effTakeProfitPct:   trade.effTakeProfitPct ?? null,
+      effStopLossPct:     trade.effStopLossPct ?? null,
+      effTrailingStopPct: trade.effTrailingStopPct ?? null,
+      effMaxHoldHours:    trade.effMaxHoldHours ?? null,
     });
 
     // 3. Atomic account settlement — SQL-side increments, NOT read-modify-write.
@@ -1471,6 +1503,28 @@ export async function closeUserPosition(
     }
   }
 
+  // ── Phase 0 telemetry: MFE/MAE excursion + effective exit config ───────────
+  // Measurement only — read the running excursion marks accumulated by the risk
+  // monitor and resolve the effective exit config this position closed under.
+  // FAIL-OPEN: this runs AFTER the live broker close may have settled, so a
+  // transient DB failure in resolveExitConfig() must NEVER abort persistence and
+  // strand a local-open vs broker-closed position. On any error every telemetry
+  // field degrades to undefined → NULL. Neither path influences the close
+  // decision, fees, or PnL math.
+  const excursion = getExcursion(positionId);
+  let effExit: Awaited<ReturnType<typeof resolveExitConfig>> | null = null;
+  try {
+    effExit = await resolveExitConfig(userId, pos.exchange ?? null);
+  } catch (err) {
+    logger.warn(
+      { err, userId, positionId, exchange: pos.exchange ?? null },
+      "[PHASE0_TELEMETRY] resolveExitConfig failed during close — recording NULL eff* fields (close unaffected)",
+    );
+  }
+  const timeToPeakMs = excursion !== undefined
+    ? Math.max(0, excursion.mfeAt - pos.entryTime)
+    : undefined;
+
   const trade: UserSimTrade = {
     id:              tradeId,
     userId,
@@ -1509,6 +1563,20 @@ export async function closeUserPosition(
     exitFeeBroker:          brokerExitFee,
     exitFeeBrokerCurrency:  brokerExitFee !== undefined ? brokerExitFeeCurrency : undefined,
     sandbox:                pos.sandbox === true,
+    // Phase 0 measurement-only telemetry (undefined → persisted NULL).
+    mfeUsd:             excursion ? parseFloat(excursion.mfeUsd.toFixed(2)) : undefined,
+    mfePct:             excursion ? parseFloat(excursion.mfePct.toFixed(3)) : undefined,
+    mfeAt:              excursion?.mfeAt,
+    maeUsd:             excursion ? parseFloat(excursion.maeUsd.toFixed(2)) : undefined,
+    maePct:             excursion ? parseFloat(excursion.maePct.toFixed(3)) : undefined,
+    maeAt:              excursion?.maeAt,
+    timeToPeakMs,
+    effTakeProfitPct:   effExit ? parseFloat(effExit.takeProfitPercent.toFixed(4)) : undefined,
+    effStopLossPct:     effExit ? parseFloat(effExit.stopLossPercent.toFixed(4)) : undefined,
+    effTrailingStopPct: effExit && effExit.trailingStopPercent !== null
+      ? parseFloat(effExit.trailingStopPercent.toFixed(4))
+      : undefined,
+    effMaxHoldHours:    effExit ? parseFloat(effExit.maxHoldHours.toFixed(4)) : undefined,
   };
 
   // Live trades pay broker commission on both legs — deduct from cash and
@@ -1602,6 +1670,10 @@ export async function closeUserPosition(
   // even when several closes for this user committed concurrently the cached
   // state converges to exactly what the DB holds (no read-modify-write).
   const settledAccount = finalize.account!;
+  // Phase 0: a fully-closed position will never be sampled again — drop its
+  // excursion marks now (the monitor prune is a backstop). Partial closes keep
+  // the position open, so their marks are intentionally retained.
+  if (!isPartial) clearExcursion(positionId);
   const liveIdx = state.positions.findIndex((p) => p.id === positionId);
   if (isPartial) {
     if (liveIdx !== -1) {

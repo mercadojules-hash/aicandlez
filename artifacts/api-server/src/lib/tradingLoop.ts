@@ -40,6 +40,7 @@ import { auditLogger } from "../services/telemetry/AuditLogger.js";
 import { executionStreamBus, getSafeTestMode } from "./executionStreamBus.js";
 import { recordSignalTrace, classifyDownstream, type SignalTrace } from "./signalFunnel.js";
 import { resolveExitConfig, buildExitConfigResolver } from "./exitConfig.js";
+import { updateExcursion, pruneExcursions } from "./excursionTracker.js";
 import { logger } from "./logger.js";
 
 function genId() { return crypto.randomUUID(); }
@@ -2193,6 +2194,8 @@ async function runHardStopMonitor() {
     for (const id of failedLiveCloseStreak.keys()) {
       if (!openPositionIds.has(id)) failedLiveCloseStreak.delete(id);
     }
+    // Phase 0: prune MFE/MAE marks for positions no longer open (same pattern).
+    pruneExcursions(openPositionIds);
 
     await Promise.all(positions.map(async (p) => {
       const isBuy  = p.side === "BUY";
@@ -2245,6 +2248,23 @@ async function runHardStopMonitor() {
 
       const price  = priceBySym.get(p.symbol);
       const exitCfg = resolveExit(p.userId, p.exchange);
+
+      // ── MFE/MAE telemetry (Phase 0 — measurement only, NO exit behaviour) ────
+      // Fold this tick's unrealized P&L (gross of fees) into the position's
+      // running peak-favorable / worst-adverse marks BEFORE any exit decision, so
+      // even a same-tick close still records an excursion sample. Skipped on a
+      // missing/stale price (the exit logic below is likewise price-gated).
+      if (price !== undefined) {
+        const unrealizedUsd = isBuy
+          ? (price - p.entryPrice) * p.quantity
+          : (p.entryPrice - price) * p.quantity;
+        const unrealizedPct = p.entryPrice > 0
+          ? (isBuy
+              ? (price - p.entryPrice) / p.entryPrice
+              : (p.entryPrice - price) / p.entryPrice) * 100
+          : 0;
+        updateExcursion(p.positionId, unrealizedUsd, unrealizedPct, nowMs);
+      }
 
       // Age is computed price-independently so the max-hold ceiling can fire even
       // when the market-data feed is down. A hard time ceiling that depended on a
