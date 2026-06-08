@@ -215,3 +215,9 @@ id = "HvdW8yAWzlssLdo-FWuES"
 uri = "file://.local/owner-recovery/Jarvis-Owner-Recovery-Package.zip"
 type = "unspecified"
 title = "Jarvis Owner Recovery Package (credential map — fill values locally)"
+
+[[outputs]]
+id = "Ra3U1QASvC9kDB1qAziW6"
+uri = "file://.local/reports/AICandlez-Profitability-Investigation-2026-06-08.md"
+type = "text"
+title = "AICandlez Profitability Investigation & Optimization Report (2026-06-08)"

@@ -1,0 +1,237 @@
+AICANDLEZ PROFITABILITY INVESTIGATION & OPTIMIZATION REPORT REQUEST
+
+Objective:
+
+Do NOT make any production changes yet.
+
+First perform a complete profitability investigation, generate a report, and provide recommendations. No parameter changes should be deployed until findings are reviewed and approved.
+
+BACKGROUND
+
+Recent analysis indicates that risk control appears significantly improved.
+
+Recent losses are generally:
+
+-0.3%
+-0.6%
+-1.1%
+-1.9%
+
+Large losses above 4-6% appear largely eliminated due to the current stop-loss architecture.
+
+The current concern is profitability and profit capture.
+
+Recent winning trades are generally:
+
++0.8%
++1.1%
++1.4%
++1.6%
++2.0%
++2.3%
++3.0%
+
+Historical findings previously reported:
+
+• Approximately 86% of winning trades never reach +5%
+• Approximately 6% of winning trades ever reach +10%
+
+Current production settings:
+
+TP = 10%
+Trailing = 5%
+Max Hold = 6 Hours
+Stop Loss = 2%
+
+The concern is that profit capture settings may be disconnected from actual market behavior and that AICandlez may be favoring safety over profitability.
+
+INVESTIGATION REQUIRED
+
+Analyze the most recent completed trade dataset available (minimum 500 completed trades if available).
+
+Generate the following report:
+
+SECTION 1 — WINNER DISTRIBUTION ANALYSIS
+
+For all winning trades determine:
+
+• Average winning trade %
+• Median winning trade %
+• Largest winning trade %
+• Smallest winning trade %
+
+Calculate:
+
+Percentage of trades that reached:
+
+• 1%
+• 2%
+• 3%
+• 5%
+• 7%
+• 10%
+
+Provide actual counts and percentages.
+
+SECTION 2 — PEAK PROFIT ANALYSIS
+
+For every completed trade determine:
+
+• Peak unrealized profit achieved
+• Final realized profit
+• Difference between peak and exit
+
+Questions to answer:
+
+1. How many trades reached 10% at any point?
+2. How many reached 5% at any point?
+3. How many reached 3% at any point?
+4. How often are profitable trades giving back gains before exit?
+
+SECTION 3 — TIME-TO-PEAK ANALYSIS
+
+Determine:
+
+Average time required to reach:
+
+• 1%
+• 2%
+• 3%
+• 5%
+• 10%
+
+Provide:
+
+• Average
+• Median
+• Fastest
+• Slowest
+
+Question:
+
+Are profitable trades reaching their maximum potential before 6 hours or after 6 hours?
+
+SECTION 4 — EXIT REASON ANALYSIS
+
+Classify every completed trade by exit reason.
+
+Examples:
+
+• Take Profit
+• Trailing Stop
+• Max Hold
+• Signal Reversal
+• Stop Loss
+• Emergency Exit
+• Manual Exit
+
+Provide:
+
+• Count
+• Percentage
+
+Question:
+
+What is the true dominant exit mechanism?
+
+SECTION 5 — MAX HOLD ANALYSIS
+
+Determine:
+
+If Max Hold were changed from:
+
+6 Hours → 3 Hours
+6 Hours → 1 Hour
+6 Hours → 30 Minutes
+
+What would historical profitability have been?
+
+Provide simulated results.
+
+DO NOT DEPLOY.
+
+Report only.
+
+SECTION 6 — SIGNAL QUALITY ANALYSIS
+
+Investigate whether current signal filters are suppressing profit opportunities.
+
+Review:
+
+• MTF confirmation requirements
+• Confidence thresholds
+• Volatility filters
+• Trend filters
+• Risk filters
+
+Determine whether the system is primarily selecting:
+
+A. High-probability / low-volatility trades
+
+or
+
+B. High-momentum / high-profit trades
+
+Provide evidence.
+
+SECTION 7 — EXPECTANCY ANALYSIS
+
+Calculate:
+
+• Win rate
+• Loss rate
+• Average winner
+• Average loser
+• Profit factor
+• Expected value per trade
+
+Determine whether current profitability is constrained by:
+
+1. Trade frequency
+2. Profit capture
+3. Signal quality
+4. Position sizing
+5. Exit architecture
+
+FINAL DELIVERABLE
+
+Provide:
+
+EXECUTIVE SUMMARY
+
+ROOT CAUSE ANALYSIS
+
+TOP 5 PROFITABILITY BOTTLENECKS
+
+RANKED RECOMMENDATIONS
+
+For each recommendation provide:
+
+• Expected impact
+• Risk level
+• Estimated profitability improvement
+
+IMPORTANT
+
+Do not modify production settings.
+
+Do not deploy any changes.
+
+Do not alter TP, Trailing, Max Hold, Confidence Thresholds, MTF Filters, or Risk Controls.
+
+Research first.
+
+Report findings.
+
+Then provide a separate implementation plan that can be reviewed and approved before deployment.
+
+Once the report is complete, we will review the findings, update Jarvis Executive Memory, and determine whether profitability optimization should focus on:
+
+• Max Hold reduction
+• TP redesign
+• Trailing redesign
+• Signal quality improvements
+• Trade frequency expansion
+• Position sizing optimization
+
+End Report Request.
