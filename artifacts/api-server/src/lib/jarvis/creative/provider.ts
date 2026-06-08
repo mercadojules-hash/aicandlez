@@ -26,6 +26,7 @@ import {
   type ProviderCallInput,
   type ProviderCallResult,
 } from "../cognition/provider.js";
+import { videoRendererAvailable } from "./phoenixRender.js";
 
 export type CreativeMediaKind = "text" | "image" | "video";
 
@@ -58,8 +59,10 @@ export const MEDIA_PROVIDER_STATUS: Record<
   },
   video: {
     kind: "video",
-    available: false,
-    note: "Phoenix (Phase 3) — programmatic video, not yet built",
+    available: videoRendererAvailable(),
+    note: videoRendererAvailable()
+      ? "Phoenix (Phase 3) — programmatic video via local ffmpeg renderer"
+      : "Phoenix (Phase 3) — no video renderer (ffmpeg) on host; degrades to storyboard + scene breakdown",
   },
 };
 

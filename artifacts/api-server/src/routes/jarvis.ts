@@ -112,6 +112,7 @@ import { loadBrandProfile } from "../lib/jarvis/creative/brandContext.js";
 import { seedCreativeDivision } from "../lib/jarvis/creative/seed.js";
 import { MEDIA_PROVIDER_STATUS } from "../lib/jarvis/creative/provider.js";
 import { generateVisionConcepts } from "../lib/jarvis/creative/vision.js";
+import { generatePhoenixVideo } from "../lib/jarvis/creative/phoenix.js";
 import {
   ObjectStorageService,
   ObjectNotFoundError,
@@ -4722,6 +4723,90 @@ router.post(
     } catch (err) {
       req.log.error({ err }, "POST /jarvis/creative/vision/concepts failed");
       res.status(500).json({ error: "jarvis_creative_vision_failed" });
+    }
+  },
+);
+
+// Phoenix — storyboard + scene breakdown + draft marketing videos (Phase 3,
+// Tier-1). Advisory: drafts a campaign package of grounded storyboard + scene
+// breakdown (the scene breakdown is a portable render manifest) + best-effort
+// MP4 renditions rendered programmatically via local ffmpeg (binaries in object
+// storage); never publishes, never auto-posts. Admin-gated + audited. A missing
+// renderer degrades only the videos — the grounded text artifacts still persist.
+const generatePhoenixSchema = z.object({
+  businessId: z.string().uuid(),
+  query: z.string().trim().min(1).max(2000),
+  objective: z.string().trim().max(2000).optional().nullable(),
+  audience: z.string().trim().max(2000).optional().nullable(),
+  durationSec: z.number().int().min(5).max(120).optional().nullable(),
+  formats: z.array(z.enum(["16:9", "9:16", "1:1"])).max(3).optional().nullable(),
+  instructions: z.string().trim().max(4000).optional().nullable(),
+  campaignId: z.string().uuid().optional().nullable(),
+  executiveUserId: z.string().uuid().optional().nullable(),
+});
+
+router.post(
+  "/jarvis/creative/phoenix/storyboard",
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = generatePhoenixSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_phoenix_request" });
+      return;
+    }
+    if (!(await isCognitionEnabled())) {
+      res.status(409).json({ error: "cognition_disabled" });
+      return;
+    }
+    if (!(await businessExists(parsed.data.businessId))) {
+      res.status(400).json({ error: "unknown_business" });
+      return;
+    }
+    try {
+      const result = await generatePhoenixVideo({
+        businessId: parsed.data.businessId,
+        query: parsed.data.query,
+        objective: parsed.data.objective ?? null,
+        audience: parsed.data.audience ?? null,
+        durationSec: parsed.data.durationSec ?? null,
+        formats: parsed.data.formats ?? null,
+        instructions: parsed.data.instructions ?? null,
+        campaignId: parsed.data.campaignId ?? null,
+        createdBy: actor.email ?? actor.userId,
+        executiveUserId: parsed.data.executiveUserId ?? null,
+      });
+      if (result.ok && result.campaign) {
+        await audit(req, actor, "create", "creative_campaign", result.campaign.id, {
+          agent: "phoenix",
+          name: result.campaign.name,
+          sourceMode: "cognition",
+          runId: result.runId,
+          groundingScore: result.groundingScore,
+          assets: result.assets.length,
+          sceneCount: result.sceneCount,
+          videosRendered: result.videosRendered,
+          videosFailed: result.videosFailed,
+        });
+      }
+      res.status(result.ok ? 201 : 200).json({
+        ok: result.ok,
+        status: result.status,
+        campaign: result.campaign,
+        assets: result.assets,
+        runId: result.runId,
+        groundingScore: result.groundingScore,
+        citations: result.citations,
+        sceneCount: result.sceneCount,
+        videosRendered: result.videosRendered,
+        videosFailed: result.videosFailed,
+        formats: result.formats,
+        rendererAvailable: result.rendererAvailable,
+        reason: result.reason,
+      });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/creative/phoenix/storyboard failed");
+      res.status(500).json({ error: "jarvis_creative_phoenix_failed" });
     }
   },
 );

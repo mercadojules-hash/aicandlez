@@ -28,6 +28,8 @@ export type CreativeAssetKind =
   | "funnel_plan"
   | "launch_plan"
   | "image"
+  | "storyboard"
+  | "scene_breakdown"
   | "video";
 
 /** A single dated entry in the content calendar. */
@@ -146,6 +148,75 @@ export interface GenerateVisionInput {
   audience?: string | null;
   /** How many concepts to draft (clamped server-side). */
   conceptCount?: number | null;
+  instructions?: string | null;
+  /** Attach to an existing campaign instead of creating a package. */
+  campaignId?: string | null;
+  createdBy?: string | null;
+  executiveUserId?: string | null;
+}
+
+/* ---------------------------------------------------------------------------
+ * Phoenix (Phase 3) — programmatic video creative agent.
+ *
+ * Phoenix drafts a STORYBOARD + SCENE BREAKDOWN (grounded text) and renders
+ * best-effort MP4 renditions PROGRAMMATICALLY (local ffmpeg) — no AI video clip
+ * provider, no ElevenLabs, no new secrets. The scene breakdown doubles as a
+ * portable, re-renderable RENDER MANIFEST: a Vault-safe SoT that can be rendered
+ * anywhere ffmpeg exists, so the durable intelligence never depends on a binary.
+ * ------------------------------------------------------------------------- */
+
+/** Output renditions Phoenix can render. 16:9 = marketing video, 9:16 = reel. */
+export type PhoenixVideoFormat = "16:9" | "9:16" | "1:1";
+
+/**
+ * A single storyboard scene — the atomic render unit. Colors are validated hex
+ * (honoring the brand palette); `voiceover` is a NARRATION SCRIPT only (Tier-1
+ * never synthesizes audio — no ElevenLabs). `motion` is an advisory hint.
+ */
+export interface PhoenixScene {
+  index: number;
+  /** Seconds on screen (clamped 1–10 at render). */
+  durationSec: number;
+  /** Background fill, 6-digit hex (no leading #). */
+  bgColor: string;
+  /** Text color, 6-digit hex (no leading #). */
+  textColor: string;
+  title: string;
+  caption: string;
+  /** Narration script (advisory text; NOT synthesized in Tier-1). */
+  voiceover?: string;
+  /** Advisory motion hint (e.g. "fade", "slide", "zoom"). */
+  motion?: string;
+}
+
+/**
+ * Parsed + normalized Phoenix storyboard (a draft creative package). This object
+ * IS the render manifest — serialized into the scene_breakdown asset so the video
+ * is re-renderable from Postgres metadata alone (Vault portability).
+ */
+export interface PhoenixStoryboard {
+  packageName: string;
+  objective: string;
+  audience: string;
+  /** One-line creative concept. */
+  logline: string;
+  /** Target total length in seconds (clamped). */
+  durationSec: number;
+  scenes: PhoenixScene[];
+  citations: RetrievedRef[];
+}
+
+/** Input to Phoenix storyboard + video synthesis. */
+export interface GeneratePhoenixInput {
+  businessId: string;
+  /** Free-text brief — e.g. "30-second promotional video". */
+  query: string;
+  objective?: string | null;
+  audience?: string | null;
+  /** Target length in seconds (clamped server-side). */
+  durationSec?: number | null;
+  /** Which renditions to render; default ["16:9", "9:16"]. */
+  formats?: PhoenixVideoFormat[] | null;
   instructions?: string | null;
   /** Attach to an existing campaign instead of creating a package. */
   campaignId?: string | null;
