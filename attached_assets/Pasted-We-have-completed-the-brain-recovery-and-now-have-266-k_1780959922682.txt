@@ -1,0 +1,125 @@
+We have completed the brain recovery and now have:
+
+266 knowledge assets imported
+266 memories imported
+Executive Query routing fixes
+ElevenLabs Creator subscription active
+ElevenLabs API key ready to provide
+Jarvis Desktop running locally
+
+Before the next ZIP export, I want one final major build focused on user experience and voice.
+
+Priority 1 — ElevenLabs Integration
+
+I have an ElevenLabs Creator account and API key ready.
+
+Please implement:
+
+ELEVENLABS_API_KEY secret support
+ELEVENLABS_VOICE_ID setting
+Voice Settings page
+Voice Test page
+
+Voice Pipeline:
+
+Microphone
+→ Speech-to-Text
+→ Executive Query
+→ Jarvis Reasoning
+→ ElevenLabs TTS
+
+Support:
+
+Push-to-Talk
+Hands-Free Mode
+Streaming Responses
+Interrupt While Speaking
+Wake Phrase ("Jarvis")
+
+Do not require additional setup beyond API key and Voice ID.
+
+Priority 2 — Visual Redesign
+
+Current UI is functional but still looks like an administrative dashboard.
+
+Redesign Jarvis to feel like an executive AI operating system.
+
+Voice Page
+
+Replace current Voice page with:
+
+Animated Jarvis Orb
+Listening Animation
+Speaking Animation
+Audio Waveform
+Transcript Window
+Session Timeline
+Command Center
+
+Create a true Executive Dashboard showing:
+
+Knowledge Assets
+Memories
+Agents
+Businesses
+Projects
+System Status
+
+Use cards, metrics, and visual components instead of tables whenever possible.
+
+Knowledge Graph
+
+This should become one of the flagship screens.
+
+Display:
+
+AICandlez
+↕
+Trading Agent
+↕
+Sprint Files
+↕
+Executive Memory
+
+as an interactive visual graph rather than rows.
+
+Agents
+
+Represent agents as active nodes with status indicators:
+
+Jarvis Core
+Trading Agent
+Research Agent
+Operations Agent
+SEO Agent
+Mobile Agent
+Business Agent
+Development Agent
+
+Display relationships visually.
+
+Priority 3 — Validation
+
+Before packaging:
+
+Verify:
+
+Voice pipeline functions
+Executive Query retrieves imported knowledge
+Agent Registry displays populated agents
+Business Registry displays populated businesses
+Project Registry displays populated projects
+Knowledge Graph loads correctly
+Deliverable
+
+Provide:
+
+New ZIP package
+Short implementation report
+Exact ElevenLabs secrets required:
+ELEVENLABS_API_KEY
+ELEVENLABS_VOICE_ID
+
+Do not spend time generating additional reports unless needed for validation.
+
+Focus development effort on voice integration and visual transformation.
