@@ -111,6 +111,11 @@ import { publishCreativeAsset } from "../lib/jarvis/creative/publishGate.js";
 import { loadBrandProfile } from "../lib/jarvis/creative/brandContext.js";
 import { seedCreativeDivision } from "../lib/jarvis/creative/seed.js";
 import { MEDIA_PROVIDER_STATUS } from "../lib/jarvis/creative/provider.js";
+import { generateVisionConcepts } from "../lib/jarvis/creative/vision.js";
+import {
+  ObjectStorageService,
+  ObjectNotFoundError,
+} from "../lib/objectStorage.js";
 import {
   checkCognitionBudget,
   runIndexerPass,
@@ -4642,6 +4647,85 @@ router.post(
   },
 );
 
+// Vision — branded ad concepts + draft marketing images (Phase 2). Advisory:
+// drafts a campaign package of grounded concept copy + draft images (binaries in
+// object storage); never publishes, never auto-posts. Admin-gated + audited.
+const generateVisionSchema = z.object({
+  businessId: z.string().uuid(),
+  query: z.string().trim().min(1).max(2000),
+  objective: z.string().trim().max(2000).optional().nullable(),
+  channel: z.string().trim().max(64).optional().nullable(),
+  audience: z.string().trim().max(2000).optional().nullable(),
+  conceptCount: z.number().int().min(1).max(8).optional().nullable(),
+  instructions: z.string().trim().max(4000).optional().nullable(),
+  campaignId: z.string().uuid().optional().nullable(),
+  executiveUserId: z.string().uuid().optional().nullable(),
+});
+
+router.post(
+  "/jarvis/creative/vision/concepts",
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = generateVisionSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_vision_request" });
+      return;
+    }
+    if (!(await isCognitionEnabled())) {
+      res.status(409).json({ error: "cognition_disabled" });
+      return;
+    }
+    if (!(await businessExists(parsed.data.businessId))) {
+      res.status(400).json({ error: "unknown_business" });
+      return;
+    }
+    try {
+      const result = await generateVisionConcepts({
+        businessId: parsed.data.businessId,
+        query: parsed.data.query,
+        objective: parsed.data.objective ?? null,
+        channel: parsed.data.channel ?? null,
+        audience: parsed.data.audience ?? null,
+        conceptCount: parsed.data.conceptCount ?? null,
+        instructions: parsed.data.instructions ?? null,
+        campaignId: parsed.data.campaignId ?? null,
+        createdBy: actor.email ?? actor.userId,
+        executiveUserId: parsed.data.executiveUserId ?? null,
+      });
+      if (result.ok && result.campaign) {
+        await audit(req, actor, "create", "creative_campaign", result.campaign.id, {
+          agent: "vision",
+          name: result.campaign.name,
+          sourceMode: "cognition",
+          runId: result.runId,
+          groundingScore: result.groundingScore,
+          assets: result.assets.length,
+          imagesGenerated: result.imagesGenerated,
+          imagesFailed: result.imagesFailed,
+        });
+      }
+      res.status(result.ok ? 201 : 200).json({
+        ok: result.ok,
+        status: result.status,
+        campaign: result.campaign,
+        assets: result.assets,
+        runId: result.runId,
+        groundingScore: result.groundingScore,
+        citations: result.citations,
+        conceptCount: result.conceptCount,
+        imagesGenerated: result.imagesGenerated,
+        imagesFailed: result.imagesFailed,
+        imageProviderAvailable: result.imageProviderAvailable,
+        reason: result.reason,
+      });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/creative/vision/concepts failed");
+      res.status(500).json({ error: "jarvis_creative_vision_failed" });
+    }
+  },
+);
+
 router.get(
   "/jarvis/creative/campaigns",
   requireRole(["admin", "super-admin"]),
@@ -4738,6 +4822,66 @@ router.post(
     } catch (err) {
       req.log.error({ err }, "POST /jarvis/creative/assets/:id/publish failed");
       res.status(500).json({ error: "jarvis_creative_asset_publish_failed" });
+    }
+  },
+);
+
+// Stream a creative asset's binary (image) from object storage. Admin-gated +
+// audited. The DB only holds the storageKey; bytes live in object storage.
+router.get(
+  "/jarvis/creative/assets/:id/binary",
+  requireRole(["admin", "super-admin"]),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    try {
+      const [asset] = await db
+        .select()
+        .from(jarvisCreativeAssetsTable)
+        .where(eq(jarvisCreativeAssetsTable.id, String(req.params.id)))
+        .limit(1);
+      if (!asset || !asset.storageKey) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      const svc = new ObjectStorageService();
+      let file;
+      try {
+        file = await svc.getObjectEntityFile(asset.storageKey);
+      } catch (err) {
+        if (err instanceof ObjectNotFoundError) {
+          res.status(404).json({ error: "binary_not_found" });
+          return;
+        }
+        throw err;
+      }
+      await audit(req, actor, "creative.asset.binary.read", "creative_asset", asset.id, {
+        storageKey: asset.storageKey,
+        mimeType: asset.mimeType,
+      });
+      const [metadata] = await file.getMetadata();
+      res.setHeader(
+        "Content-Type",
+        (metadata.contentType as string) ||
+          asset.mimeType ||
+          "application/octet-stream",
+      );
+      if (metadata.size) {
+        res.setHeader("Content-Length", String(metadata.size));
+      }
+      res.setHeader("Cache-Control", "private, max-age=3600");
+      file
+        .createReadStream()
+        .on("error", (err: unknown) => {
+          req.log.error({ err }, "creative asset binary stream failed");
+          if (!res.headersSent) res.status(500).end();
+          else res.end();
+        })
+        .pipe(res);
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/creative/assets/:id/binary failed");
+      if (!res.headersSent) {
+        res.status(500).json({ error: "jarvis_creative_asset_binary_failed" });
+      }
     }
   },
 );

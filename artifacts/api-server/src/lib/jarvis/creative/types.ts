@@ -106,6 +106,53 @@ export interface CampaignProposal {
   citations: RetrievedRef[];
 }
 
+/** Aspect ratios Vision can request for a generated image. */
+export type VisionImageAspect = "1:1" | "4:3" | "16:9" | "3:4" | "9:16";
+
+/**
+ * A single Vision creative concept: the advisory ad concept (copy + direction)
+ * PLUS the image-generation brief (prompt/negativePrompt/aspect) used to draft a
+ * marketing image for it. Copy may be original; business facts stay grounded.
+ */
+export interface VisionConcept {
+  title: string;
+  channel: string;
+  angle: string;
+  headline: string;
+  primaryText: string;
+  cta: string;
+  visualDirection: string;
+  imagePrompt: string;
+  negativePrompt?: string;
+  aspect?: VisionImageAspect;
+}
+
+/** Parsed + normalized Vision proposal (a draft creative package). */
+export interface VisionProposal {
+  packageName: string;
+  objective: string;
+  audience: string;
+  concepts: VisionConcept[];
+  citations: RetrievedRef[];
+}
+
+/** Input to Vision concept generation. */
+export interface GenerateVisionInput {
+  businessId: string;
+  /** Free-text brief — e.g. "5 Facebook ad concepts". */
+  query: string;
+  channel?: string | null;
+  objective?: string | null;
+  audience?: string | null;
+  /** How many concepts to draft (clamped server-side). */
+  conceptCount?: number | null;
+  instructions?: string | null;
+  /** Attach to an existing campaign instead of creating a package. */
+  campaignId?: string | null;
+  createdBy?: string | null;
+  executiveUserId?: string | null;
+}
+
 /** Terminal status of a creative synthesis run (mirrors CognitionStatus). */
 export type CreativeStatus =
   | "ok"

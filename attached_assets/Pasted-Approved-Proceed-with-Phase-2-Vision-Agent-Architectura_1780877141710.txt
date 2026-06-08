@@ -1,0 +1,110 @@
+Approved.
+
+Proceed with Phase 2 — Vision Agent.
+
+Architectural direction:
+
+Vision is the first media-generation component of the Creative Intelligence Division.
+
+Goal:
+
+Allow Jarvis to create branded visual assets for:
+
+* AICandlez
+* MixtapePSD
+* Natura AI
+* Natura Yoga
+* Future businesses
+
+Vision must integrate with:
+
+* Executive Memory
+* Business Registry
+* Brand Profiles
+* Creative Campaigns
+* Creative Assets
+* Governance
+* Approval Workflow
+
+Requirements:
+
+1. Image Generation
+
+* Social media graphics
+* Ad creatives
+* Promotional graphics
+* Branding assets
+* Thumbnails
+* Marketing images
+
+2. Brand Grounding
+   Every image must be generated using:
+
+* Business-specific brand profile
+* Existing campaign context
+* Executive Memory context
+* Creative brief context
+
+3. Governance
+
+* Draft only
+* Human approval required
+* No publication authority
+* No automatic posting
+* Audit all actions
+* Preserve existing governance controls
+
+4. Storage
+
+* Store binaries in object storage
+* Store metadata in jarvis_creative_assets
+* Preserve Vault portability
+* Maintain storageKey pattern
+* Never store image binaries in Postgres
+
+5. Sovereignty
+
+* Follow existing provider abstraction pattern
+* Direct provider first
+* Replit fallback only if necessary
+* No new dependencies on trading systems
+* No coupling to execution modules
+
+6. Deliverables
+
+After Vision is operational, I want Jarvis to answer:
+
+"Vision, create 5 Facebook ad concepts for AICandlez."
+
+and generate:
+
+* Creative concepts
+* Marketing images
+* Variations
+* Branding-compliant assets
+* Draft creative packages ready for approval
+
+Additionally:
+
+Begin planning the Jarvis Vault architecture in parallel (design only, no implementation yet).
+
+The Vault planning document should include:
+
+* Export strategy
+* Import strategy
+* Embedding migration strategy
+* Creative asset migration strategy
+* External drive folder structure
+* Object storage migration strategy
+* Business portability requirements
+
+Do not implement Vault migration yet.
+
+Deliver:
+
+1. Vision readiness assessment
+2. Vision implementation summary
+3. Updated Jarvis readiness assessment
+4. Jarvis Vault architecture plan
+
+Maintain all sovereignty, governance, audit, approval, and safety controls.
