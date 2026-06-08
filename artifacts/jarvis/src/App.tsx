@@ -49,6 +49,8 @@ import Policies from "@/pages/Policies";
 import Budgets from "@/pages/Budgets";
 import AgentTrust from "@/pages/AgentTrust";
 import Voice from "@/pages/Voice";
+import VoiceSettings from "@/pages/VoiceSettings";
+import VoiceTest from "@/pages/VoiceTest";
 import JarvisCore from "@/pages/JarvisCore";
 import ExecutiveBriefing from "@/pages/ExecutiveBriefing";
 import ExecutiveQuery from "@/pages/ExecutiveQuery";
@@ -305,6 +307,16 @@ function AppRoutes() {
       <Route path="/voice">
         <Protected>
           <Voice />
+        </Protected>
+      </Route>
+      <Route path="/voice-settings">
+        <Protected>
+          <VoiceSettings />
+        </Protected>
+      </Route>
+      <Route path="/voice-test">
+        <Protected>
+          <VoiceTest />
         </Protected>
       </Route>
       <Route path="/governance">

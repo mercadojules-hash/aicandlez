@@ -131,8 +131,15 @@ import { raw } from "express";
 import {
   getVoiceEnabled,
   setVoiceEnabled,
+  getVoiceId,
+  setVoiceId,
+  resolveVoiceId,
+  hasElevenLabsKey,
+  DEFAULT_TTS_VOICE_ID,
+  ELEVENLABS_API_BASE,
 } from "../lib/jarvis/cognition/voice/config.js";
 import { runVoiceTurn } from "../lib/jarvis/cognition/voice/orchestrator.js";
+import { synthesize } from "../lib/jarvis/cognition/voice/tts.js";
 import {
   startSession,
   getSession,
@@ -6805,7 +6812,19 @@ router.get(
 // turn route ingests a raw audio body; all others are JSON. Two-plane discipline
 // lives in the orchestrator — routes are thin and audited.
 
-const voiceSettingsSchema = z.object({ enabled: z.boolean() });
+const voiceSettingsSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    // Empty string clears the operator override (falls back to env/default).
+    voiceId: z.string().trim().max(128).optional(),
+  })
+  .refine((v) => v.enabled !== undefined || v.voiceId !== undefined, {
+    message: "no_fields",
+  });
+const voiceTestSchema = z.object({
+  text: z.string().trim().min(1).max(800).optional(),
+  voiceId: z.string().trim().max(128).optional(),
+});
 const voiceSessionStartSchema = z.object({
   businessId: z.string().uuid().optional().nullable(),
 });
@@ -6825,7 +6844,19 @@ router.get(
   requireRole(ADMIN_ROLES),
   async (req: Request, res: Response): Promise<void> => {
     try {
-      res.json({ enabled: await getVoiceEnabled() });
+      const [enabled, voiceId] = await Promise.all([
+        getVoiceEnabled(),
+        getVoiceId(),
+      ]);
+      res.json({
+        enabled,
+        voiceId,
+        // `true` only when the operator has set an explicit UI override; lets the
+        // page distinguish "using env/default" from "using my chosen voice".
+        voiceIdIsOverride: voiceId !== resolveVoiceId(),
+        defaultVoiceId: DEFAULT_TTS_VOICE_ID,
+        hasApiKey: hasElevenLabsKey(),
+      });
     } catch (err) {
       req.log.error({ err }, "GET /jarvis/voice/settings failed");
       res.status(500).json({ error: "jarvis_voice_settings_read_failed" });
@@ -6845,15 +6876,141 @@ router.post(
       return;
     }
     try {
-      await setVoiceEnabled(parsed.data.enabled, actor.userId);
-      await audit(req, actor, "update", "voice_settings", null, {
-        key: "cognition.voice.enabled",
-        enabled: parsed.data.enabled,
+      if (parsed.data.enabled !== undefined) {
+        await setVoiceEnabled(parsed.data.enabled, actor.userId);
+        await audit(req, actor, "update", "voice_settings", null, {
+          key: "cognition.voice.enabled",
+          enabled: parsed.data.enabled,
+        });
+      }
+      if (parsed.data.voiceId !== undefined) {
+        await setVoiceId(parsed.data.voiceId, actor.userId);
+        await audit(req, actor, "update", "voice_settings", null, {
+          key: "cognition.voice.voiceId",
+          voiceId: parsed.data.voiceId || null,
+        });
+      }
+      const [enabled, voiceId] = await Promise.all([
+        getVoiceEnabled(),
+        getVoiceId(),
+      ]);
+      res.json({
+        enabled,
+        voiceId,
+        voiceIdIsOverride: voiceId !== resolveVoiceId(),
+        defaultVoiceId: DEFAULT_TTS_VOICE_ID,
+        hasApiKey: hasElevenLabsKey(),
       });
-      res.json({ enabled: parsed.data.enabled });
     } catch (err) {
       req.log.error({ err }, "POST /jarvis/voice/settings failed");
       res.status(500).json({ error: "jarvis_voice_settings_write_failed" });
+    }
+  },
+);
+
+// Available premium voices — proxies the ElevenLabs voice library so the Voice
+// Settings / Voice Test pages can offer a picker. Fail-safe: no key or provider
+// error ⇒ `{ voices: [] }` (the page falls back to a manual voice-id input).
+router.get(
+  "/jarvis/voice/voices",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    if (!hasElevenLabsKey()) {
+      res.json({ voices: [], hasApiKey: false });
+      return;
+    }
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15_000);
+    try {
+      const r = await fetch(`${ELEVENLABS_API_BASE}/v1/voices`, {
+        headers: { "xi-api-key": process.env.ELEVENLABS_API_KEY as string },
+        signal: controller.signal,
+      });
+      if (!r.ok) {
+        res.json({ voices: [], hasApiKey: true });
+        return;
+      }
+      const data = (await r.json()) as {
+        voices?: Array<{
+          voice_id?: string;
+          name?: string;
+          category?: string;
+          labels?: Record<string, string>;
+          preview_url?: string;
+        }>;
+      };
+      const voices = (data.voices ?? [])
+        .filter((v) => typeof v.voice_id === "string")
+        .map((v) => ({
+          voiceId: v.voice_id as string,
+          name: v.name ?? "Unnamed",
+          category: v.category ?? null,
+          description: v.labels
+            ? Object.values(v.labels).filter(Boolean).join(", ")
+            : null,
+          previewUrl: v.preview_url ?? null,
+        }));
+      res.json({ voices, hasApiKey: true });
+    } catch (err) {
+      req.log.error({ err }, "GET /jarvis/voice/voices failed");
+      res.json({ voices: [], hasApiKey: true });
+    } finally {
+      clearTimeout(timeout);
+    }
+  },
+);
+
+// Voice Test — synthesize a sample line with a given (or current) voice and
+// return the audio so the operator can audition a voice before committing it.
+// Admin-gated; bypasses the enabled toggle (this is the tool used to decide
+// whether to enable). Fail-safe: a TTS miss returns ok:false + the reason.
+router.post(
+  "/jarvis/voice/test",
+  requireAuth,
+  requireRole(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    const actor = await resolveActor((req as AuthReq).clerkUserId);
+    const parsed = voiceTestSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_voice_test" });
+      return;
+    }
+    if (!hasElevenLabsKey()) {
+      res.json({
+        ok: false,
+        hasApiKey: false,
+        error: "ELEVENLABS_API_KEY missing",
+        audioBase64: null,
+        audioContentType: null,
+        voiceId: parsed.data.voiceId?.trim() || (await getVoiceId()),
+        latencyMs: 0,
+      });
+      return;
+    }
+    try {
+      const voiceId = parsed.data.voiceId?.trim() || (await getVoiceId());
+      const text =
+        parsed.data.text ||
+        "Good evening. Jarvis online and at your service — all executive systems are nominal.";
+      const tts = await synthesize(text, { voiceId });
+      await audit(req, actor, "voice_turn", "voice_test", null, {
+        voiceId,
+        ok: tts.ok,
+        chars: tts.chars,
+      });
+      res.json({
+        ok: tts.ok && !!tts.audio,
+        hasApiKey: true,
+        error: tts.error,
+        audioBase64: tts.audio ? tts.audio.toString("base64") : null,
+        audioContentType: tts.contentType,
+        voiceId: tts.voiceId,
+        latencyMs: tts.latencyMs,
+      });
+    } catch (err) {
+      req.log.error({ err }, "POST /jarvis/voice/test failed");
+      res.status(500).json({ error: "jarvis_voice_test_failed" });
     }
   },
 );

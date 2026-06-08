@@ -33,6 +33,8 @@ import {
   Radio,
   Command,
   Server,
+  Settings2,
+  FlaskConical,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEffect } from "react";
@@ -56,6 +58,8 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Sovereignty Layer", path: "/sovereignty", icon: ShieldCheck },
   { label: "Knowledge", path: "/knowledge", icon: BookOpen },
   { label: "Voice", path: "/voice", icon: Radio },
+  { label: "Voice Settings", path: "/voice-settings", icon: Settings2 },
+  { label: "Voice Test", path: "/voice-test", icon: FlaskConical },
   { label: "Settings", path: "/settings", icon: SettingsIcon },
 ];
 

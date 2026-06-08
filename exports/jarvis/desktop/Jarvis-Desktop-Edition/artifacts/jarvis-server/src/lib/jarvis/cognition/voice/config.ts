@@ -23,6 +23,8 @@ import { jarvisSettingsTable } from "@workspace/db";
 
 // ── jarvis_settings toggle (default OFF) ─────────────────────────────────────
 export const SETTING_VOICE_ENABLED = "cognition.voice.enabled";
+/** Operator-chosen ElevenLabs voice id (overrides the env var when set). */
+export const SETTING_VOICE_ID = "cognition.voice.voiceId";
 
 /** Is the voice interface enabled? (default false). Never throws. */
 export async function getVoiceEnabled(): Promise<boolean> {
@@ -98,6 +100,57 @@ export const TTS_VOICE_SETTINGS = {
 export function resolveVoiceId(): string {
   const v = process.env.ELEVENLABS_VOICE_ID;
   return v && v.trim().length > 0 ? v.trim() : DEFAULT_TTS_VOICE_ID;
+}
+
+/** Is a premium ElevenLabs key configured? (gates server STT + premium TTS). */
+export function hasElevenLabsKey(): boolean {
+  const k = process.env.ELEVENLABS_API_KEY;
+  return typeof k === "string" && k.trim().length > 0;
+}
+
+/**
+ * The active readback voice id. Precedence: operator UI setting
+ * (`cognition.voice.voiceId` in jarvis_settings) > `ELEVENLABS_VOICE_ID` env >
+ * `DEFAULT_TTS_VOICE_ID`. This lets the executive set a voice in the Voice
+ * Settings page with no redeploy, while the env var stays a valid fallback.
+ * Never throws — any DB error degrades to the env/default resolution.
+ */
+export async function getVoiceId(): Promise<string> {
+  try {
+    const [row] = await db
+      .select()
+      .from(jarvisSettingsTable)
+      .where(eq(jarvisSettingsTable.key, SETTING_VOICE_ID))
+      .limit(1);
+    const v = typeof row?.value === "string" ? row.value.trim() : "";
+    if (v) return v;
+  } catch {
+    /* fall through to env/default */
+  }
+  return resolveVoiceId();
+}
+
+/**
+ * Persist (or clear) the operator-chosen voice id. An empty/blank value clears
+ * the setting so resolution falls back to the env var / default.
+ */
+export async function setVoiceId(
+  voiceId: string,
+  updatedBy: string | null,
+): Promise<void> {
+  const value = typeof voiceId === "string" ? voiceId.trim() : "";
+  await db
+    .insert(jarvisSettingsTable)
+    .values({
+      key: SETTING_VOICE_ID,
+      value,
+      updatedBy,
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: jarvisSettingsTable.key,
+      set: { value, updatedBy, updatedAt: new Date() },
+    });
 }
 
 // ── Coarse cost estimators (budget ledger + audit ONLY — never billing truth) ─

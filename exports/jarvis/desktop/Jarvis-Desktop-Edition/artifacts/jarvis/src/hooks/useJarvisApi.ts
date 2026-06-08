@@ -238,6 +238,7 @@ export const jarvisKeys = {
   cognitionOverview: ["jarvis", "cognition-overview"] as const,
   semanticStatus: ["jarvis", "semantic-status"] as const,
   voiceSettings: ["jarvis", "voice-settings"] as const,
+  voiceVoices: ["jarvis", "voice-voices"] as const,
   voiceSessions: ["jarvis", "voice-sessions"] as const,
   voiceTurns: (id: string) => ["jarvis", "voice-turns", id] as const,
   aicandlezLive: ["jarvis", "aicandlez-live"] as const,
@@ -3145,24 +3146,77 @@ export interface JarvisVoiceTurnResult {
   latencyMs: number;
 }
 
-export function useVoiceSettings(): UseQueryResult<{ enabled: boolean }> {
+export interface JarvisVoiceSettings {
+  enabled: boolean;
+  voiceId: string;
+  voiceIdIsOverride: boolean;
+  defaultVoiceId: string;
+  hasApiKey: boolean;
+}
+
+export interface JarvisVoiceOption {
+  voiceId: string;
+  name: string;
+  category: string | null;
+  description: string | null;
+  previewUrl: string | null;
+}
+
+export interface JarvisVoiceTestResult {
+  ok: boolean;
+  hasApiKey: boolean;
+  error: string | null;
+  audioBase64: string | null;
+  audioContentType: string | null;
+  voiceId: string;
+  latencyMs: number;
+}
+
+export function useVoiceSettings(): UseQueryResult<JarvisVoiceSettings> {
   return useQuery({
     queryKey: jarvisKeys.voiceSettings,
-    queryFn: () => authFetchJson<{ enabled: boolean }>(`${API}/voice/settings`),
+    queryFn: () =>
+      authFetchJson<JarvisVoiceSettings>(`${API}/voice/settings`),
   });
 }
 
+// Accepts a partial patch: toggle `enabled`, set `voiceId` (empty string clears
+// the override → env/default), or both. Returns the full resolved settings.
 export function useSetVoiceSettings() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (enabled: boolean) =>
-      authFetchJson<{ enabled: boolean }>(`${API}/voice/settings`, {
+    mutationFn: (patch: { enabled?: boolean; voiceId?: string }) =>
+      authFetchJson<JarvisVoiceSettings>(`${API}/voice/settings`, {
         method: "POST",
-        body: JSON.stringify({ enabled }),
+        body: JSON.stringify(patch),
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: jarvisKeys.voiceSettings });
     },
+  });
+}
+
+// Premium voice library (ElevenLabs). Fail-safe: empty list when no key.
+export function useVoiceOptions(): UseQueryResult<JarvisVoiceOption[]> {
+  return useQuery({
+    queryKey: jarvisKeys.voiceVoices,
+    queryFn: async () => {
+      const data = await authFetchJson<{ voices: JarvisVoiceOption[] }>(
+        `${API}/voice/voices`,
+      );
+      return data.voices ?? [];
+    },
+  });
+}
+
+// Audition a voice — synthesizes a sample line and returns audio (base64).
+export function useVoiceTest() {
+  return useMutation({
+    mutationFn: (args: { text?: string; voiceId?: string }) =>
+      authFetchJson<JarvisVoiceTestResult>(`${API}/voice/test`, {
+        method: "POST",
+        body: JSON.stringify(args),
+      }),
   });
 }
 

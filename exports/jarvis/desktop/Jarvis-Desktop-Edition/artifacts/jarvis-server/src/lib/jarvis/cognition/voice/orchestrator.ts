@@ -19,6 +19,7 @@ import {
   estimateSttCostMicros,
   estimateTtsCostMicros,
   getVoiceEnabled,
+  getVoiceId,
 } from "./config.js";
 import { transcribe } from "./stt.js";
 import { synthesize } from "./tts.js";
@@ -167,7 +168,10 @@ export async function runVoiceTurn(
   }
 
   // ── TTS (pure I/O; fail-open to text-only) ──────────────────────────────────
-  const tts = await synthesize(replyText);
+  // Resolve the readback voice from the operator UI setting (DB) → env → default
+  // on every turn so a Voice Settings change applies with no restart.
+  const voiceId = await getVoiceId();
+  const tts = await synthesize(replyText, { voiceId });
   const ttsOk = tts.ok && !!tts.audio;
   if (ttsOk) costMicros += estimateTtsCostMicros(tts.chars);
 
