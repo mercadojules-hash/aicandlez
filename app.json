@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "741cc1d7-059a-4ed4-9b34-975231d0b775"
+      }
+    },
+    "ios": {
+      "bundleIdentifier": "com.mercadojules.workspace",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    }
+  }
+}
