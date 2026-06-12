@@ -64,6 +64,17 @@ services:
       # without a code change; admin PUT /api/settings can still override live.
       - key: MAX_ACTIVE_POSITIONS
         value: "12"
+      # Production test config: lower the live execution signal floor without
+      # relying on the global settings.min_confidence row, which the current live
+      # loop ignores in favor of EXPERIMENT_CONF_FLOOR.
+      - key: EXPERIMENT_CONF_FLOOR
+        value: "55"
+      # Production test config: env defaults used by exitConfig.ts only when a
+      # per-account/per-exchange row leaves the field unset.
+      - key: LIVE_POSITION_MAX_HOLD_MS
+        value: "10800000"
+      - key: LIVE_TRAILING_STOP_PERCENT
+        value: "5"
       - key: KRAKEN_API_KEY
         sync: false
       - key: KRAKEN_API_SECRET
