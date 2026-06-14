@@ -47,6 +47,30 @@ export interface StrategyV2GateDecision {
   reason: StrategyV2BlockReason | null;
 }
 
+export interface StrategyV2Diagnostics {
+  executions: number;
+  blocks: {
+    sell: number;
+    symbol: number;
+    rsi: number;
+    ema: number;
+    trend: number;
+    momentum: number;
+  };
+}
+
+const diagnostics: StrategyV2Diagnostics = {
+  executions: 0,
+  blocks: {
+    sell: 0,
+    symbol: 0,
+    rsi: 0,
+    ema: 0,
+    trend: 0,
+    momentum: 0,
+  },
+};
+
 export function isStrategyV2Enabled(): boolean {
   return process.env.STRATEGY_V2_ENABLED === "true";
 }
@@ -67,6 +91,8 @@ export function parseStrategyV2SymbolBlocklist(raw: string): Set<string> {
 }
 
 export function evaluateStrategyV2Gate(input: StrategyV2GateInput): StrategyV2GateDecision {
+  diagnostics.executions++;
+
   if (!input.enabled || input.effectiveAction === "HOLD") {
     return allow();
   }
@@ -99,11 +125,38 @@ export function evaluateStrategyV2Gate(input: StrategyV2GateInput): StrategyV2Ga
   return allow();
 }
 
+export function getStrategyV2Diagnostics(): StrategyV2Diagnostics {
+  return {
+    executions: diagnostics.executions,
+    blocks: { ...diagnostics.blocks },
+  };
+}
+
 function allow(): StrategyV2GateDecision {
   return { allowed: true, reason: null };
 }
 
 function block(reason: StrategyV2BlockReason): StrategyV2GateDecision {
+  switch (reason) {
+    case "strategy_v2_shorts_disabled":
+      diagnostics.blocks.sell++;
+      break;
+    case "strategy_v2_symbol_blocked":
+      diagnostics.blocks.symbol++;
+      break;
+    case "strategy_v2_rsi_out_of_range":
+      diagnostics.blocks.rsi++;
+      break;
+    case "strategy_v2_ema_not_aligned":
+      diagnostics.blocks.ema++;
+      break;
+    case "strategy_v2_not_bullish":
+      diagnostics.blocks.trend++;
+      break;
+    case "strategy_v2_momentum_not_positive":
+      diagnostics.blocks.momentum++;
+      break;
+  }
   return { allowed: false, reason };
 }
 
