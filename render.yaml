@@ -64,6 +64,11 @@ services:
       # without a code change; admin PUT /api/settings can still override live.
       - key: MAX_ACTIVE_POSITIONS
         value: "12"
+      # Entry-only diversification cap. Keeps one symbol from consuming the
+      # whole global book, but allows a second same-symbol add when V2 and all
+      # downstream gates pass.
+      - key: MAX_POSITIONS_PER_SYMBOL
+        value: "2"
       # Production test config: lower the live execution signal floor without
       # relying on the global settings.min_confidence row, which the current live
       # loop ignores in favor of EXPERIMENT_CONF_FLOOR.
