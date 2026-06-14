@@ -19,14 +19,9 @@ import { eq, and, inArray } from "drizzle-orm";
  *      unset. Per-account / per-exchange edits MUST win over it, otherwise the
  *      per-account controls would be silently ineffective in any environment
  *      where the operator env knob is set. (SL/TP have no env knob.)
- *   4. Hardcoded default — SL 2 %, TP 10 %, trailing 5 %, max-hold 6h.
- *      Evolution: P4 set a fixed 1.5 % default trailing; a counterfactual
- *      widened it to 2 %; an approved joint TP+trailing change then moved TP
- *      4 → 10 % and trailing 2 → 5 % together (the 2 % trailing was the binding
- *      constraint clipping winners before a higher TP could be reached). SL is
- *      unchanged; max-hold was later lowered 24h → 6h universally (applies to
- *      all users without an explicit override). An account that never touches
- *      the controls now takes profit at 10 % and trails at 5 %.
+ *   4. Hardcoded default — SL 2 %, TP 4.5 %, trailing 1.75 %, max-hold 6h.
+ *      These Strategy V2 fallback defaults apply only when no account,
+ *      exchange, or env default is configured. Explicit user settings still win.
  *
  * `trailingStopPercent === null` is still honored by the live monitor (mirror
  * each position's own stored stop-loss band) if a row explicitly carries it, but
@@ -37,15 +32,11 @@ import { eq, and, inArray } from "drizzle-orm";
 
 export const EXIT_DEFAULTS = {
   stopLossPercent:     2,
-  // Approved production change: TP widened 4 % → 10 % and trailing 2 % → 5 %
-  // together. A joint TP+trailing grid on a full live-trade day showed the 2 %
-  // trailing (not the TP ceiling) was the binding constraint — it clipped
-  // winners before they could reach a higher TP. Widening TP alone loses; TP
-  // and trailing must move together. SL stays 2 %. (Max-hold was later lowered
-  // 24h → 6h universally — see maxHoldHours below.) To revert TP/trailing,
-  // restore takeProfitPercent: 4 / trailingStopPercent: 2.
-  takeProfitPercent:   10,
-  trailingStopPercent: 5,
+  // Strategy V2 fallback only. Per-account / per-exchange settings and env
+  // defaults still take precedence, so this does not override user-specific DB
+  // settings.
+  takeProfitPercent:   4.5,
+  trailingStopPercent: 1.75,
   // Universal max-hold: 24h → 6h → 1h → restored to 6h (approved, applies to ALL
   // users). A production exit audit of live Coinbase trades showed the 1h ceiling
   // was the dominant exit (~55% MAX_HOLD) and was force-closing positions long

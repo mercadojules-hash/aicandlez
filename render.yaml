@@ -101,6 +101,16 @@ services:
       # ARM + disclaimer) can place real-money orders. Controlled-beta enablement.
       - key: CUSTOMER_LIVE_EXECUTION_ENABLED
         value: "true"
+      # Strategy V2 entry gate: blocks new live entries only. Exits, manual
+      # closes, stops, take-profits, trailing stops, max-hold, and reconciliation
+      # remain unaffected.
+      - key: STRATEGY_V2_ENABLED
+        value: "true"
+      - key: STRATEGY_V2_SYMBOL_BLOCKLIST
+        value: LINKUSD,AAVEUSD,AVAXUSD,UNIUSD,ADAUSD,ETCUSD
+      # Risk Governor stays disabled during Strategy V2 validation.
+      - key: RISK_GOVERNOR_ENABLED
+        value: "false"
       # Exit-engine v2: persist automated closes to the `trades` table, rehydrate
       # open positions on boot, persisted-row cap gate, position<->trade id linkage.
       # Required for live trade accounting + close-lifecycle validation.

@@ -40,6 +40,7 @@ import { auditLogger } from "../services/telemetry/AuditLogger.js";
 import { executionStreamBus, getSafeTestMode } from "./executionStreamBus.js";
 import { recordSignalTrace, classifyDownstream, type SignalTrace } from "./signalFunnel.js";
 import { resolveExitConfig, buildExitConfigResolver } from "./exitConfig.js";
+import { evaluateStrategyV2Gate, isStrategyV2Enabled } from "./strategyV2Gate.js";
 import { updateExcursion, pruneExcursions } from "./excursionTracker.js";
 import { logger } from "./logger.js";
 
@@ -3664,12 +3665,23 @@ async function tick() {
       // and the operator auto-mode / kill-switch. Hard stops (positions cap,
       // risk engine, correlation, exchange validation) still live in autoExecute.
       const effectiveAction: "BUY" | "SELL" | "HOLD" = testAction;
+      const strategyV2Gate = evaluateStrategyV2Gate({
+        enabled: isStrategyV2Enabled(),
+        symbol,
+        effectiveAction,
+        fast: mtf.fast,
+        slow: mtf.slow,
+        fastSnap: mtf.fastSnap,
+        slowSnap: mtf.slowSnap,
+      });
+      const strategyV2GatePass = strategyV2Gate.allowed;
 
       const shouldTrade =
         settings.autoMode &&
         !settings.killSwitch &&
         executionEligible &&
         effectiveAction !== "HOLD" &&
+        strategyV2GatePass &&
         volumeGatePass &&
         trend1HGatePass;
 
@@ -3683,6 +3695,8 @@ async function tick() {
         signalBlockReason = `Low confidence (${mtf.avgConfidence.toFixed(1)}% < ${confThresh}%)`;
       } else if (!sidewaysGatePass) {
         signalBlockReason = "Sideways/range-bound market";
+      } else if (!strategyV2GatePass) {
+        signalBlockReason = strategyV2Gate.reason;
       } else if (!volumeGatePass) {
         signalBlockReason = "Volume below average (low-volume filter)";
       } else if (!trend1HGatePass) {
@@ -3712,6 +3726,8 @@ async function tick() {
       if (!shouldTrade && signalBlockReason && effectiveAction !== "HOLD") {
         const isConfBlock =
           signalBlockReason.startsWith("Low confidence");
+        const isStrategyV2Block =
+          signalBlockReason.startsWith("strategy_v2_");
         // TEMP [VOL_GATE_TEST] — attribute each rejected actionable signal to
         // its first failing gate (confidence vs volume). Remove with the rest
         // of the volGateTest block when the controlled test window closes.
@@ -3720,13 +3736,19 @@ async function tick() {
         } else if (signalBlockReason === "Volume below average (low-volume filter)") {
           engineStats.volGateTest.rejectedByVolume++;
         }
+        if (isStrategyV2Block) {
+          logger.info(
+            { tag: "STRATEGY_V2_BLOCK", symbol, side: effectiveAction, confidence: mtf.avgConfidence, reason: signalBlockReason },
+            `[STRATEGY_V2_BLOCK] ${symbol} ${effectiveAction} @ ${mtf.avgConfidence.toFixed(1)}% — ${signalBlockReason}`,
+          );
+        }
         executionStreamBus.emitEvent({
           type:       isConfBlock ? "confidence_too_low" : "signal_rejected",
           severity:   "warn",
           symbol,
           side:       effectiveAction as "BUY" | "SELL",
           confidence: mtf.avgConfidence,
-          gate:       isConfBlock ? "confidence_floor" : "pre_execute_gate",
+          gate:       isConfBlock ? "confidence_floor" : isStrategyV2Block ? "strategy_v2" : "pre_execute_gate",
           reason:     signalBlockReason,
           message:    `Signal rejected ${symbol} ${effectiveAction}: ${signalBlockReason}`,
         });
@@ -3822,6 +3844,7 @@ async function tick() {
         const gVolume     = volumeGatePass;
         const gSideways   = sidewaysGatePass;
         const gTrend1H    = trend1HGatePass;
+        const gStrategyV2 = strategyV2GatePass;
 
         // First failing engine gate → headline rejection reason.
         let fnRejGate:   string | null = null;
@@ -3838,6 +3861,9 @@ async function tick() {
         } else if (!gSideways) {
           fnRejGate = "sideways";
           fnRejReason = "Sideways / range-bound market (spread filter)";
+        } else if (!gStrategyV2) {
+          fnRejGate = "strategy_v2";
+          fnRejReason = strategyV2Gate.reason;
         } else if (!gTrend1H) {
           fnRejGate = "trend1h";
           fnRejReason = `1H trend conflict (trend=${mtf.trend1H}, signal=${fnSide})`;
