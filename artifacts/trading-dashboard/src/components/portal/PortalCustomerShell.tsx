@@ -5104,13 +5104,564 @@ function CustomerRailMetric({ label, value, color }: { label: string; value: str
   );
 }
 
+type PortalOpenPositionRow = {
+  id: string;
+  symbol: string;
+  display: string;
+  side: "LONG" | "SHORT";
+  entry: number;
+  last: number;
+  pnl: number;
+  pnlPct: number;
+  origin?: string;
+  entryTime?: number | null;
+  exchangeOrderId?: string | null;
+  admin?: Record<string, unknown>;
+};
+
+function portalMetricNum(value: unknown, fallback = NaN): number {
+  if (value === null || value === undefined) return fallback;
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function portalRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" ? value as Record<string, unknown> : {};
+}
+
+function portalFmtSignedDollar(value: number): string {
+  if (!Number.isFinite(value)) return "—";
+  return `${value >= 0 ? "+" : "-"}$${Math.abs(value).toFixed(2)}`;
+}
+
+function portalFmtSignedPct(value: number, decimals = 2): string {
+  if (!Number.isFinite(value)) return "—";
+  return `${value >= 0 ? "+" : ""}${value.toFixed(decimals)}%`;
+}
+
+function portalFmtPct(value: number, decimals = 2): string {
+  if (!Number.isFinite(value)) return "—";
+  return `${value.toFixed(decimals)}%`;
+}
+
+function portalFmtDurationMs(value: unknown): string {
+  const n = portalMetricNum(value);
+  if (!Number.isFinite(n) || n <= 0) return "—";
+  const mins = Math.floor(n / 60_000);
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 48) return `${hours}h ${mins % 60}m`;
+  return `${Math.floor(hours / 24)}d ${hours % 24}h`;
+}
+
+function portalFmtTimestamp(value: unknown): string {
+  const n = portalMetricNum(value);
+  if (!Number.isFinite(n) || n <= 0) return "—";
+  return new Date(n).toLocaleString("en-US", {
+    month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit",
+  });
+}
+
+function portalProfitRetentionPct(currentProfit: number, peakProfit: number): number {
+  if (!Number.isFinite(currentProfit) || !Number.isFinite(peakProfit) || peakProfit <= 0) return NaN;
+  return Math.max(0, Math.min(999, (currentProfit / peakProfit) * 100));
+}
+
+function portalPnlColor(value: number): string {
+  return value > 0 ? T.NEON : value < 0 ? T.RED : T.TEXT_2;
+}
+
+function portalExitBadge(raw: string): { label: string; color: string } {
+  const normalized = raw.toLowerCase().replace(/[_-]/g, " ");
+  if (normalized.includes("trail")) return { label: "TRAIL CLOSEST", color: "#ffaa00" };
+  if (normalized.includes("max") || normalized.includes("hold")) return { label: "MAX HOLD CLOSEST", color: "#00aaff" };
+  if (normalized.includes("stop")) return { label: "STOP LOSS CLOSEST", color: "#ff3355" };
+  if (normalized.includes("take") || normalized.includes("profit") || normalized.includes("tp")) {
+    return { label: "TP CLOSEST", color: "#00ff8a" };
+  }
+  return { label: "EXIT UNKNOWN", color: T.TEXT_3 };
+}
+
+function PortalExitProximityBadge({ exit }: { exit: string }) {
+  const badge = portalExitBadge(exit);
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", justifyContent: "center",
+      padding: "4px 7px", minHeight: 22,
+      border: `1px solid ${badge.color}66`, borderRadius: 3,
+      background: `${badge.color}14`, color: badge.color,
+      fontFamily: T.FONT_MONO, fontSize: 8, fontWeight: 900,
+      letterSpacing: "0.06em", whiteSpace: "nowrap",
+    }}>
+      {badge.label}
+    </span>
+  );
+}
+
+function PortalCommandMetric({ label, value, color = T.TEXT_0 }: {
+  label: string;
+  value: string;
+  color?: string;
+}) {
+  return (
+    <div style={{
+      minWidth: 0, padding: "7px 8px",
+      border: `1px solid rgba(124,255,0,0.10)`,
+      background: "rgba(0,0,0,0.22)",
+    }}>
+      <div style={{
+        color: T.TEXT_3, fontSize: 8, fontWeight: 800,
+        letterSpacing: T.TRACK_LABEL, marginBottom: 4,
+        whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+      }}>
+        {label}
+      </div>
+      <div style={{
+        color, fontSize: 11, fontWeight: 800,
+        fontVariantNumeric: "tabular-nums",
+        whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+      }}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function PortalExitRuleBox({ title, status, rows }: {
+  title: string;
+  status: string;
+  rows: Array<[string, string]>;
+}) {
+  const statusText = status.toUpperCase();
+  const hot = statusText === "READY" || statusText === "BREACHED";
+  const good = statusText === "ARMED" || statusText === "SAFE" || statusText === "PENDING";
+  const color = hot ? T.RED : good ? T.NEON : T.TEXT_2;
+  return (
+    <div style={{
+      minWidth: 0, padding: "8px 9px",
+      border: `1px solid ${hot ? T.RED : good ? T.NEON : T.BORDER_GRN}33`,
+      background: "rgba(0,0,0,0.24)",
+    }}>
+      <div style={{
+        display: "flex", justifyContent: "space-between", gap: 8,
+        marginBottom: 6, fontSize: 9, fontWeight: 900,
+        letterSpacing: "0.06em",
+      }}>
+        <span style={{ color: T.TEXT_0 }}>{title}</span>
+        <span style={{ color }}>{status || "—"}</span>
+      </div>
+      {rows.map(([k, v]) => (
+        <div key={k} style={{
+          display: "flex", justifyContent: "space-between", gap: 8,
+          color: T.TEXT_2, fontSize: 9, lineHeight: 1.5,
+        }}>
+          <span>{k}</span>
+          <span style={{ color: T.TEXT_0, textAlign: "right" }}>{v}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function AdminOpenPositionsCommandCenter({
+  rows, clerkUserId,
+}: {
+  rows: ReadonlyArray<PortalOpenPositionRow>;
+  clerkUserId: string | null;
+}) {
+  const qc = useQueryClient();
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const [expandedTradeId, setExpandedTradeId] = useState<string | null>(null);
+  const [sellTarget, setSellTarget] = useState<PortalOpenPositionRow | null>(null);
+
+  const manualSell = useMutation({
+    mutationFn: async (position: PortalOpenPositionRow) => {
+      if (!clerkUserId) throw new Error("Admin user id unavailable");
+      const res = await authFetch(`/api/admin/users/${encodeURIComponent(clerkUserId)}/manual-sell`, {
+        method: "POST",
+        body: JSON.stringify({
+          positionId: position.id,
+          symbol: position.symbol,
+          note: "Manual sell from Phase 2 Admin View",
+        }),
+      });
+      const text = await res.text();
+      let json: unknown = null;
+      try { json = text ? JSON.parse(text) : null; } catch { /* noop */ }
+      if (!res.ok) {
+        throw new Error((json as { error?: string } | null)?.error ?? `HTTP ${res.status}`);
+      }
+      return json;
+    },
+    onSuccess: () => {
+      toast({ title: "Manual sell submitted", description: "Position close executed and portfolio refreshed." });
+      setSellTarget(null);
+      void qc.invalidateQueries({ queryKey: ["customer-simulation-account"] });
+      void qc.invalidateQueries({ queryKey: ["customer-simulation-trades"] });
+      void qc.invalidateQueries({ queryKey: ["admin-user-detail", clerkUserId] });
+      void qc.invalidateQueries({ queryKey: RUNTIME_STATE_QUERY_KEY });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Manual sell failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  return (
+    <section style={{
+      display: "flex", flexDirection: "column", gap: 8,
+      background: T.BG_TERMINAL,
+      border: `1px solid rgba(124,255,0,0.16)`,
+      boxShadow: "inset 0 0 24px rgba(102,255,102,0.04)",
+      fontFamily: T.FONT_MONO,
+    }}>
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        gap: 12, padding: "9px 10px",
+        borderBottom: `1px solid rgba(124,255,0,0.10)`,
+        flexWrap: "wrap",
+      }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <span style={{
+            color: T.TEXT_0, fontSize: 12, fontWeight: 900,
+            letterSpacing: "0.16em",
+          }}>
+            OPEN POSITIONS COMMAND CENTER
+          </span>
+          <span style={{ color: T.TEXT_3, fontSize: 9, letterSpacing: T.TRACK_LABEL }}>
+            Admin View · live exits, retention, diagnostics
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowDiagnostics(v => !v)}
+          style={{
+            minHeight: 28, padding: "5px 9px",
+            border: `1px solid ${showDiagnostics ? "#00aaff66" : "rgba(124,255,0,0.18)"}`,
+            background: showDiagnostics ? "#00aaff14" : "transparent",
+            color: showDiagnostics ? "#00aaff" : T.TEXT_2,
+            fontFamily: T.FONT_MONO, fontSize: 9, fontWeight: 900,
+            letterSpacing: T.TRACK_LABEL, cursor: "pointer",
+          }}
+        >
+          SHOW TRADE DIAGNOSTICS
+        </button>
+      </div>
+
+      {rows.length === 0 ? (
+        <div style={{
+          padding: 24, textAlign: "center", color: T.TEXT_3,
+          fontSize: 10, fontWeight: 800, letterSpacing: T.TRACK_LABEL,
+        }}>
+          NO OPEN POSITIONS
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 7, padding: 8 }}>
+          {rows.map((row) => {
+            const raw = row.admin ?? {};
+            const diag = portalRecord(raw["trailing_diagnostics"]);
+            const exitRules = portalRecord(raw["exit_rules"]);
+            const takeProfit = portalRecord(exitRules["take_profit"]);
+            const trailingStop = portalRecord(exitRules["trailing_stop"]);
+            const stopLoss = portalRecord(exitRules["stop_loss"]);
+            const maxHold = portalRecord(exitRules["max_hold"]);
+            const ai = portalRecord(raw["ai_decision"]);
+            const reasons = Array.isArray(ai["reason_holding"]) ? ai["reason_holding"] as string[] : [];
+
+            const entryPrice = portalMetricNum(raw["entry_price"], row.entry);
+            const currentPrice = portalMetricNum(raw["current_price"], row.last);
+            const pnl = portalMetricNum(raw["unrealized_pnl"], row.pnl);
+            const pnlPct = portalMetricNum(raw["unrealized_pnl_pct"], row.pnlPct);
+            const peakUsd = portalMetricNum(raw["peak_profit_usd"] ?? diag["peak_profit_usd"]);
+            const peakPct = portalMetricNum(raw["peak_profit_pct"] ?? diag["peak_profit_pct"]);
+            const drawdownUsd = portalMetricNum(raw["drawdown_from_peak_usd"]);
+            const drawdownPct = portalMetricNum(raw["drawdown_from_peak_pct"]);
+            const timeOpenMs = raw["time_open_ms"] ?? (row.entryTime ? Date.now() - row.entryTime : NaN);
+            const retentionPct = portalProfitRetentionPct(pnl, peakUsd);
+            const retentionColor = !Number.isFinite(retentionPct)
+              ? T.TEXT_3
+              : retentionPct >= 75 ? T.NEON
+              : retentionPct >= 50 ? T.AMBER : T.RED;
+            const isLive = !!row.origin && row.origin !== "PAPER";
+            const busy = manualSell.isPending && sellTarget?.id === row.id;
+            const closestExit = String(ai["next_likely_exit"] ?? raw["exit_condition_closest_to_trigger"] ?? "—");
+            const confidence = portalMetricNum(ai["confidence"]);
+            const expanded = expandedTradeId === row.id;
+            const trailingActive = Boolean(diag["trailing_active"]);
+            const status = String(raw["exit_mode_status"] ?? (trailingActive ? "TRAIL TRACKING" : "MONITORING"));
+            const pnlColor = pnl > 0 ? T.NEON : pnl < 0 ? T.RED : T.TEXT_2;
+
+            return (
+              <div key={row.id} style={{
+                display: "flex", flexDirection: "column", gap: 8,
+                padding: 8, background: T.BG_CARD,
+                border: `1px solid ${isLive ? "rgba(255,170,0,0.28)" : "rgba(124,255,0,0.12)"}`,
+              }}>
+                <div className="cd-admin-command-row" style={{
+                  display: "grid",
+                  gridTemplateColumns: "minmax(150px, 1.2fr) repeat(8, minmax(96px, 1fr)) minmax(126px, 0.9fr)",
+                  gap: 6, alignItems: "stretch",
+                }}>
+                  <div style={{
+                    minWidth: 0, display: "flex", flexDirection: "column", gap: 5,
+                    padding: "7px 8px", border: `1px solid rgba(124,255,0,0.10)`,
+                    background: "rgba(0,0,0,0.22)",
+                  }}>
+                    <span style={{ color: T.TEXT_0, fontSize: 13, fontWeight: 900, letterSpacing: "0.08em" }}>
+                      {row.symbol}
+                    </span>
+                    <span style={{ color: isLive ? T.AMBER : T.TEXT_3, fontSize: 8, fontWeight: 900, letterSpacing: T.TRACK_LABEL }}>
+                      {isLive ? `LIVE · ${row.origin}` : "PAPER"}
+                    </span>
+                  </div>
+                  <PortalCommandMetric label="ENTRY" value={fmtPrice(entryPrice)} />
+                  <PortalCommandMetric label="CURRENT" value={fmtPrice(currentPrice)} />
+                  <PortalCommandMetric label="P/L $" value={portalFmtSignedDollar(pnl)} color={pnlColor} />
+                  <PortalCommandMetric label="P/L %" value={portalFmtSignedPct(pnlPct)} color={pnlColor} />
+                  <PortalCommandMetric label="PEAK $" value={portalFmtSignedDollar(peakUsd)} color={Number.isFinite(peakUsd) ? portalPnlColor(peakUsd) : T.TEXT_3} />
+                  <PortalCommandMetric label="PEAK %" value={portalFmtSignedPct(peakPct)} color={Number.isFinite(peakPct) ? portalPnlColor(peakPct) : T.TEXT_3} />
+                  <PortalCommandMetric label="RETENTION" value={Number.isFinite(retentionPct) ? `${retentionPct.toFixed(1)}%` : "—"} color={retentionColor} />
+                  <PortalCommandMetric label="DRAWDOWN" value={`${portalFmtSignedDollar(drawdownUsd)} · ${portalFmtPct(drawdownPct)}`} color={drawdownPct > 0 ? T.AMBER : T.TEXT_3} />
+                  <div style={{ display: "grid", gap: 6, gridTemplateRows: "1fr 1fr" }}>
+                    <button
+                      type="button"
+                      disabled={!isLive || !clerkUserId || manualSell.isPending}
+                      onClick={() => setSellTarget(row)}
+                      title={isLive ? "Manual sell live position" : "Manual sell appears only for live exchange positions"}
+                      style={{
+                        minHeight: 29, border: "1px solid rgba(255,51,85,0.55)",
+                        background: isLive ? "rgba(255,51,85,0.14)" : "rgba(255,255,255,0.03)",
+                        color: isLive ? "#ff6680" : T.TEXT_3,
+                        fontFamily: T.FONT_MONO, fontSize: 9, fontWeight: 900,
+                        letterSpacing: "0.08em",
+                        cursor: !isLive || !clerkUserId || manualSell.isPending ? "not-allowed" : "pointer",
+                        opacity: busy ? 0.65 : 1,
+                      }}
+                    >
+                      {busy ? "SELLING" : "SELL"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setExpandedTradeId(expanded ? null : row.id)}
+                      style={{
+                        minHeight: 29, border: `1px solid ${expanded ? "#00aaff66" : "rgba(124,255,0,0.16)"}`,
+                        background: expanded ? "#00aaff14" : "transparent",
+                        color: "#00aaff",
+                        fontFamily: T.FONT_MONO, fontSize: 9, fontWeight: 900,
+                        letterSpacing: "0.08em", cursor: "pointer",
+                      }}
+                    >
+                      DETAILS
+                    </button>
+                  </div>
+                </div>
+
+                <div className="cd-admin-command-status-grid" style={{
+                  display: "grid",
+                  gridTemplateColumns: "minmax(180px, 0.85fr) minmax(240px, 1.4fr) minmax(170px, 0.8fr) minmax(130px, 0.7fr)",
+                  gap: 6,
+                }}>
+                  <PortalCommandMetric label="MINUTES OPEN" value={portalFmtDurationMs(timeOpenMs)} />
+                  <div style={{
+                    minWidth: 0, padding: "7px 8px",
+                    border: `1px solid rgba(124,255,0,0.10)`,
+                    background: "rgba(0,0,0,0.22)",
+                  }}>
+                    <div style={{ color: T.TEXT_3, fontSize: 8, fontWeight: 900, letterSpacing: T.TRACK_LABEL, marginBottom: 4 }}>
+                      WHY AM I STILL IN THIS TRADE?
+                    </div>
+                    <div style={{ color: T.TEXT_0, fontSize: 11, lineHeight: 1.35 }}>
+                      {String(reasons[0] ?? "AI exit conditions have not triggered.")}
+                    </div>
+                  </div>
+                  <div style={{
+                    minWidth: 0, padding: "7px 8px",
+                    border: `1px solid rgba(124,255,0,0.10)`,
+                    background: "rgba(0,0,0,0.22)",
+                  }}>
+                    <div style={{ color: T.TEXT_3, fontSize: 8, fontWeight: 900, letterSpacing: T.TRACK_LABEL, marginBottom: 5 }}>
+                      CLOSEST EXIT
+                    </div>
+                    <PortalExitProximityBadge exit={closestExit} />
+                  </div>
+                  <PortalCommandMetric label="AI CONFIDENCE" value={Number.isFinite(confidence) ? `${Math.round(confidence)}%` : "—"} color="#00aaff" />
+                </div>
+
+                <div className="cd-admin-command-exit-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(150px, 1fr))", gap: 6 }}>
+                  <PortalExitRuleBox title="Take Profit" status={String(takeProfit["status"] ?? "—")} rows={[
+                    ["Target", portalFmtSignedPct(portalMetricNum(takeProfit["target_pct"]))],
+                    ["Current", portalFmtSignedPct(portalMetricNum(takeProfit["current_pct"], pnlPct))],
+                    ["Distance", portalFmtPct(portalMetricNum(takeProfit["distance_pct"]))],
+                  ]} />
+                  <PortalExitRuleBox title="Trailing Stop" status={String(trailingStop["status"] ?? (trailingActive ? "ARMED" : "—"))} rows={[
+                    ["Peak", portalFmtSignedPct(portalMetricNum(trailingStop["peak_pct"], peakPct))],
+                    ["Current", portalFmtSignedPct(portalMetricNum(trailingStop["current_pct"], pnlPct))],
+                    ["Trail Distance", portalFmtPct(portalMetricNum(trailingStop["trail_distance_pct"]))],
+                  ]} />
+                  <PortalExitRuleBox title="Stop Loss" status={String(stopLoss["status"] ?? "—")} rows={[
+                    ["Current", portalFmtSignedPct(portalMetricNum(stopLoss["current_pct"], pnlPct))],
+                    ["Stop", portalFmtSignedPct(portalMetricNum(stopLoss["stop_pct"]))],
+                    ["Distance", portalFmtPct(portalMetricNum(stopLoss["distance_pct"]))],
+                  ]} />
+                  <PortalExitRuleBox title="Max Hold" status={String(maxHold["status"] ?? "—")} rows={[
+                    ["Open", portalFmtDurationMs(timeOpenMs)],
+                    ["Limit", Number.isFinite(portalMetricNum(maxHold["max_minutes"])) ? `${Math.round(portalMetricNum(maxHold["max_minutes"]))}m` : "—"],
+                    ["Remaining", Number.isFinite(portalMetricNum(maxHold["remaining_minutes"])) ? `${Math.round(portalMetricNum(maxHold["remaining_minutes"]))}m` : "—"],
+                  ]} />
+                </div>
+
+                {expanded && (
+                  <div className="cd-admin-command-details-grid" style={{
+                    display: "grid", gridTemplateColumns: "minmax(240px, 1fr) minmax(240px, 1fr)",
+                    gap: 8, paddingTop: 2,
+                  }}>
+                    <div style={{ padding: 8, border: `1px solid rgba(124,255,0,0.10)`, background: "rgba(0,0,0,0.20)" }}>
+                      <div style={{ color: T.TEXT_3, fontSize: 8, fontWeight: 900, letterSpacing: T.TRACK_LABEL, marginBottom: 6 }}>
+                        REASON HOLDING
+                      </div>
+                      {(reasons.length ? reasons : ["AI exit conditions have not triggered."]).slice(0, 5).map(reason => (
+                        <div key={reason} style={{ color: T.TEXT_1, fontSize: 10, lineHeight: 1.5 }}>
+                          - {reason}
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ padding: 8, border: `1px solid rgba(124,255,0,0.10)`, background: "rgba(0,0,0,0.20)" }}>
+                      <div style={{ color: T.TEXT_3, fontSize: 8, fontWeight: 900, letterSpacing: T.TRACK_LABEL, marginBottom: 6 }}>
+                        EXIT MODE STATUS
+                      </div>
+                      <div style={{ color: trailingActive ? "#00aaff" : T.TEXT_0, fontSize: 12, fontWeight: 900 }}>
+                        {status}
+                      </div>
+                      <div style={{ color: T.TEXT_2, fontSize: 10, marginTop: 5 }}>
+                        Next likely exit: <span style={{ color: "#00aaff", fontWeight: 900 }}>{closestExit}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {showDiagnostics && (
+                  <div style={{
+                    display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+                    gap: 6, paddingTop: 2,
+                  }}>
+                    <PortalCommandMetric label="PEAK TIMESTAMP" value={portalFmtTimestamp(raw["peak_profit_at"] ?? diag["peak_profit_at"])} />
+                    <PortalCommandMetric label="TRAILING ARMED" value={trailingActive ? "YES" : "NO"} color={trailingActive ? "#00aaff" : T.TEXT_2} />
+                    <PortalCommandMetric label="TRAILING TRIGGER" value={fmtPrice(portalMetricNum(diag["exit_trigger_price"] ?? trailingStop["trigger_price"]))} />
+                    <PortalCommandMetric label="TP TRIGGER" value={fmtPrice(portalMetricNum(takeProfit["trigger_price"]))} />
+                    <PortalCommandMetric label="STOP PRICE" value={fmtPrice(portalMetricNum(stopLoss["trigger_price"]))} />
+                    <PortalCommandMetric label="MAX HOLD REMAINING" value={Number.isFinite(portalMetricNum(maxHold["remaining_minutes"])) ? `${Math.round(portalMetricNum(maxHold["remaining_minutes"]))}m` : "—"} />
+                    <PortalCommandMetric label="DRAWNDOWN FROM PEAK" value={`${portalFmtSignedDollar(drawdownUsd)} · ${portalFmtPct(drawdownPct)}`} color={drawdownPct > 0 ? T.AMBER : T.TEXT_3} />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {sellTarget && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 100,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          padding: 16, background: "rgba(0,0,0,0.72)",
+        }}>
+          {(() => {
+            const raw = sellTarget.admin ?? {};
+            const diag = portalRecord(raw["trailing_diagnostics"]);
+            const pnl = portalMetricNum(raw["unrealized_pnl"], sellTarget.pnl);
+            const pnlPct = portalMetricNum(raw["unrealized_pnl_pct"], sellTarget.pnlPct);
+            const peakUsd = portalMetricNum(raw["peak_profit_usd"] ?? diag["peak_profit_usd"]);
+            const peakPct = portalMetricNum(raw["peak_profit_pct"] ?? diag["peak_profit_pct"]);
+            const drawdownUsd = portalMetricNum(raw["drawdown_from_peak_usd"]);
+            const drawdownPct = portalMetricNum(raw["drawdown_from_peak_pct"]);
+            const retentionPct = portalProfitRetentionPct(pnl, peakUsd);
+            const exit = String(portalRecord(raw["ai_decision"])["next_likely_exit"] ?? raw["exit_condition_closest_to_trigger"] ?? "—");
+            return (
+              <div style={{
+                width: 380, maxWidth: "100%",
+                padding: 16, background: T.BG_CARD,
+                border: "1px solid rgba(255,51,85,0.45)",
+                boxShadow: "0 24px 80px rgba(0,0,0,0.70)",
+                fontFamily: T.FONT_MONO,
+              }}>
+                <div style={{
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  gap: 12, marginBottom: 12,
+                }}>
+                  <div style={{ color: "#ff6680", fontSize: 11, fontWeight: 900, letterSpacing: "0.12em" }}>
+                    CONFIRM MANUAL SELL
+                  </div>
+                  <button
+                    type="button"
+                    disabled={manualSell.isPending}
+                    onClick={() => setSellTarget(null)}
+                    style={{
+                      border: 0, background: "transparent", color: T.TEXT_2,
+                      cursor: manualSell.isPending ? "wait" : "pointer", fontSize: 16,
+                    }}
+                  >
+                    x
+                  </button>
+                </div>
+                <div style={{ display: "grid", gap: 7 }}>
+                  <PortalCommandMetric label="SYMBOL" value={sellTarget.symbol} />
+                  <PortalCommandMetric label="CURRENT PROFIT" value={`${portalFmtSignedDollar(pnl)} · ${portalFmtSignedPct(pnlPct)}`} color={pnl > 0 ? T.NEON : pnl < 0 ? T.RED : T.TEXT_2} />
+                  <PortalCommandMetric label="PEAK PROFIT" value={`${portalFmtSignedDollar(peakUsd)} · ${portalFmtSignedPct(peakPct)}`} color={Number.isFinite(peakUsd) ? T.NEON : T.TEXT_3} />
+                  <PortalCommandMetric label="RETENTION" value={Number.isFinite(retentionPct) ? `${retentionPct.toFixed(1)}%` : "—"} color={Number.isFinite(retentionPct) ? T.NEON : T.TEXT_3} />
+                  <PortalCommandMetric label="DRAWDOWN" value={`${portalFmtSignedDollar(drawdownUsd)} · ${portalFmtPct(drawdownPct)}`} color={drawdownPct > 0 ? T.AMBER : T.TEXT_3} />
+                  <PortalCommandMetric label="TIME OPEN" value={portalFmtDurationMs(raw["time_open_ms"] ?? (sellTarget.entryTime ? Date.now() - sellTarget.entryTime : NaN))} />
+                  <PortalCommandMetric label="ENTRY / CURRENT" value={`${fmtPrice(portalMetricNum(raw["entry_price"], sellTarget.entry))} / ${fmtPrice(portalMetricNum(raw["current_price"], sellTarget.last))}`} />
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+                    <span style={{ color: T.TEXT_3, fontSize: 9, fontWeight: 900, letterSpacing: T.TRACK_LABEL }}>EXIT PROXIMITY</span>
+                    <PortalExitProximityBadge exit={exit} />
+                  </div>
+                  <div style={{
+                    border: "1px solid rgba(255,170,0,0.38)",
+                    background: "rgba(255,170,0,0.08)",
+                    color: "#ffd27a", padding: 9, fontSize: 10,
+                    lineHeight: 1.45, fontWeight: 800,
+                  }}>
+                    AI may still be holding this position for upside continuation.
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+                  <button
+                    type="button"
+                    disabled={manualSell.isPending}
+                    onClick={() => setSellTarget(null)}
+                    style={{
+                      flex: 1, minHeight: 34, border: `1px solid rgba(124,255,0,0.14)`,
+                      background: "transparent", color: T.TEXT_2,
+                      fontFamily: T.FONT_MONO, fontSize: 10, fontWeight: 900,
+                      cursor: manualSell.isPending ? "wait" : "pointer",
+                    }}
+                  >
+                    CANCEL
+                  </button>
+                  <button
+                    type="button"
+                    disabled={manualSell.isPending}
+                    onClick={() => manualSell.mutate(sellTarget)}
+                    style={{
+                      flex: 1, minHeight: 34, border: "1px solid rgba(255,51,85,0.55)",
+                      background: "rgba(255,51,85,0.16)", color: "#ff6680",
+                      fontFamily: T.FONT_MONO, fontSize: 10, fontWeight: 900,
+                      letterSpacing: "0.08em", cursor: manualSell.isPending ? "wait" : "pointer",
+                    }}
+                  >
+                    {manualSell.isPending ? "SELLING..." : "SELL NOW"}
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function CustomerBlotterPanelOpen({ rows, entitled = false }: {
-  rows: ReadonlyArray<{
-    id: string; symbol: string; display: string; side: "LONG" | "SHORT";
-    entry: number; last: number; pnl: number; pnlPct: number;
-    /* Per-row execution origin — see CustomerBlotterRow. */
-    origin?: string;
-  }>;
+  rows: ReadonlyArray<PortalOpenPositionRow>;
   /* Phase 8.4 — entitled customers see "● LIVE READY" badge.
      Server kill switch + concurrent caps still gate real fills. */
   entitled?: boolean;
@@ -5593,11 +6144,17 @@ export function PortalCustomerShell({ operatorPreview = false }: { operatorPrevi
     id:               string | number;
     symbol:           string;
     side:             string;
+    sizeUSD?:          number;
+    quantity?:         number;
     entryPrice:       number;
+    entryTime?:        number;
     currentPrice?:    number;
     unrealizedPnL?:   number;
     unrealizedPnLPct?: number;
     exchange?:        string | null;
+    exchangeOrderId?: string | null;
+    stopLoss?:         number | null;
+    takeProfit?:       number | null;
   };
   type ServerAccountSummary = {
     equity:        number;
@@ -5754,6 +6311,8 @@ export function PortalCustomerShell({ operatorPreview = false }: { operatorPrevi
         pnl:     Number(p.unrealizedPnL ?? 0),
         pnlPct:  Number(p.unrealizedPnLPct ?? 0),
         origin:  exch ? exch.toUpperCase() : "PAPER",
+        entryTime: Number.isFinite(Number(p.entryTime)) ? Number(p.entryTime) : null,
+        exchangeOrderId: p.exchangeOrderId ?? null,
       };
     });
   }, [serverAccount]);
@@ -5803,6 +6362,45 @@ export function PortalCustomerShell({ operatorPreview = false }: { operatorPrevi
   // Investigation-only — no behavior change.
   const { user: diagUser } = useUser();
   const userId = diagUser?.id ?? null;
+  const { data: adminSelfDetail } = useQuery<{ positions: Array<Record<string, unknown>> }>({
+    queryKey: ["admin-user-detail", userId],
+    queryFn: async () => {
+      const resp = await authFetch(`/api/admin/users/${encodeURIComponent(String(userId))}`);
+      if (!resp.ok) throw new Error(`/api/admin/users/${userId} ${resp.status}`);
+      return (await resp.json()) as { positions: Array<Record<string, unknown>> };
+    },
+    enabled: operatorPreview && !!userId,
+    refetchInterval: 8_000,
+    staleTime: 4_000,
+    retry: false,
+  });
+  const commandCenterRows = useMemo<PortalOpenPositionRow[]>(() => {
+    const positions = adminSelfDetail?.positions ?? [];
+    if (operatorPreview && positions.length > 0) {
+      return positions.map((p, i) => {
+        const symbol = String(p["symbol"] ?? "—");
+        const rawSide = String(p["side"] ?? "").toUpperCase();
+        const side: "LONG" | "SHORT" = rawSide === "SELL" || rawSide === "SHORT" ? "SHORT" : "LONG";
+        const exch = String(p["exchange"] ?? "").trim();
+        const entryTime = portalMetricNum(p["entry_time"], NaN);
+        return {
+          id: String(p["id"] ?? i),
+          symbol,
+          display: shortPair(symbol),
+          side,
+          entry: portalMetricNum(p["entry_price"], 0),
+          last: portalMetricNum(p["current_price"] ?? p["entry_price"], 0),
+          pnl: portalMetricNum(p["unrealized_pnl"], 0),
+          pnlPct: portalMetricNum(p["unrealized_pnl_pct"], 0),
+          origin: exch ? exch.toUpperCase() : "PAPER",
+          entryTime: Number.isFinite(entryTime) ? entryTime : null,
+          exchangeOrderId: String(p["exchange_order_id"] ?? p["exchangeOrderId"] ?? "") || null,
+          admin: p,
+        };
+      });
+    }
+    return blotterOpenRows;
+  }, [adminSelfDetail?.positions, blotterOpenRows, operatorPreview]);
   const clientQuerySourceRef = useRef<string | null>(null);
   useEffect(() => {
     const mode = isLiveRuntime ? "live" : "paper";
@@ -6616,12 +7214,27 @@ export function PortalCustomerShell({ operatorPreview = false }: { operatorPrevi
         .cd-customer-battlefield-grid {
           grid-template-columns: minmax(0, 1fr) 380px;
         }
+        @media (max-width: 1280px) {
+          .cd-admin-command-row {
+            grid-template-columns: repeat(5, minmax(104px, 1fr)) !important;
+          }
+          .cd-admin-command-status-grid,
+          .cd-admin-command-exit-grid {
+            grid-template-columns: repeat(2, minmax(160px, 1fr)) !important;
+          }
+        }
         @media (max-width: 1024px) {
           .cd-customer-battlefield-grid {
             grid-template-columns: minmax(0, 1fr) !important;
           }
           .cd-customer-battlefield-aside {
             width: 100% !important;
+          }
+          .cd-admin-command-row,
+          .cd-admin-command-status-grid,
+          .cd-admin-command-exit-grid,
+          .cd-admin-command-details-grid {
+            grid-template-columns: 1fr !important;
           }
         }
         @media (max-width: 768px) {
@@ -7244,6 +7857,10 @@ export function PortalCustomerShell({ operatorPreview = false }: { operatorPrevi
           onUpgrade={() => setUpgrade(true)}
           equityUsd={displayEquity}
         />
+
+        {operatorPreview && (
+          <AdminOpenPositionsCommandCenter rows={commandCenterRows} clerkUserId={userId} />
+        )}
 
         {/* PHASE 9 — UserDashboard filter pill strip. Wired to existing
             `filter`/`setFilter` (type `Filt`) so the underlying
