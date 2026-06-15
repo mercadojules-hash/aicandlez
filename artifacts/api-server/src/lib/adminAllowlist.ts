@@ -33,12 +33,15 @@ export function isSuperAdminEmail(email: string | null | undefined): boolean {
 // operator access, append the email + redeploy; to revoke it, remove the email
 // + redeploy (the account self-corrects to a plain customer on next login).
 //
-// Currently intentionally EMPTY: admin/operator access is restricted to the
-// single super-admin (mercadojules@gmail.com). info@mixtapepsd.com and
-// teedelgado@gmail.com were previously here but are now customer accounts.
+// Operator access is granted without duplicating accounts: the same customer
+// row, portfolio, exchange connections, and billing state remain intact while
+// /auth/me promotes the email to `admin` on login.
+// info@mixtapepsd.com was previously here but is now a customer account.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const OPERATOR_ADMIN_EMAILS: readonly string[] = [];
+export const OPERATOR_ADMIN_EMAILS: readonly string[] = [
+  "teedelgado@gmail.com",
+];
 
 export function isOperatorAdminEmail(email: string | null | undefined): boolean {
   if (!email) return false;

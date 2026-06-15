@@ -202,7 +202,7 @@ function StatCard({ icon: Icon, label, value, sub, color, delta, deltaUp }: {
   color: string; delta?: string; deltaUp?: boolean;
 }) {
   return (
-    <div className="rounded border flex flex-col gap-3 p-4 relative overflow-hidden"
+    <div className="rounded border flex flex-col gap-2 p-3 relative overflow-hidden"
       style={{ background: "#010C18", borderColor: "#0d1e2e" }}>
       <div className="absolute inset-0 opacity-5"
         style={{ background: `radial-gradient(ellipse at top left, ${color}, transparent 70%)` }} />
@@ -219,11 +219,11 @@ function StatCard({ icon: Icon, label, value, sub, color, delta, deltaUp }: {
         )}
       </div>
       <div className="relative">
-        <div className="text-[24px] font-bold font-mono tabular-nums leading-none" style={{ color }}>
+        <div className="text-[19px] font-bold font-mono tabular-nums leading-none" style={{ color }}>
           {value}
         </div>
         {sub && <div className="text-[9px] font-mono mt-1" style={{ color: "#4a6a80" }}>{sub}</div>}
-        <div className="text-[9px] font-mono font-bold tracking-[0.15em] mt-1.5 uppercase" style={{ color: "#9FB3C8" }}>
+        <div className="text-[8px] font-mono font-bold tracking-[0.12em] mt-1 uppercase" style={{ color: "#9FB3C8" }}>
           {label}
         </div>
       </div>
@@ -368,7 +368,7 @@ function UserIntelligencePanel({
   isSuperAdmin: boolean;
 }) {
   const qc        = useQueryClient();
-  const [tab, setTab]           = useState<IntelTab>("profile");
+  const [tab, setTab]           = useState<IntelTab>("trading");
   const [panel, setPanel]       = useState<ActionPanel>(null);
   const [note, setNote]         = useState("");
   const [reason, setReason]     = useState("");
@@ -395,7 +395,7 @@ function UserIntelligencePanel({
 
   useEffect(() => {
     if (user) {
-      setTab("profile");
+      setTab("trading");
       setPanel(null);
       setNote("");
       setReason("");
@@ -450,7 +450,7 @@ function UserIntelligencePanel({
     mutation.mutate({ path, body: { note: note.trim(), ...extra } });
   }
 
-  const W = 640;
+  const W = 1040;
   const C = {
     bg:     "#040810",
     panel:  "#010C18",
@@ -476,11 +476,11 @@ function UserIntelligencePanel({
       }}>
         {/* Drawer header */}
         <div style={{
-          padding: "14px 18px", borderBottom: `1px solid ${C.border}`,
+          padding: "8px 12px", borderBottom: `1px solid ${C.border}`,
           background: "#000", display: "flex", alignItems: "center", gap: 10,
         }}>
           <div style={{
-            width: 32, height: 32, borderRadius: 16,
+            width: 26, height: 26, borderRadius: 13,
             background: `linear-gradient(135deg, ${planColor(user.plan)}22, #7b68ee22)`,
             border: `1px solid ${planColor(user.plan)}55`,
             display: "flex", alignItems: "center", justifyContent: "center",
@@ -509,8 +509,8 @@ function UserIntelligencePanel({
 
         {/* User summary */}
         <div style={{
-          padding: "12px 18px", borderBottom: `1px solid ${C.border}`,
-          display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10,
+          padding: "8px 12px", borderBottom: `1px solid ${C.border}`,
+          display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 6,
         }}>
           <SummaryCell label="PLAN" value={user.plan.toUpperCase()} color={planColor(user.plan)} />
           <SummaryCell label="STATUS" value={user.adminStatus.toUpperCase()} color={statusColor(user.adminStatus)} />
@@ -540,7 +540,7 @@ function UserIntelligencePanel({
               <button key={t.id}
                 onClick={() => { setTab(t.id); setPanel(null); }}
                 style={{
-                  flex: 1, padding: "10px 8px", background: "transparent",
+                  flex: 1, padding: "7px 8px", background: "transparent",
                   border: "none", borderBottom: `2px solid ${active ? C.accent : "transparent"}`,
                   color: active ? C.text : C.dim, cursor: "pointer",
                   fontFamily: "monospace", fontSize: 9, fontWeight: 700,
@@ -555,7 +555,7 @@ function UserIntelligencePanel({
         </div>
 
         {/* Tab body */}
-        <div style={{ padding: "14px 18px", flex: 1, overflowY: "auto" }}>
+        <div style={{ padding: "10px 12px", flex: 1, overflowY: "auto" }}>
           {tab === "profile" && (
             <ProfileTab user={user} detail={detail} loading={detailQuery.isLoading} isSuperAdmin={isSuperAdmin} />
           )}
@@ -1271,9 +1271,13 @@ function MetricLine({ label, value, color }: { label: string; value: string; col
     <div style={{
       display: "flex", alignItems: "center", justifyContent: "space-between",
       gap: 12, borderBottom: `1px solid ${TAB_C.border}`, paddingBottom: 7,
+      minWidth: 0,
     }}>
-      <span style={{ color: TAB_C.faint, fontWeight: 700, letterSpacing: "0.08em" }}>{label}</span>
-      <span style={{ color: color ?? TAB_C.text, fontWeight: 800, textAlign: "right" }}>{value}</span>
+      <span style={{ color: TAB_C.faint, fontWeight: 700, letterSpacing: "0.08em", minWidth: 0 }}>{label}</span>
+      <span style={{
+        color: color ?? TAB_C.text, fontWeight: 800, textAlign: "right",
+        minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+      }}>{value}</span>
     </div>
   );
 }
@@ -1321,6 +1325,38 @@ function DebugKV({ k, v }: { k: string; v: string }) {
       <span style={{ color: TAB_C.faint }}>{k}</span>
       <span style={{ color: TAB_C.text, textAlign: "right" }}>{v}</span>
     </div>
+  );
+}
+
+function profitRetentionPct(currentProfit: number, peakProfit: number): number {
+  if (!Number.isFinite(currentProfit) || !Number.isFinite(peakProfit) || peakProfit <= 0) return NaN;
+  return Math.max(0, Math.min(999, (currentProfit / peakProfit) * 100));
+}
+
+function exitProximityBadge(raw: string): { label: string; color: string } {
+  const normalized = raw.toLowerCase().replace(/[_-]/g, " ");
+  if (normalized.includes("trail")) return { label: "TRAIL CLOSEST", color: "#ffaa00" };
+  if (normalized.includes("max") || normalized.includes("hold")) return { label: "MAX HOLD CLOSEST", color: "#00aaff" };
+  if (normalized.includes("stop")) return { label: "STOP LOSS CLOSEST", color: "#ff3355" };
+  if (normalized.includes("take") || normalized.includes("profit") || normalized.includes("tp")) {
+    return { label: "TP CLOSEST", color: "#00ff8a" };
+  }
+  return { label: "EXIT UNKNOWN", color: TAB_C.dim };
+}
+
+function ExitProximityBadge({ exit }: { exit: string }) {
+  const badge = exitProximityBadge(exit);
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", justifyContent: "center",
+      border: `1px solid ${badge.color}66`, color: badge.color,
+      background: `${badge.color}14`, borderRadius: 3,
+      padding: "4px 7px", fontFamily: "monospace",
+      fontSize: 8, fontWeight: 900, letterSpacing: "0.06em",
+      whiteSpace: "nowrap",
+    }}>
+      {badge.label}
+    </span>
   );
 }
 
@@ -3658,30 +3694,7 @@ function TradingTab({ detail, loading, clerkUserId }: {
 
   return (
     <div>
-      <AdminExitControlsSection clerkUserId={clerkUserId} detail={detail} />
-      <TabSectionLabel icon={TrendingUp}>PERFORMANCE</TabSectionLabel>
-      {loading && !detail ? <TabLoading /> : (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-          <MetricCell label="REALIZED PNL"  value={fmtDollar(agg?.realizedPnl ?? 0)}
-            color={pctColor(agg?.realizedPnl ?? 0)} />
-          <MetricCell label="WIN RATE"      value={agg?.winRate != null ? `${(agg.winRate * 100).toFixed(1)}%` : "—"}
-            color={(agg?.winRate ?? 0) >= 0.5 ? "#00ff8a" : "#ff8844"} />
-          <MetricCell label="TRADES"        value={`${agg?.tradesCount ?? 0}`}
-            sub={agg ? `${agg.wins}W / ${agg.losses}L` : undefined} />
-          <MetricCell label="AVG CONF"      value={agg?.avgConfidence != null ? `${agg.avgConfidence.toFixed(1)}%` : "—"}
-            color="#00aaff" />
-          <MetricCell label="AVG LATENCY"   value={agg?.avgLatencyMs != null ? `${Math.round(agg.avgLatencyMs)}ms` : "—"} />
-          <MetricCell label="ERROR EVENTS"  value={`${agg?.errorEventCount ?? 0}`}
-            color={(agg?.errorEventCount ?? 0) > 0 ? "#ff8844" : TAB_C.dim} />
-          <MetricCell label="FEES PAID"     value={fmtDollar(agg?.feesGenerated ?? 0)}
-            color="#cc55ff" sub={agg ? `${agg.feeRecords} fee events` : undefined} />
-          <MetricCell label="TRADES/DAY"    value={agg?.tradesPerDay != null ? agg.tradesPerDay.toFixed(2) : "—"}
-            sub={agg ? `${agg.lifetimeDays.toFixed(0)}d lifetime` : undefined} />
-          <MetricCell label="PROFITABLE PNL" value={fmtDollar(agg?.profitablePnl ?? 0)} color="#00ff8a" />
-        </div>
-      )}
-
-      <TabSectionLabel icon={Activity}>OPEN POSITIONS</TabSectionLabel>
+      <TabSectionLabel icon={Activity}>OPEN POSITIONS COMMAND CENTER</TabSectionLabel>
       <div style={{ display: "flex", justifyContent: "flex-end", margin: "-4px 0 8px" }}>
         <button
           type="button"
@@ -3723,66 +3736,137 @@ function TradingTab({ detail, loading, clerkUserId }: {
             const peakUsd = safeNum(diag["peak_profit_usd"] ?? p["peak_profit_usd"], NaN);
             const triggerPct = safeNum(diag["exit_trigger_profit_pct"], NaN);
             const distancePct = safeNum(diag["distance_to_exit_pct"], NaN);
+            const drawdownUsd = safeNum(p["drawdown_from_peak_usd"], NaN);
+            const drawdownPct = safeNum(p["drawdown_from_peak_pct"], NaN);
             const trailingActive = Boolean(diag["trailing_active"]);
             const busy = manualSell.isPending && sellTarget?.["id"] === p["id"];
             const expanded = expandedTradeId === tradeId;
+            const closestExit = String(ai["next_likely_exit"] ?? p["exit_condition_closest_to_trigger"] ?? "—");
+            const confidence = safeNum(ai["confidence"], NaN);
+            const maxHoldRemaining = safeNum(maxHold["remaining_minutes"], NaN);
+            const retentionPct = profitRetentionPct(pnl, peakUsd);
+            const retentionColor = !Number.isFinite(retentionPct)
+              ? TAB_C.dim
+              : retentionPct >= 75 ? "#00ff8a"
+              : retentionPct >= 50 ? "#ffaa00" : "#ff3355";
             return (
               <div key={tradeId} style={{
-                padding: "10px",
+                padding: "8px",
                 background: "#000814", border: `1px solid ${live ? "#ff884440" : TAB_C.border}`,
                 borderRadius: 3, fontSize: 9, fontFamily: "monospace",
               }}>
                 <div style={{
-                  display: "grid", gridTemplateColumns: "70px repeat(6, minmax(62px, 1fr)) 72px",
-                  gap: 8, alignItems: "center",
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(132px, 1fr))",
+                  gap: 6, alignItems: "stretch",
                 }}>
-                  <span style={{
-                    fontWeight: 800, color: side === "BUY" || side === "LONG" ? "#00ff8a" : "#ff3355",
-                    letterSpacing: "0.1em",
-                  }}>{symbol}</span>
+                  <div>
+                    <div style={{
+                      fontWeight: 800, color: side === "BUY" || side === "LONG" ? "#00ff8a" : "#ff3355",
+                      letterSpacing: "0.1em", fontSize: 12,
+                    }}>{symbol}</div>
+                    <div style={{ color: TAB_C.faint, marginTop: 3 }}>{side || "POSITION"}</div>
+                  </div>
+                  <MetricLine label="EXCHANGE" value={String(p["exchange"] ?? "PAPER").toUpperCase()} color={live ? "#ff8844" : TAB_C.dim} />
                   <MetricLine label="ENTRY" value={fmtPrice(entryPrice)} />
                   <MetricLine label="CURRENT" value={fmtPrice(currentPrice)} />
                   <MetricLine label="P&L $" value={fmtSignedDollar(pnl)} color={pctColor(pnl)} />
                   <MetricLine label="P&L %" value={fmtSignedPct(pnlPct)} color={pctColor(pnlPct)} />
                   <MetricLine label="PEAK" value={`${fmtSignedDollar(peakUsd)} · ${fmtSignedPct(peakPct)}`} color={pctColor(peakPct)} />
-                  <MetricLine label="OPEN" value={fmtDurationMs(p["time_open_ms"])} />
-                  {live ? (
+                  <MetricLine label="RETENTION" value={Number.isFinite(retentionPct) ? `${Math.round(retentionPct)}%` : "—"} color={retentionColor} />
+                  <MetricLine label="DRAWDOWN" value={`${fmtSignedDollar(drawdownUsd)} · ${fmtPct(drawdownPct, 2)}`} color={drawdownPct > 0 ? "#ffaa00" : TAB_C.dim} />
+                  <MetricLine label="MIN OPEN" value={fmtDurationMs(p["time_open_ms"])} />
+                  <div style={{ display: "grid", gap: 5, alignContent: "start", minWidth: 0 }}>
+                    <span style={{ color: TAB_C.faint, fontWeight: 800, letterSpacing: "0.08em" }}>PROXIMITY</span>
+                    <ExitProximityBadge exit={closestExit} />
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: live ? "1fr 1fr" : "1fr", gap: 6 }}>
+                    {live && (
+                      <button
+                        type="button"
+                        disabled={manualSell.isPending}
+                        onClick={() => setSellTarget(p)}
+                        style={{
+                          minHeight: 30, borderRadius: 3,
+                          border: "1px solid #ff335588",
+                          background: "#ff33551a",
+                          color: "#ff6680",
+                          fontSize: 9, fontFamily: "monospace", fontWeight: 800,
+                          letterSpacing: "0.08em",
+                          cursor: manualSell.isPending ? "not-allowed" : "pointer",
+                          opacity: busy ? 0.65 : 1,
+                        }}
+                      >
+                        {busy ? "..." : "SELL"}
+                      </button>
+                    )}
                     <button
                       type="button"
-                      disabled={manualSell.isPending}
-                      onClick={() => setSellTarget(p)}
+                      onClick={() => setExpandedTradeId(expanded ? null : tradeId)}
                       style={{
-                        height: 30, borderRadius: 3,
-                        border: "1px solid #ff335588",
-                        background: "#ff33551a",
-                        color: "#ff6680",
+                        minHeight: 30, borderRadius: 3,
+                        border: `1px solid ${expanded ? "#00aaff66" : TAB_C.border}`,
+                        background: expanded ? "#00aaff14" : "#06111d",
+                        color: "#00aaff",
                         fontSize: 9, fontFamily: "monospace", fontWeight: 800,
-                        letterSpacing: "0.08em",
-                        cursor: manualSell.isPending ? "not-allowed" : "pointer",
-                        opacity: busy ? 0.65 : 1,
+                        letterSpacing: "0.08em", cursor: "pointer",
                       }}
                     >
-                      {busy ? "..." : "SELL"}
+                      DETAILS
                     </button>
-                  ) : <span />}
+                  </div>
                 </div>
 
                 <div style={{
-                  marginTop: 8, display: "flex", justifyContent: "space-between",
-                  gap: 10, alignItems: "center",
+                  marginTop: 7, display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                  gap: 8, alignItems: "stretch",
                 }}>
-                  <div style={{ color: TAB_C.dim }}>
-                    {String(p["exchange"] ?? "PAPER").toUpperCase()} · qty {Number(p["quantity"] ?? 0).toFixed(4)}
+                  <div style={{
+                    border: `1px solid ${TAB_C.border}`, background: "#020b14",
+                    borderRadius: 3, padding: "6px 8px",
+                  }}>
+                    <div style={{ color: TAB_C.faint, fontWeight: 800, letterSpacing: "0.08em", marginBottom: 3 }}>
+                      STATUS
+                    </div>
+                    <div style={{
+                      color: trailingActive ? "#00aaff" : TAB_C.text,
+                      fontWeight: 800, letterSpacing: "0.08em",
+                    }}>
+                      {String(p["exit_mode_status"] ?? "MONITORING")}
+                    </div>
+                    <div style={{ color: TAB_C.dim, marginTop: 3 }}>
+                      qty {Number(p["quantity"] ?? 0).toFixed(4)}
+                    </div>
                   </div>
                   <div style={{
-                    color: trailingActive ? "#00aaff" : TAB_C.text,
-                    fontWeight: 800, letterSpacing: "0.08em",
+                    border: `1px solid ${TAB_C.border}`, background: "#020b14",
+                    borderRadius: 3, padding: "6px 8px",
                   }}>
-                    STATUS: {String(p["exit_mode_status"] ?? "MONITORING")}
+                    <div style={{ color: TAB_C.faint, fontWeight: 800, letterSpacing: "0.08em", marginBottom: 3 }}>
+                      WHY AM I STILL IN THIS TRADE?
+                    </div>
+                    <div style={{ color: TAB_C.text, lineHeight: 1.45 }}>
+                      {(reasons[0] ?? "AI exit conditions have not triggered.").replace(/^\s*[-•]\s*/, "")}
+                    </div>
+                  </div>
+                  <div style={{
+                    border: `1px solid ${TAB_C.border}`, background: "#020b14",
+                    borderRadius: 3, padding: "6px 8px",
+                  }}>
+                    <div style={{ color: TAB_C.faint, fontWeight: 800, letterSpacing: "0.08em", marginBottom: 3 }}>
+                      NEXT LIKELY EXIT
+                    </div>
+                    <div style={{ color: "#00aaff", fontWeight: 800 }}>
+                      <ExitProximityBadge exit={closestExit} />
+                    </div>
+                    <div style={{ color: TAB_C.dim, marginTop: 3 }}>
+                      Confidence {Number.isFinite(confidence) ? Math.round(confidence) : "—"}
+                    </div>
                   </div>
                 </div>
 
-                <div style={{ marginTop: 9, display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 8 }}>
+                <div style={{ marginTop: 7, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 6 }}>
                   <ExitRuleBox title="Take Profit" status={String(tp["status"] ?? "—")} rows={[
                     ["Target", fmtSignedPct(safeNum(tp["target_pct"], NaN))],
                     ["Current", fmtSignedPct(safeNum(tp["current_pct"], NaN))],
@@ -3801,30 +3885,16 @@ function TradingTab({ detail, loading, clerkUserId }: {
                   <ExitRuleBox title="Max Hold" status={String(maxHold["status"] ?? "—")} rows={[
                     ["Open", `${Math.round(safeNum(maxHold["minutes_open"], 0))} min`],
                     ["Limit", safeNum(maxHold["max_minutes"], NaN) ? `${Math.round(safeNum(maxHold["max_minutes"], 0))} min` : "—"],
-                    ["Remaining", safeNum(maxHold["remaining_minutes"], NaN) ? `${Math.round(safeNum(maxHold["remaining_minutes"], 0))} min` : "—"],
+                    ["Remaining", Number.isFinite(maxHoldRemaining) ? `${Math.round(maxHoldRemaining)} min` : "—"],
                   ]} />
                 </div>
-
-                <button
-                  type="button"
-                  onClick={() => setExpandedTradeId(expanded ? null : tradeId)}
-                  style={{
-                    marginTop: 9, width: "100%", borderRadius: 3,
-                    border: `1px solid ${TAB_C.border}`, background: "#06111d",
-                    color: "#00aaff", padding: "7px 8px", cursor: "pointer",
-                    fontFamily: "monospace", fontSize: 9, fontWeight: 800,
-                    letterSpacing: "0.08em",
-                  }}
-                >
-                  WHY AM I STILL IN THIS TRADE?
-                </button>
 
                 {expanded && (
                   <div style={{
                     marginTop: 8, border: `1px solid ${TAB_C.border}`, borderRadius: 4,
                     padding: 10, background: "#020b14",
                   }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 8 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 8, marginBottom: 8 }}>
                       <DebugKV k="Entry" v={fmtPrice(entryPrice)} />
                       <DebugKV k="Current" v={fmtPrice(currentPrice)} />
                       <DebugKV k="Profit" v={fmtSignedPct(pnlPct)} />
@@ -3844,10 +3914,11 @@ function TradingTab({ detail, loading, clerkUserId }: {
 
                 {showDiagnostics && (
                   <div style={{
-                    marginTop: 8, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8,
+                    marginTop: 8, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8,
                     borderTop: `1px solid ${TAB_C.border}`, paddingTop: 8,
                   }}>
                     <DebugKV k="Peak Profit" v={`${fmtSignedDollar(peakUsd)} · ${fmtSignedPct(peakPct)}`} />
+                    <DebugKV k="Profit Retention" v={Number.isFinite(retentionPct) ? `${Math.round(retentionPct)}%` : "—"} />
                     <DebugKV k="Peak Timestamp" v={fmtMs(diag["peak_profit_at"])} />
                     <DebugKV k="Trailing Armed" v={trailingActive ? "YES" : "NO"} />
                     <DebugKV k="Trailing Trigger" v={fmtPrice(safeNum(diag["exit_trigger_price"], NaN))} />
@@ -3900,13 +3971,33 @@ function TradingTab({ detail, loading, clerkUserId }: {
                 : {};
               const pnl = safeNum(sellTarget["unrealized_pnl"], NaN);
               const pnlPct = safeNum(sellTarget["unrealized_pnl_pct"], NaN);
+              const peakUsd = safeNum(diag["peak_profit_usd"] ?? sellTarget["peak_profit_usd"], NaN);
+              const peakPct = safeNum(diag["peak_profit_pct"] ?? sellTarget["peak_profit_pct"], NaN);
+              const drawdownUsd = safeNum(sellTarget["drawdown_from_peak_usd"], NaN);
+              const drawdownPct = safeNum(sellTarget["drawdown_from_peak_pct"], NaN);
+              const retentionPct = profitRetentionPct(pnl, peakUsd);
               return (
                 <div style={{ display: "grid", gap: 8, fontFamily: "monospace", fontSize: 10 }}>
                   <MetricLine label="SYMBOL" value={String(sellTarget["symbol"] ?? "—")} />
                   <MetricLine label="CURRENT P/L" value={`${fmtSignedDollar(pnl)} · ${fmtSignedPct(pnlPct)}`} color={pctColor(pnl)} />
+                  <MetricLine label="PEAK PROFIT" value={`${fmtSignedDollar(peakUsd)} · ${fmtSignedPct(peakPct)}`} color={pctColor(peakPct)} />
+                  <MetricLine label="PROFIT RETENTION" value={Number.isFinite(retentionPct) ? `${Math.round(retentionPct)}%` : "—"} color={Number.isFinite(retentionPct) ? pctColor(retentionPct - 50) : TAB_C.dim} />
+                  <MetricLine label="DRAWDOWN" value={`${fmtSignedDollar(drawdownUsd)} · ${fmtPct(drawdownPct, 2)}`} color={drawdownPct > 0 ? "#ffaa00" : TAB_C.dim} />
+                  <MetricLine label="TIME OPEN" value={fmtDurationMs(sellTarget["time_open_ms"])} />
                   <MetricLine label="ENTRY PRICE" value={fmtPrice(safeNum(sellTarget["entry_price"], NaN))} />
                   <MetricLine label="CURRENT PRICE" value={fmtPrice(safeNum(sellTarget["current_price"], NaN))} />
                   <MetricLine label="TRAILING" value={Boolean(diag["trailing_active"]) ? "ARMED" : "NO"} />
+                  <div style={{
+                    border: "1px solid #ffaa0055",
+                    background: "#ffaa0012",
+                    color: "#ffd27a",
+                    borderRadius: 3,
+                    padding: "8px 9px",
+                    lineHeight: 1.45,
+                    fontWeight: 700,
+                  }}>
+                    AI may still be holding this position for upside continuation.
+                  </div>
                 </div>
               );
             })()}
@@ -3939,6 +4030,30 @@ function TradingTab({ detail, loading, clerkUserId }: {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      <AdminExitControlsSection clerkUserId={clerkUserId} detail={detail} />
+
+      <TabSectionLabel icon={TrendingUp}>PERFORMANCE SNAPSHOT</TabSectionLabel>
+      {loading && !detail ? <TabLoading /> : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
+          <MetricCell label="REALIZED PNL"  value={fmtDollar(agg?.realizedPnl ?? 0)}
+            color={pctColor(agg?.realizedPnl ?? 0)} />
+          <MetricCell label="WIN RATE"      value={agg?.winRate != null ? `${(agg.winRate * 100).toFixed(1)}%` : "—"}
+            color={(agg?.winRate ?? 0) >= 0.5 ? "#00ff8a" : "#ff8844"} />
+          <MetricCell label="TRADES"        value={`${agg?.tradesCount ?? 0}`}
+            sub={agg ? `${agg.wins}W / ${agg.losses}L` : undefined} />
+          <MetricCell label="AVG CONF"      value={agg?.avgConfidence != null ? `${agg.avgConfidence.toFixed(1)}%` : "—"}
+            color="#00aaff" />
+          <MetricCell label="AVG LATENCY"   value={agg?.avgLatencyMs != null ? `${Math.round(agg.avgLatencyMs)}ms` : "—"} />
+          <MetricCell label="ERROR EVENTS"  value={`${agg?.errorEventCount ?? 0}`}
+            color={(agg?.errorEventCount ?? 0) > 0 ? "#ff8844" : TAB_C.dim} />
+          <MetricCell label="FEES PAID"     value={fmtDollar(agg?.feesGenerated ?? 0)}
+            color="#cc55ff" sub={agg ? `${agg.feeRecords} fee events` : undefined} />
+          <MetricCell label="TRADES/DAY"    value={agg?.tradesPerDay != null ? agg.tradesPerDay.toFixed(2) : "—"}
+            sub={agg ? `${agg.lifetimeDays.toFixed(0)}d lifetime` : undefined} />
+          <MetricCell label="PROFITABLE PNL" value={fmtDollar(agg?.profitablePnl ?? 0)} color="#00ff8a" />
         </div>
       )}
 
@@ -4369,16 +4484,16 @@ export default function Admin() {
     <div className="min-h-screen" style={{ background: "#060810", color: "#EAF2FF" }}>
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="border-b px-6 py-4 flex items-center gap-4"
+      <div className="border-b px-4 py-2 flex items-center gap-3"
         style={{ background: "#000000", borderColor: "#0d1e2e" }}>
-        <div className="p-2 rounded" style={{ background: "#cc55ff12", border: "1px solid #cc55ff30" }}>
+        <div className="p-1.5 rounded" style={{ background: "#cc55ff12", border: "1px solid #cc55ff30" }}>
           <Shield className="w-4 h-4" style={{ color: "#cc55ff", filter: "drop-shadow(0 0 4px #cc55ff)" }} />
         </div>
         <div>
-          <div className="text-[10px] font-mono font-bold tracking-[0.3em]" style={{ color: "#cc55ff80" }}>
+          <div className="text-[8px] font-mono font-bold tracking-[0.24em]" style={{ color: "#cc55ff80" }}>
             RESTRICTED ACCESS · {isSuperAdmin ? "SUPER-ADMIN" : "ADMIN"}
           </div>
-          <div className="text-[18px] font-bold font-mono tracking-[0.1em]" style={{ color: "#EAF2FF" }}>
+          <div className="text-[14px] font-bold font-mono tracking-[0.08em]" style={{ color: "#EAF2FF" }}>
             OPERATOR CONSOLE · USERS
           </div>
         </div>
@@ -4419,10 +4534,10 @@ export default function Admin() {
         </div>
       </div>
 
-      <div className="p-6 space-y-6 max-w-screen-2xl mx-auto">
+      <div className="p-4 space-y-3 max-w-screen-2xl mx-auto">
 
         {/* ── Real Platform Metrics ─────────────────────────────────────── */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2">
           <StatCard icon={Users}      label="Total Users"      value={platformMetrics.total.toLocaleString()}     sub={`${platformMetrics.onlineNow} online now`}        color="#00aaff" />
           <StatCard icon={Globe}      label="Live Exchanges"   value={platformMetrics.liveCount.toString()}        sub="Users with live keys"                              color="#ff8844" />
           <StatCard icon={DollarSign} label="MRR"              value={fmtDollar(platformMetrics.totalMrr)}         sub="Sum of paying subs"                                color="#00ff8a" />
@@ -4435,7 +4550,7 @@ export default function Admin() {
 
         {/* ── Filters Bar ─────────────────────────────────────────────────── */}
         <div className="rounded border overflow-hidden" style={{ borderColor: "#0d1e2e" }}>
-          <div className="flex items-center gap-3 px-4 py-3 border-b" style={{ background: "#000000", borderColor: "#0d1e2e" }}>
+          <div className="flex items-center gap-2 px-3 py-2 border-b" style={{ background: "#000000", borderColor: "#0d1e2e" }}>
             <Users className="w-4 h-4" style={{ color: "#cc55ff" }} />
             <span className="text-[11px] font-bold font-mono tracking-[0.15em]" style={{ color: "#EAF2FF" }}>
               USER MANAGEMENT
