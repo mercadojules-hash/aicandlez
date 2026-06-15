@@ -38,6 +38,7 @@ import { categoryForSymbol, DEFAULT_CATEGORY_ALLOCATION, type SymbolCategory } f
 import { isLiveSymbolDisabled, liveSymbolSizeMultiplier } from "./symbolPolicy.js";
 import { simAccountsTable } from "@workspace/db";
 import { loadParallelConfig, effectivePerExchangeMax } from "./multiExchangeParallel.js";
+import { roundPrice } from "./pricePrecision.js";
 
 // ── Per-user live execution bridge ────────────────────────────────────────────
 //
@@ -1906,7 +1907,7 @@ export async function placeLiveAutoOrderForUser(
       userId,
       exchange:        row.exchange,
       exchangeOrderId: `DRYRUN-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      fillPrice:       parseFloat(referencePrice.toFixed(2)),
+      fillPrice:       roundPrice(referencePrice),
       quantity:        qtyBase,
       sizeUSD,
       dryRun:          true,
@@ -2310,7 +2311,7 @@ export async function placeLiveCloseOrderForUser(
       userId,
       exchange:             row.exchange,
       exchangeCloseOrderId: `DRYRUN-CLOSE-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      fillPrice:            parseFloat(referencePrice.toFixed(2)),
+      fillPrice:            roundPrice(referencePrice),
       quantity,
       dryRun:               true,
     };

@@ -19,6 +19,7 @@ import { recordPerformanceFee, resolveFeePolicy } from "./feeLedger.js";
 import { resolveCorrelation } from "./executionTelemetry.js";
 import { resolveExitConfig } from "./exitConfig.js";
 import { getExcursion, clearExcursion } from "./excursionTracker.js";
+import { roundPrice } from "./pricePrecision.js";
 
 // Synchronous equity proxy used by close-path instrumentation. Equity here =
 // cashBalance + Σ position.sizeUSD (entry notional). It is NOT a live MTM —
@@ -1002,7 +1003,7 @@ export async function placeUserOrder(userId: string, req: UserOrderRequest): Pro
     symbol,
     side,
     quantity:   parseFloat(quantity.toFixed(8)),
-    entryPrice: parseFloat(entryPrice.toFixed(2)),
+    entryPrice: roundPrice(entryPrice),
     entryTime:  Date.now(),
     sizeUSD:    parseFloat(sizeUSD.toFixed(2)),
     signalId:   req.signalId,
@@ -1072,7 +1073,7 @@ export async function registerLiveUserFill(params: {
     symbol:          normalizeSymbol(params.symbol),
     side:            params.side,
     quantity:        parseFloat(params.quantity.toFixed(8)),
-    entryPrice:      parseFloat(params.entryPrice.toFixed(2)),
+    entryPrice:      roundPrice(params.entryPrice),
     entryTime:       Date.now(),
     sizeUSD:         parseFloat(params.sizeUSD.toFixed(2)),
     signalId:        params.signalId,

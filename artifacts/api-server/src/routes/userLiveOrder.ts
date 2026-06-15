@@ -20,6 +20,7 @@ import { isCustomerLiveExecutionEnabled } from "../lib/liveUserExecution.js";
 import { executeCustomerOrder } from "../lib/executionGateway.js";
 import { registerLiveUserFill } from "../lib/userSimRegistry.js";
 import { resolveExitConfig } from "../lib/exitConfig.js";
+import { roundPrice } from "../lib/pricePrecision.js";
 import { TIER_MAX_SIZE_USD, type TierPlan } from "../lib/tierLimits.js";
 import { getSupportedExchanges, UnsupportedSymbolError } from "../lib/marketData.js";
 import { emit as emitTelemetry, genCorrelationId, rememberCorrelation } from "../lib/executionTelemetry.js";
@@ -422,8 +423,8 @@ router.post(
             quantity:               qty,
             entryPrice:             entry,
             sizeUSD:                resolvedSizeUSD,
-            stopLoss:               parseFloat(sl.toFixed(2)),
-            takeProfit:             parseFloat(tp.toFixed(2)),
+            stopLoss:               roundPrice(sl),
+            takeProfit:             roundPrice(tp),
             exchange:               result.exchange ?? "unknown",
             exchangeOrderId:        orderId,
             entryFeeBroker:         result.brokerFee,

@@ -43,6 +43,7 @@ import { resolveExitConfig, buildExitConfigResolver } from "./exitConfig.js";
 import { evaluateStrategyV2Gate, isStrategyV2Enabled } from "./strategyV2Gate.js";
 import { updateExcursion, pruneExcursions } from "./excursionTracker.js";
 import { logger } from "./logger.js";
+import { roundOptionalPrice, roundPrice } from "./pricePrecision.js";
 
 function genId() { return crypto.randomUUID(); }
 
@@ -958,16 +959,16 @@ export async function registerManualOperatorTrade(args: {
     symbol,
     side,
     amount:          parseFloat(sizeUSD.toFixed(2)),
-    price:           parseFloat(fillPrice.toFixed(2)),
+    price:           roundPrice(fillPrice),
     status:          "open",
     mode:            "manual",
     signalId:        null,
-    stopLoss:        stopLoss   !== null ? parseFloat(stopLoss.toFixed(2))   : null,
-    takeProfit:      takeProfit !== null ? parseFloat(takeProfit.toFixed(2)) : null,
+    stopLoss:        roundOptionalPrice(stopLoss),
+    takeProfit:      roundOptionalPrice(takeProfit),
     reason:          "Manual operator override — AI-managed SL/TP",
     exchange,
     exchangeOrderId: exchangeOrderId ?? null,
-    fillPrice:       parseFloat(fillPrice.toFixed(2)),
+    fillPrice:       roundPrice(fillPrice),
     fillQty:         parseFloat(fillQty.toFixed(8)),
   });
 
@@ -1771,8 +1772,8 @@ async function autoExecute(
             sizeUSD:         resolvedSizeUSD,
             signalId,
             confidence,
-            stopLoss:        parseFloat(userSL.toFixed(2)),
-            takeProfit:      parseFloat(userTP.toFixed(2)),
+            stopLoss:        roundPrice(userSL),
+            takeProfit:      roundPrice(userTP),
             exchange:        r.exchange ?? "unknown",
             exchangeOrderId: orderId,
             entryFeeBroker:         r.brokerFee,
@@ -1788,8 +1789,8 @@ async function autoExecute(
               entryPrice:     userEntry,
               quantity:       userQty,
               positionId:     mirroredPositionId,
-              stopLoss:       parseFloat(userSL.toFixed(2)),
-              takeProfit:     parseFloat(userTP.toFixed(2)),
+              stopLoss:       roundPrice(userSL),
+              takeProfit:     roundPrice(userTP),
               // Resolved exit settings actually applied to this live entry
               // (req: logs surface the resolved exit config on new live opens).
               exitConfig: {
@@ -2147,11 +2148,11 @@ async function autoExecute(
             signalId:   signalId ?? undefined,
             confidence,
             stopLoss:   side === "BUY"
-              ? parseFloat((pos.entryPrice * (1 - u.stopLossPercent   / 100)).toFixed(2))
-              : parseFloat((pos.entryPrice * (1 + u.stopLossPercent   / 100)).toFixed(2)),
+              ? roundPrice(pos.entryPrice * (1 - u.stopLossPercent   / 100))
+              : roundPrice(pos.entryPrice * (1 + u.stopLossPercent   / 100)),
             takeProfit: side === "BUY"
-              ? parseFloat((pos.entryPrice * (1 + u.takeProfitPercent / 100)).toFixed(2))
-              : parseFloat((pos.entryPrice * (1 - u.takeProfitPercent / 100)).toFixed(2)),
+              ? roundPrice(pos.entryPrice * (1 + u.takeProfitPercent / 100))
+              : roundPrice(pos.entryPrice * (1 - u.takeProfitPercent / 100)),
           });
           if (userResult.success) {
             paperFanoutFills++;
@@ -2278,8 +2279,8 @@ async function autoExecute(
     status:     "open",
     mode:       tradeMode,
     signalId,
-    stopLoss:   parseFloat(stopLoss.toFixed(2)),
-    takeProfit: parseFloat(takeProfit.toFixed(2)),
+    stopLoss:   roundPrice(stopLoss),
+    takeProfit: roundPrice(takeProfit),
     reason:     shortSummary,
   });
 
@@ -2307,8 +2308,8 @@ async function autoExecute(
   auditLogger.append("system", "TRADE_EXECUTED", {
     symbol, side, sizeUSD,
     entryPrice:  pos.entryPrice,
-    stopLoss:    parseFloat(stopLoss.toFixed(2)),
-    takeProfit:  parseFloat(takeProfit.toFixed(2)),
+    stopLoss:    roundPrice(stopLoss),
+    takeProfit:  roundPrice(takeProfit),
     signalId,
     shortSummary,
     tradeMode,
