@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { getWsStats } from "../lib/wsServer.js";
+import { getTradeSizeOverrideUsd } from "../lib/tradeSizeOverride.js";
 
 const router: IRouter = Router();
 
@@ -37,6 +38,9 @@ router.get("/healthz", async (_req, res) => {
     },
     websocket: {
       connected: ws.connected,
+    },
+    runtimeConfig: {
+      tradeSizeOverrideUsd: getTradeSizeOverrideUsd(),
     },
     timestamp: new Date().toISOString(),
   });
