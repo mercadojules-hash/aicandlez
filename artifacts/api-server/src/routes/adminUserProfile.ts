@@ -105,11 +105,15 @@ async function writeAudit(
   return id;
 }
 
-function resolveActor(req: Request, res: Response): { actorId: string; targetId: string } | null {
+function resolveActor(
+  req: Request,
+  res: Response,
+  opts: { allowSelf?: boolean } = {},
+): { actorId: string; targetId: string } | null {
   const actorId  = (req as AuthReq).clerkUserId;
   const targetId = String(req.params["id"] ?? "");
   if (!targetId) { res.status(400).json({ error: "Missing user id" }); return null; }
-  if (actorId === targetId) {
+  if (!opts.allowSelf && actorId === targetId) {
     res.status(400).json({ error: "Operators cannot edit their own settings through this surface" });
     return null;
   }
@@ -502,7 +506,7 @@ const ManualSellBody = z.object({
 });
 
 router.post("/admin/users/:id/manual-sell", ...requireOperator, async (req, res): Promise<void> => {
-  const ctx = resolveActor(req, res);
+  const ctx = resolveActor(req, res, { allowSelf: true });
   if (!ctx) return;
   const parsed = ManualSellBody.safeParse(req.body ?? {});
   if (!parsed.success) {
