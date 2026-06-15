@@ -31,7 +31,10 @@ import { __invalidateAdminUserTelemetryCache } from "./adminUserTelemetry.js";
 import { executionStreamBus } from "../lib/executionStreamBus.js";
 import { getUncachableStripeClient } from "../stripeClient.js";
 import { resolvePriceIdForPlan } from "../lib/adminBillingActions.js";
-import { closeUserPosition } from "../lib/userSimRegistry.js";
+import { executeCustomerOrder } from "../lib/executionGateway.js";
+import { closeUserPosition, registerLiveUserFill } from "../lib/userSimRegistry.js";
+import { emit as emitTelemetry, genCorrelationId, rememberCorrelation } from "../lib/executionTelemetry.js";
+import { notifyFillHydrated } from "../lib/positionStore.js";
 import type Stripe from "stripe";
 
 const router = Router();
@@ -503,6 +506,227 @@ const ManualSellBody = z.object({
   positionId: z.string().trim().min(1, "positionId is required"),
   symbol:     z.string().trim().min(1).max(30).optional(),
   note:       z.string().trim().max(2_000).optional(),
+});
+
+const OperatorBuyBody = z.object({
+  symbol:     z.string().trim().min(2, "symbol is required").max(30),
+  sizeUSD:    z.number().min(1).max(100_000).optional(),
+  confidence: z.number().min(0).max(100).optional(),
+  note:       z.string().trim().max(2_000).optional(),
+});
+
+const OPERATOR_BUY_LABEL = "OPERATOR_ENTERED";
+const OPERATOR_BUY_DEFAULT_SIZE_USD = 125;
+
+router.post("/admin/users/:id/operator-buy", ...requireOperator, async (req, res): Promise<void> => {
+  const ctx = resolveActor(req, res, { allowSelf: true });
+  if (!ctx) return;
+  const parsed = OperatorBuyBody.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json(serialize4xx(req, parsed.error, "operator-buy"));
+    return;
+  }
+
+  const symbol = parsed.data.symbol.trim().toUpperCase();
+  const sizeUSD = parsed.data.sizeUSD ?? OPERATOR_BUY_DEFAULT_SIZE_USD;
+  const correlationId = genCorrelationId();
+  const acceptedAt = Date.now();
+
+  try {
+    req.log.warn({
+      tag:          "OPERATOR_BUY_REQUESTED",
+      operatorId:   ctx.actorId,
+      targetUserId: ctx.targetId,
+      symbol,
+      sizeUSD,
+      label:        OPERATOR_BUY_LABEL,
+    }, "[OPERATOR_BUY_REQUESTED] operator requested immediate live buy for user account");
+
+    const result = await executeCustomerOrder({
+      trigger:       "manual",
+      userId:        ctx.targetId,
+      symbol,
+      side:          "BUY",
+      sizeUSD,
+      useSandbox:    false,
+      correlationId,
+    });
+
+    if (!result.success) {
+      res.status(result.errorCode === "unsupported_symbol" ? 400 : 409).json({
+        ok:            false,
+        errorCode:     result.errorCode,
+        error:         result.error ?? "Operator buy rejected",
+        exchange:      result.exchange,
+        correlationId,
+      });
+      return;
+    }
+
+    let persistenceResult: "persisted" | "failed" = "persisted";
+    let mirroredPositionId: string | null = null;
+    let stopLoss: number | null = null;
+    let takeProfit: number | null = null;
+    let exitConfig: {
+      stopLossPercent: number;
+      takeProfitPercent: number;
+      trailingStopPercent: number | null;
+      maxHoldHours: number;
+    } | null = null;
+
+    try {
+      const entry = result.fillPrice ?? 0;
+      const resolvedSizeUSD = result.sizeUSD ?? sizeUSD;
+      const qty = result.quantity ?? (entry > 0 ? resolvedSizeUSD / entry : 0);
+      if (entry <= 0 || qty <= 0) {
+        throw new Error("Broker fill missing positive price/quantity");
+      }
+      const { resolveExitConfig } = await import("../lib/exitConfig.js");
+      const cfg = await resolveExitConfig(ctx.targetId, result.exchange ?? null);
+      exitConfig = {
+        stopLossPercent:     cfg.stopLossPercent,
+        takeProfitPercent:   cfg.takeProfitPercent,
+        trailingStopPercent: cfg.trailingStopPercent,
+        maxHoldHours:        cfg.maxHoldHours,
+      };
+      stopLoss = parseFloat((entry * (1 - cfg.stopLossPercent / 100)).toFixed(2));
+      takeProfit = parseFloat((entry * (1 + cfg.takeProfitPercent / 100)).toFixed(2));
+      const orderId = result.exchangeOrderId
+        ?? `OPERATOR-LIVE-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const pos = await registerLiveUserFill({
+        userId:                 ctx.targetId,
+        symbol,
+        side:                   "BUY",
+        quantity:               qty,
+        entryPrice:             entry,
+        sizeUSD:                resolvedSizeUSD,
+        signalId:               OPERATOR_BUY_LABEL,
+        confidence:             parsed.data.confidence,
+        stopLoss,
+        takeProfit,
+        exchange:               result.exchange ?? "unknown",
+        exchangeOrderId:        orderId,
+        entryFeeBroker:         result.brokerFee,
+        entryFeeBrokerCurrency: result.brokerFeeCurrency,
+        sandbox:                false,
+      });
+      mirroredPositionId = pos?.id ?? orderId;
+
+      req.log.info({
+        tag:        "LIVE_EXIT_CONFIG_RESOLVED",
+        userId:     ctx.targetId,
+        exchange:   result.exchange ?? null,
+        symbol,
+        side:       "BUY",
+        positionId: mirroredPositionId,
+        label:      OPERATOR_BUY_LABEL,
+        exitConfig,
+      }, `[LIVE_EXIT_CONFIG_RESOLVED] ${ctx.targetId} ${symbol} operator BUY exits TP${cfg.takeProfitPercent}%/SL${cfg.stopLossPercent}%/trail${cfg.trailingStopPercent ?? "mirror"}/hold${cfg.maxHoldHours}h`);
+    } catch (mirrorErr) {
+      persistenceResult = "failed";
+      req.log.error({
+        tag:          "OPERATOR_BUY_PERSISTENCE_FAILED",
+        correlationId,
+        operatorId:   ctx.actorId,
+        targetUserId: ctx.targetId,
+        symbol,
+        err: mirrorErr instanceof Error ? mirrorErr.message : String(mirrorErr),
+      }, "[OPERATOR_BUY_PERSISTENCE_FAILED] broker fill placed but live position mirror failed");
+    }
+
+    if (persistenceResult === "persisted") {
+      rememberCorrelation(mirroredPositionId, correlationId, "manual");
+      rememberCorrelation(result.exchangeOrderId ?? null, correlationId, "manual");
+    }
+    const positionId = mirroredPositionId ?? result.exchangeOrderId ?? null;
+    emitTelemetry({
+      tag:               "POSITION_PERSISTED",
+      correlationId,
+      userId:            ctx.targetId,
+      symbol,
+      normalizedSymbol:  symbol,
+      exchange:          result.exchange ?? null,
+      runtimeMode:       "live",
+      persistenceResult,
+      positionId,
+      latencyMs:         Date.now() - acceptedAt,
+      trigger:           "manual",
+      side:              "BUY",
+      sizeUSD,
+      fillPrice:         result.fillPrice ?? null,
+      label:             OPERATOR_BUY_LABEL,
+    });
+    if (persistenceResult === "persisted") {
+      notifyFillHydrated({
+        trigger:         "manual",
+        correlationId,
+        userId:          ctx.targetId,
+        symbol,
+        side:            "BUY",
+        sizeUSD:         result.sizeUSD ?? sizeUSD,
+        fillPrice:       result.fillPrice ?? null,
+        quantity:        result.quantity ?? null,
+        exchange:        result.exchange ?? null,
+        exchangeOrderId: result.exchangeOrderId ?? null,
+        positionId,
+        runtimeMode:     "live",
+        latencyMs:       Date.now() - acceptedAt,
+        sandbox:         false,
+        dryRun:          result.dryRun === true,
+      });
+    }
+
+    const auditId = await writeAudit({
+      actorId:  ctx.actorId,
+      targetId: ctx.targetId,
+      action:   OPERATOR_BUY_LABEL,
+      payload: {
+        note: parsed.data.note?.trim() || "Operator live BUY from trading dashboard",
+        operatorId:   ctx.actorId,
+        targetUserId: ctx.targetId,
+        symbol,
+        side:         "BUY",
+        sizeUSD,
+        label:        OPERATOR_BUY_LABEL,
+        confidence:   parsed.data.confidence ?? null,
+        exchange:     result.exchange ?? null,
+        exchangeOrderId: result.exchangeOrderId ?? null,
+        positionId,
+        fillPrice:    result.fillPrice ?? null,
+        quantity:     result.quantity ?? null,
+        stopLoss,
+        takeProfit,
+        exitConfig,
+        persistenceResult,
+        correlationId,
+      },
+    });
+
+    res.status(persistenceResult === "persisted" ? 201 : 202).json({
+      ok: persistenceResult === "persisted",
+      auditId,
+      label: OPERATOR_BUY_LABEL,
+      persistenceResult,
+      positionId,
+      exchange:        result.exchange,
+      exchangeOrderId: result.exchangeOrderId,
+      fillPrice:       result.fillPrice,
+      quantity:        result.quantity,
+      sizeUSD:         result.sizeUSD ?? sizeUSD,
+      stopLoss,
+      takeProfit,
+      exitConfig,
+      dryRun:          result.dryRun ?? false,
+      correlationId,
+    });
+  } catch (err) {
+    res.status(500).json(serialize5xx(req, err, "operator-buy", {
+      targetId: ctx.targetId,
+      symbol,
+      sizeUSD,
+      correlationId,
+    }));
+  }
 });
 
 router.post("/admin/users/:id/manual-sell", ...requireOperator, async (req, res): Promise<void> => {

@@ -36,6 +36,8 @@ const apiBaseUrl: string = (
   (import.meta.env["VITE_API_BASE_URL"] as string | undefined) ?? ""
 ).replace(/\/$/, "");
 
+const OPERATOR_BUY_SIZE_USD = 125;
+
 // ── DEV-only customer-preview gate ───────────────────────────────────────────
 // Mirrors `shouldForceCustomerPreview()` in Portal.tsx. When an admin opens the
 // customer shell via `?previewCustomer=1` on a .replit.dev preview origin, the
@@ -313,7 +315,7 @@ export function SignalRow({ spec, breakdown }: Props) {
   // `["billing-subscription-portal-shell"]` cache entry. Net zero new
   // network for the row tree.
   const plan: Plan = useCustomerPlan();
-  const { getToken }  = useAuth();
+  const { getToken, userId }  = useAuth();
   const qc            = useQueryClient();
   const liveFallbackToastedRef = useRef(false);
   const [liveSize, setLiveSize] = useLiveOrderSize();
@@ -443,6 +445,9 @@ export function SignalRow({ spec, breakdown }: Props) {
   };
 
   const sandboxFallbackToastedRef = useRef(false);
+  const operatorOrderInFlightRef = useRef(false);
+  const [operatorBuyConfirmOpen, setOperatorBuyConfirmOpen] = useState(false);
+  const [operatorBuyPending, setOperatorBuyPending] = useState(false);
 
   /** Fire a paper trade through the internal simulator (legacy default path). */
   const firePaperSim = (side: "LONG" | "SHORT", sl: number, tp: number) => {
@@ -511,8 +516,90 @@ export function SignalRow({ spec, breakdown }: Props) {
     });
   };
 
-  const operatorOrderInFlightRef = useRef(false);
   const armedForLive = useArmedForLive();
+  const executeOperatorBuy = () => {
+    if (!userId) {
+      toast({
+        title: `OPERATOR BUY UNAVAILABLE — ${spec.label}`,
+        description: "Authenticated operator user id is not available yet.",
+      });
+      return;
+    }
+    if (operatorOrderInFlightRef.current || operatorBuyPending) {
+      toast({
+        title: `OPERATOR ORDER IN FLIGHT — ${spec.label}`,
+        description: `Wait for the previous BUY on ${spec.symbol} to settle before sending another.`,
+      });
+      return;
+    }
+    operatorOrderInFlightRef.current = true;
+    setOperatorBuyPending(true);
+    toast({
+      title: `OPERATOR BUY SUBMITTED — ${spec.label}`,
+      description: `BUY · $${OPERATOR_BUY_SIZE_USD} notional · hand management to AI · ${conf}% confidence`,
+    });
+    void (async () => {
+      try {
+        const token = await getToken().catch(() => null);
+        const res = await authFetch(`${apiBaseUrl}/api/admin/users/${encodeURIComponent(userId)}/operator-buy`, {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            symbol:     spec.symbol,
+            sizeUSD:    OPERATOR_BUY_SIZE_USD,
+            confidence: confActive ? conf : undefined,
+            note:       "Operator Buy from signal row; hand management to AI",
+          }),
+        });
+        const body = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          errorCode?: string;
+          label?: string;
+          exchange?: string;
+          exchangeOrderId?: string;
+          fillPrice?: number;
+          positionId?: string;
+          dryRun?: boolean;
+        };
+        if (!res.ok || body.error) {
+          toast({
+            title: `OPERATOR BUY REJECTED — ${spec.label}`,
+            description: body.error ?? body.errorCode ?? `HTTP ${res.status}`,
+          });
+          return;
+        }
+        const exch = (body.exchange ?? "exchange").toUpperCase();
+        const orderIdShort = body.exchangeOrderId
+          ? `#${body.exchangeOrderId.slice(-8)}`
+          : "";
+        const priceStr = body.fillPrice && body.fillPrice > 0
+          ? `$${fmt(body.fillPrice)}`
+          : "market";
+        toast({
+          title: `OPERATOR_ENTERED @ ${priceStr} — ${spec.label}${body.dryRun ? " (DRY RUN)" : ""}`,
+          description: ["BUY", exch, orderIdShort, "AI MANAGED"].filter(Boolean).join(" · "),
+        });
+        setOperatorBuyConfirmOpen(false);
+        void qc.invalidateQueries({ queryKey: ["customer-simulation-account"] });
+        void qc.invalidateQueries({ queryKey: ["customer-simulation-trades"] });
+        void qc.invalidateQueries({ queryKey: ["admin-user-detail", userId] });
+        void qc.invalidateQueries({ queryKey: ["runtime-state"] });
+      } catch (err) {
+        toast({
+          title: `OPERATOR BUY ERROR — ${spec.label}`,
+          description: err instanceof Error ? err.message : String(err),
+        });
+      } finally {
+        operatorOrderInFlightRef.current = false;
+        setOperatorBuyPending(false);
+      }
+    })();
+  };
+
   const fireTrade = (side: "LONG" | "SHORT") => {
     // [MANUAL_BUY_CLICK] — top-of-funnel diagnostic log added 2026-05-28
     // for the customer "click ignored / partial execute" report. Fires
@@ -552,6 +639,25 @@ export function SignalRow({ spec, breakdown }: Props) {
     }
     const sl = side === "LONG" ? entry * 0.98  : entry * 1.02;
     const tp = side === "LONG" ? entry * 1.045 : entry * 0.955;
+
+    if (isOperatorRole) {
+      if (side !== "LONG") {
+        toast({
+          title: `OPERATOR SELL DISABLED — ${spec.label}`,
+          description: "Use Manual Sell on an existing live position. Operator Buy does not open shorts.",
+        });
+        return;
+      }
+      if (roleLoading) {
+        toast({
+          title: "OPERATOR ROLE STILL LOADING",
+          description: "Wait for admin permissions to finish resolving before sending a live buy.",
+        });
+        return;
+      }
+      setOperatorBuyConfirmOpen(true);
+      return;
+    }
 
     // [TRADE_BRANCH_DECISION] — TEMP instrumentation (2026-05-28). Dumps
     // the full predicate snapshot the gate at L519 will evaluate so the
@@ -714,76 +820,6 @@ export function SignalRow({ spec, breakdown }: Props) {
         title: "LIVE LOCKED — USING PAPER",
         description: portalMode.liveLockReason ?? "Live trading is currently unavailable",
       });
-    }
-
-    // Admin operator trees (CommandCenter, /admintrade /portal): real-only by
-    // invariant — route directly through the operator-env Kraken execution
-    // path (`/api/exchange/order/execute`). Gate on `isOperatorRole` (from
-    // `useUserRole().isAdmin`) ONLY — never fall back on
-    // `!portalMode.isCustomerPortal`, because customer /portal does not
-    // mount `PortalModeProvider`, which would make a non-admin customer's
-    // BUY click leak into the operator Kraken path. Customer is PAPER-only
-    // by locked invariant — non-admins fall through to `firePaper()`.
-    if (isOperatorRole) {
-      // eslint-disable-next-line no-console
-      console.log("[TRADE_BRANCH]", "OPERATOR_KRAKEN", { symbol: spec.symbol, side });
-      if (operatorOrderInFlightRef.current) {
-        toast({
-          title: `OPERATOR ORDER IN FLIGHT — ${spec.label}`,
-          description: `Wait for the previous ${side} on ${spec.symbol} to settle before sending another.`,
-        });
-        return;
-      }
-      operatorOrderInFlightRef.current = true;
-      toast({
-        title: `OPERATOR LIVE ORDER SUBMITTED — ${spec.label}`,
-        description: `${side} · routing to KRAKEN (operator env) · $${liveSize} notional · AI ${conf}%`,
-      });
-      void (async () => {
-        try {
-          const token = await getToken().catch(() => null);
-          const url = `${apiBaseUrl}/api/exchange/order/execute`;
-          const payload = {
-            symbol:    spec.symbol,
-            side:      side === "LONG" ? "buy" : "sell",
-            orderType: "market",
-            amountUSD: liveSize,
-          };
-          const res = await authFetch(url, {
-            method: "POST",
-            credentials: "include",
-            headers: {
-              "Content-Type": "application/json",
-              ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
-            body: JSON.stringify(payload),
-          });
-          if (!res.ok) {
-            const body = await res.json().catch(() => ({} as { error?: string }));
-            toast({
-              title: `OPERATOR ORDER REJECTED — ${spec.label}`,
-              description: (body as { error?: string }).error ?? `HTTP ${res.status}`,
-            });
-            return;
-          }
-          const body = (await res.json().catch(() => ({}))) as {
-            id?: string; status?: string; fillPrice?: number; avgPrice?: number;
-          };
-          const fill = body.fillPrice ?? body.avgPrice;
-          toast({
-            title: `OPERATOR FILLED — ${spec.label}${fill ? ` @ $${fmt(fill)}` : ""}`,
-            description: [side, "KRAKEN", body.status, body.id ? `#${body.id.slice(-8)}` : ""].filter(Boolean).join(" · "),
-          });
-        } catch (err) {
-          toast({
-            title: `OPERATOR ORDER ERROR — ${spec.label}`,
-            description: err instanceof Error ? err.message : String(err),
-          });
-        } finally {
-          operatorOrderInFlightRef.current = false;
-        }
-      })();
-      return;
     }
 
     // eslint-disable-next-line no-console
@@ -1158,6 +1194,85 @@ export function SignalRow({ spec, breakdown }: Props) {
         )}
       </div>
     </div>
+    {operatorBuyConfirmOpen && (
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Confirm operator buy ${spec.label}`}
+        style={{
+          position: "fixed", inset: 0, zIndex: 2147482000,
+          display: "grid", placeItems: "center",
+          padding: 18, background: "rgba(0,0,0,0.72)",
+          fontFamily: N.FONT_MONO,
+        }}
+        onClick={() => {
+          if (!operatorBuyPending) setOperatorBuyConfirmOpen(false);
+        }}
+      >
+        <div
+          style={{
+            width: "min(460px, 100%)",
+            background: "#050806",
+            border: `1px solid ${N.BRAND}66`,
+            boxShadow: `0 0 32px ${N.BRAND}22, inset 0 0 20px ${N.BRAND}08`,
+            borderRadius: 6,
+            padding: 16,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div style={{
+            color: N.BRAND_BRT, fontSize: 10, fontWeight: 900,
+            letterSpacing: "0.22em", marginBottom: 10,
+          }}>
+            CONFIRM OPERATOR BUY
+          </div>
+          <div style={{ color: N.TEXT_0, fontSize: 16, fontWeight: 900, lineHeight: 1.35 }}>
+            Buy ${OPERATOR_BUY_SIZE_USD} of {spec.label} and hand management to AI?
+          </div>
+          <div style={{
+            marginTop: 12, display: "grid",
+            gridTemplateColumns: "1fr 1fr", gap: 8,
+            color: N.TEXT_2, fontSize: 10,
+          }}>
+            <div>Symbol <span style={{ color: N.TEXT_0, fontWeight: 800 }}>{spec.symbol}</span></div>
+            <div>AI Confidence <span style={{ color: N.BRAND_BRT, fontWeight: 800 }}>{confActive ? `${conf}%` : "—"}</span></div>
+            <div>Estimated Entry <span style={{ color: N.TEXT_0, fontWeight: 800 }}>${fmt(entry)}</span></div>
+            <div>Label <span style={{ color: N.BRAND_BRT, fontWeight: 800 }}>OPERATOR_ENTERED</span></div>
+          </div>
+          <div style={{ marginTop: 12, color: N.TEXT_3, fontSize: 10, lineHeight: 1.45 }}>
+            This sends a real market BUY through the user-scoped execution path. AI exit management attaches stop loss, take profit, trailing stop, and max hold protections after fill.
+          </div>
+          <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end", gap: 8 }}>
+            <button
+              type="button"
+              disabled={operatorBuyPending}
+              onClick={() => setOperatorBuyConfirmOpen(false)}
+              style={{
+                padding: "8px 12px", border: `1px solid ${N.BORDER_HI}`,
+                background: "transparent", color: N.TEXT_2,
+                fontFamily: N.FONT_MONO, fontSize: 10, fontWeight: 900,
+                letterSpacing: "0.12em", cursor: operatorBuyPending ? "wait" : "pointer",
+              }}
+            >
+              CANCEL
+            </button>
+            <button
+              type="button"
+              disabled={operatorBuyPending}
+              onClick={executeOperatorBuy}
+              style={{
+                padding: "8px 12px", border: `1px solid ${N.BRAND_BRT}`,
+                background: `${N.BRAND}18`, color: N.BRAND_BRT,
+                fontFamily: N.FONT_MONO, fontSize: 10, fontWeight: 900,
+                letterSpacing: "0.12em", cursor: operatorBuyPending ? "wait" : "pointer",
+              }}
+            >
+              {operatorBuyPending ? "BUYING..." : "BUY NOW"}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
     {insightsEnabled && breakdown && (
       <WhyNotTradeStrip
         conf={conf}

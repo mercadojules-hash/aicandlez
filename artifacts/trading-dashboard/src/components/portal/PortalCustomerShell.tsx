@@ -5114,6 +5114,7 @@ type PortalOpenPositionRow = {
   pnl: number;
   pnlPct: number;
   origin?: string;
+  entryLabel?: string | null;
   entryTime?: number | null;
   exchangeOrderId?: string | null;
   admin?: Record<string, unknown>;
@@ -5383,6 +5384,7 @@ function AdminOpenPositionsCommandCenter({
               : retentionPct >= 50 ? T.AMBER : T.RED;
             const isLive = !!row.origin && row.origin !== "PAPER";
             const busy = manualSell.isPending && sellTarget?.id === row.id;
+            const entryLabel = String(raw["signal_id"] ?? raw["signalId"] ?? row.entryLabel ?? "");
             const closestExit = String(ai["next_likely_exit"] ?? raw["exit_condition_closest_to_trigger"] ?? "—");
             const confidence = portalMetricNum(ai["confidence"]);
             const expanded = expandedTradeId === row.id;
@@ -5412,6 +5414,11 @@ function AdminOpenPositionsCommandCenter({
                     <span style={{ color: isLive ? T.AMBER : T.TEXT_3, fontSize: 8, fontWeight: 900, letterSpacing: T.TRACK_LABEL }}>
                       {isLive ? `LIVE · ${row.origin}` : "PAPER"}
                     </span>
+                    {entryLabel === "OPERATOR_ENTERED" && (
+                      <span style={{ color: T.NEON, fontSize: 8, fontWeight: 900, letterSpacing: T.TRACK_LABEL }}>
+                        OPERATOR_ENTERED
+                      </span>
+                    )}
                   </div>
                   <PortalCommandMetric label="ENTRY" value={fmtPrice(entryPrice)} />
                   <PortalCommandMetric label="CURRENT" value={fmtPrice(currentPrice)} />
@@ -5677,7 +5684,8 @@ function CustomerBlotterPanelOpen({ rows, entitled = false }: {
           <CustomerBlotterRow key={t.id}
             symbol={t.symbol} side={t.side} sideColor={sideColor}
             entry={t.entry} other={t.last} pnl={t.pnl} pnlPct={t.pnlPct} pnlColor={pnlColor}
-            origin={t.origin} />
+            origin={t.origin}
+            entryLabel={t.entryLabel} />
         );
       })}
     </CustomerBlotterShell>
@@ -5783,6 +5791,7 @@ function CustomerBlotterShell({
 
 function CustomerBlotterRow({
   symbol, side, sideColor, entry, other, pnl, pnlPct, pnlColor, origin,
+  entryLabel,
 }: {
   symbol: string; side: "LONG" | "SHORT"; sideColor: string;
   entry: number; other: number; pnl: number; pnlPct: number; pnlColor: string;
@@ -5792,6 +5801,7 @@ function CustomerBlotterRow({
      paper-sim row with a real-money position regardless of runtime
      mode. Undefined = no chip (back-compat). */
   origin?: string;
+  entryLabel?: string | null;
 }) {
   const fmtUsd = (n: number) => `${n >= 0 ? "+" : "-"}$${Math.abs(n).toFixed(2)}`;
   const fmtPct = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;
@@ -5817,6 +5827,17 @@ function CustomerBlotterRow({
             alignSelf: "flex-start",
           }}>
             {chipLabel}
+          </span>
+        )}
+        {entryLabel === "OPERATOR_ENTERED" && (
+          <span style={{
+            fontSize: 8.5, fontWeight: 800, letterSpacing: "0.16em",
+            color: N.BRAND_BRT,
+            padding: "1px 5px", borderRadius: 2,
+            border: `1px solid ${N.BRAND_BRT}55`, background: `${N.BRAND_BRT}10`,
+            alignSelf: "flex-start",
+          }}>
+            OPERATOR_ENTERED
           </span>
         )}
       </span>
@@ -6153,6 +6174,7 @@ export function PortalCustomerShell({ operatorPreview = false }: { operatorPrevi
     unrealizedPnLPct?: number;
     exchange?:        string | null;
     exchangeOrderId?: string | null;
+    signalId?:        string | null;
     stopLoss?:         number | null;
     takeProfit?:       number | null;
   };
@@ -6237,6 +6259,7 @@ export function PortalCustomerShell({ operatorPreview = false }: { operatorPrevi
         pnl:     Number(t.realizedPnL) || 0,
         pnlPct:  Number(t.realizedPnLPct) || 0,
         origin:  t.exchange ? t.exchange.toUpperCase() : "PAPER",
+        entryLabel: null,
       })),
     [serverTradesResp],
   );
@@ -6311,6 +6334,7 @@ export function PortalCustomerShell({ operatorPreview = false }: { operatorPrevi
         pnl:     Number(p.unrealizedPnL ?? 0),
         pnlPct:  Number(p.unrealizedPnLPct ?? 0),
         origin:  exch ? exch.toUpperCase() : "PAPER",
+        entryLabel: p.signalId ?? null,
         entryTime: Number.isFinite(Number(p.entryTime)) ? Number(p.entryTime) : null,
         exchangeOrderId: p.exchangeOrderId ?? null,
       };
@@ -6393,6 +6417,7 @@ export function PortalCustomerShell({ operatorPreview = false }: { operatorPrevi
           pnl: portalMetricNum(p["unrealized_pnl"], 0),
           pnlPct: portalMetricNum(p["unrealized_pnl_pct"], 0),
           origin: exch ? exch.toUpperCase() : "PAPER",
+          entryLabel: String(p["signal_id"] ?? p["signalId"] ?? "") || null,
           entryTime: Number.isFinite(entryTime) ? entryTime : null,
           exchangeOrderId: String(p["exchange_order_id"] ?? p["exchangeOrderId"] ?? "") || null,
           admin: p,
