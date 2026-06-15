@@ -37,7 +37,18 @@ const apiBaseUrl: string = (
   (import.meta.env["VITE_API_BASE_URL"] as string | undefined) ?? ""
 ).replace(/\/$/, "");
 
-const OPERATOR_BUY_SIZE_USD = 125;
+const OPERATOR_BUY_FALLBACK_SIZE_USD = 600;
+
+interface RuntimeHealthResponse {
+  runtimeConfig?: {
+    tradeSizeOverrideUsd?: number | null;
+  };
+}
+
+function normalizeTradeSizeOverride(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : OPERATOR_BUY_FALLBACK_SIZE_USD;
+}
 
 // ── DEV-only customer-preview gate ───────────────────────────────────────────
 // Mirrors `shouldForceCustomerPreview()` in Portal.tsx. When an admin opens the
@@ -74,7 +85,7 @@ const TYPES: SignalType[] = ["SCALP", "SWING", "MOMENTUM", "BREAKOUT", "REVERSAL
 // across page loads and rows. Server enforces a per-tier cap independently
 // of the chosen value here.
 const LIVE_SIZE_STORAGE_KEY = "acl_live_order_size_v1";
-const LIVE_SIZE_PRESETS = [50, 100, 250, 500] as const;
+const LIVE_SIZE_PRESETS = [50, 100, 250, 500, 600] as const;
 const LIVE_SIZE_MIN = 1;
 const LIVE_SIZE_MAX = 100_000;
 
@@ -149,6 +160,27 @@ function useLiveOrderCap(enabled: boolean): LiveOrderCapInfo {
     nextTier:       null,
     plan:           "free",
   };
+}
+
+function useRuntimeTradeSizeOverride(enabled: boolean): number {
+  const { getToken } = useAuth();
+  const { data } = useQuery<number>({
+    queryKey: ["runtime-config", "trade-size-override"],
+    enabled,
+    staleTime: 30_000,
+    gcTime:    5 * 60_000,
+    queryFn: async () => {
+      const token = await getToken().catch(() => null);
+      const res = await authFetch(`${apiBaseUrl}/api/healthz`, {
+        credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+      if (!res.ok) throw new Error(`healthz HTTP ${res.status}`);
+      const body = (await res.json()) as RuntimeHealthResponse;
+      return normalizeTradeSizeOverride(body.runtimeConfig?.tradeSizeOverrideUsd);
+    },
+  });
+  return data ?? OPERATOR_BUY_FALLBACK_SIZE_USD;
 }
 
 /**
@@ -303,6 +335,7 @@ export function SignalRow({ spec, breakdown }: Props) {
   // role fixes that and keeps the customer-portal branch untouched for
   // non-admin users.
   const { isAdmin: isOperatorRole, loading: roleLoading } = useUserRole();
+  const operatorBuySizeUSD = useRuntimeTradeSizeOverride(isOperatorRole);
 
   // Phase 6 — Plan-aware customer intelligence layer.
   //
@@ -321,9 +354,11 @@ export function SignalRow({ spec, breakdown }: Props) {
   const liveFallbackToastedRef = useRef(false);
   const [liveSize, setLiveSize] = useLiveOrderSize();
   const showSizePicker =
+    !isOperatorRole &&
     portalMode.isCustomerPortal &&
     portalMode.mode === "LIVE" &&
     portalMode.canUseLive;
+  const showOperatorSizeBadge = isOperatorRole && !roleLoading;
   const capInfo = useLiveOrderCap(showSizePicker);
 
   // If the stored preferred size now exceeds the user's cap (e.g. after a
@@ -447,8 +482,24 @@ export function SignalRow({ spec, breakdown }: Props) {
 
   const sandboxFallbackToastedRef = useRef(false);
   const operatorOrderInFlightRef = useRef(false);
+  const operatorBuyConfirmButtonRef = useRef<HTMLButtonElement | null>(null);
   const [operatorBuyConfirmOpen, setOperatorBuyConfirmOpen] = useState(false);
   const [operatorBuyPending, setOperatorBuyPending] = useState(false);
+
+  useEffect(() => {
+    if (!operatorBuyConfirmOpen) return;
+    const focusTimer = window.setTimeout(() => operatorBuyConfirmButtonRef.current?.focus(), 0);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !operatorBuyPending) {
+        setOperatorBuyConfirmOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.clearTimeout(focusTimer);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [operatorBuyConfirmOpen, operatorBuyPending]);
 
   /** Fire a paper trade through the internal simulator (legacy default path). */
   const firePaperSim = (side: "LONG" | "SHORT", sl: number, tp: number) => {
@@ -535,9 +586,15 @@ export function SignalRow({ spec, breakdown }: Props) {
     }
     operatorOrderInFlightRef.current = true;
     setOperatorBuyPending(true);
+    console.info("[OPERATOR_BUY_REQUEST]", {
+      symbol: spec.symbol,
+      sizeUSD: operatorBuySizeUSD,
+      runtimeTradeSizeOverrideUsd: operatorBuySizeUSD,
+      confidence: confActive ? conf : null,
+    });
     toast({
       title: `OPERATOR BUY SUBMITTED — ${spec.label}`,
-      description: `BUY · $${OPERATOR_BUY_SIZE_USD} notional · hand management to AI · ${conf}% confidence`,
+      description: `BUY · $${operatorBuySizeUSD} notional · hand management to AI · ${conf}% confidence`,
     });
     void (async () => {
       try {
@@ -551,7 +608,7 @@ export function SignalRow({ spec, breakdown }: Props) {
           },
           body: JSON.stringify({
             symbol:     spec.symbol,
-            sizeUSD:    OPERATOR_BUY_SIZE_USD,
+            sizeUSD:    operatorBuySizeUSD,
             confidence: confActive ? conf : undefined,
             note:       "Operator Buy from signal row; hand management to AI",
           }),
@@ -564,6 +621,10 @@ export function SignalRow({ spec, breakdown }: Props) {
           exchangeOrderId?: string;
           fillPrice?: number;
           positionId?: string;
+          sizeUSD?: number;
+          effectiveSizeUSD?: number;
+          runtimeTradeSizeOverrideUsd?: number;
+          requestedSizeUSD?: number | null;
           dryRun?: boolean;
         };
         if (!res.ok || body.error) {
@@ -580,9 +641,17 @@ export function SignalRow({ spec, breakdown }: Props) {
         const priceStr = body.fillPrice && body.fillPrice > 0
           ? `$${fmt(body.fillPrice)}`
           : "market";
+        console.info("[OPERATOR_BUY_EXECUTED]", {
+          symbol: spec.symbol,
+          requestPayloadSizeUSD: operatorBuySizeUSD,
+          responseSizeUSD: body.sizeUSD ?? body.effectiveSizeUSD ?? null,
+          runtimeTradeSizeOverrideUsd: body.runtimeTradeSizeOverrideUsd ?? operatorBuySizeUSD,
+          exchange: body.exchange ?? null,
+          positionId: body.positionId ?? null,
+        });
         toast({
           title: `OPERATOR_ENTERED @ ${priceStr} — ${spec.label}${body.dryRun ? " (DRY RUN)" : ""}`,
-          description: ["BUY", exch, orderIdShort, "AI MANAGED"].filter(Boolean).join(" · "),
+          description: [`$${body.sizeUSD ?? operatorBuySizeUSD}`, "BUY", exch, orderIdShort, "AI MANAGED"].filter(Boolean).join(" · "),
         });
         setOperatorBuyConfirmOpen(false);
         void qc.invalidateQueries({ queryKey: ["customer-simulation-account"] });
@@ -1035,7 +1104,7 @@ export function SignalRow({ spec, breakdown }: Props) {
             CONFIRM OPERATOR BUY
           </div>
           <div style={{ color: N.TEXT_0, fontSize: 16, fontWeight: 900, lineHeight: 1.35 }}>
-            Buy ${OPERATOR_BUY_SIZE_USD} of {spec.label} and hand management to AI?
+            Buy ${operatorBuySizeUSD} of {spec.label} and hand management to AI?
           </div>
           <div style={{
             marginTop: 12, display: "grid",
@@ -1066,6 +1135,7 @@ export function SignalRow({ spec, breakdown }: Props) {
             </button>
             <button
               type="button"
+              ref={operatorBuyConfirmButtonRef}
               disabled={operatorBuyPending}
               onClick={executeOperatorBuy}
               style={{
@@ -1195,6 +1265,21 @@ export function SignalRow({ spec, breakdown }: Props) {
               nextTierCapUSD={capInfo.nextTierCapUSD}
               nextTier={capInfo.nextTier}
             />
+          )}
+          {showOperatorSizeBadge && (
+            <span
+              title="Operator buy notional from active runtime configuration"
+              className="text-[9px] font-extrabold tracking-[0.16em] px-2 py-1 rounded tabular-nums"
+              style={{
+                color: N.BRAND,
+                background: `${N.BRAND}1c`,
+                border: `1px solid ${N.BRAND}70`,
+                boxShadow: `0 0 4px ${N.BRAND}40`,
+                fontFamily: N.FONT_MONO,
+              }}
+            >
+              ${operatorBuySizeUSD}
+            </span>
           )}
           <ActionPill
             label="BUY"

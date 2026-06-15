@@ -34,6 +34,7 @@ import { resolvePriceIdForPlan } from "../lib/adminBillingActions.js";
 import { closeUserPosition, registerLiveUserFill } from "../lib/userSimRegistry.js";
 import { emit as emitTelemetry, genCorrelationId, rememberCorrelation } from "../lib/executionTelemetry.js";
 import { notifyFillHydrated } from "../lib/positionStore.js";
+import { getTradeSizeOverrideUsd } from "../lib/tradeSizeOverride.js";
 import type Stripe from "stripe";
 
 const router = Router();
@@ -515,7 +516,6 @@ const OperatorBuyBody = z.object({
 });
 
 const OPERATOR_BUY_LABEL = "OPERATOR_ENTERED";
-const OPERATOR_BUY_DEFAULT_SIZE_USD = 125;
 
 router.post("/admin/users/:id/operator-buy", ...requireOperator, async (req, res): Promise<void> => {
   const ctx = resolveActor(req, res, { allowSelf: true });
@@ -527,7 +527,9 @@ router.post("/admin/users/:id/operator-buy", ...requireOperator, async (req, res
   }
 
   const symbol = parsed.data.symbol.trim().toUpperCase();
-  const sizeUSD = parsed.data.sizeUSD ?? OPERATOR_BUY_DEFAULT_SIZE_USD;
+  const requestedSizeUSD = parsed.data.sizeUSD ?? null;
+  const runtimeTradeSizeOverrideUsd = getTradeSizeOverrideUsd();
+  const sizeUSD = requestedSizeUSD ?? runtimeTradeSizeOverrideUsd;
   const correlationId = genCorrelationId();
   const acceptedAt = Date.now();
 
@@ -537,7 +539,9 @@ router.post("/admin/users/:id/operator-buy", ...requireOperator, async (req, res
       operatorId:   ctx.actorId,
       targetUserId: ctx.targetId,
       symbol,
-      sizeUSD,
+      requestedSizeUSD,
+      runtimeTradeSizeOverrideUsd,
+      effectiveSizeUSD: sizeUSD,
       label:        OPERATOR_BUY_LABEL,
     }, "[OPERATOR_BUY_REQUESTED] operator requested immediate live buy for user account");
 
@@ -558,6 +562,10 @@ router.post("/admin/users/:id/operator-buy", ...requireOperator, async (req, res
         errorCode:     result.errorCode,
         error:         result.error ?? "Operator buy rejected",
         exchange:      result.exchange,
+        requestedSizeUSD,
+        runtimeTradeSizeOverrideUsd,
+        effectiveSizeUSD: sizeUSD,
+        sizeUSD,
         correlationId,
       });
       return;
@@ -686,7 +694,9 @@ router.post("/admin/users/:id/operator-buy", ...requireOperator, async (req, res
         targetUserId: ctx.targetId,
         symbol,
         side:         "BUY",
-        sizeUSD,
+        requestedSizeUSD,
+        runtimeTradeSizeOverrideUsd,
+        effectiveSizeUSD: sizeUSD,
         label:        OPERATOR_BUY_LABEL,
         confidence:   parsed.data.confidence ?? null,
         exchange:     result.exchange ?? null,
@@ -712,6 +722,9 @@ router.post("/admin/users/:id/operator-buy", ...requireOperator, async (req, res
       exchangeOrderId: result.exchangeOrderId,
       fillPrice:       result.fillPrice,
       quantity:        result.quantity,
+      requestedSizeUSD,
+      runtimeTradeSizeOverrideUsd,
+      effectiveSizeUSD: result.sizeUSD ?? sizeUSD,
       sizeUSD:         result.sizeUSD ?? sizeUSD,
       stopLoss,
       takeProfit,
