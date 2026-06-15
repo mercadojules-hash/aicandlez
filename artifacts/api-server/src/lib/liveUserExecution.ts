@@ -26,6 +26,7 @@ import { isAiDisclaimerAccepted } from "./aiDisclaimer.js";
 import { engineStats, VOLUME_GATE_FRACTION } from "./tradingLoop.js";
 import { recordCustomerBrokerSubmitted, recordBrokerReject } from "./customerExecMetrics.js";
 import { resolveAiTradingGate } from "./aiTradingGate.js";
+import { getTradeSizeOverrideUsd } from "./tradeSizeOverride.js";
 import {
   ALLOWED_TRADE_SIZES,
   DEFAULT_TRADE_SIZE_USD,
@@ -784,6 +785,7 @@ export async function placeLiveAutoOrderForUser(
           logger.warn({ err, userId }, "liveUserExecution: trade-size lookup failed — using default preset");
         }
       }
+      preferred = getTradeSizeOverrideUsd() ?? preferred;
       sizeUSD = preferred;
     }
   }

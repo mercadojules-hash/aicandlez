@@ -69,6 +69,11 @@ services:
       # downstream gates pass.
       - key: MAX_POSITIONS_PER_SYMBOL
         value: "2"
+      # Operator capital-allocation override for NEW customer LIVE entries.
+      # Leaves existing open positions, strategy gates, exits, risk governor,
+      # and position caps untouched; downstream risk/liquidity gates still bind.
+      - key: TRADE_SIZE_OVERRIDE_USD
+        value: "600"
       # Production test config: lower the live execution signal floor without
       # relying on the global settings.min_confidence row, which the current live
       # loop ignores in favor of EXPERIMENT_CONF_FLOOR.
