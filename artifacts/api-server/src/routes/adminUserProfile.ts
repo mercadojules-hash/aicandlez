@@ -35,6 +35,7 @@ import { closeUserPosition, registerLiveUserFill } from "../lib/userSimRegistry.
 import { emit as emitTelemetry, genCorrelationId, rememberCorrelation } from "../lib/executionTelemetry.js";
 import { notifyFillHydrated } from "../lib/positionStore.js";
 import { getTradeSizeOverrideUsd } from "../lib/tradeSizeOverride.js";
+import { roundOptionalPrice } from "../lib/pricePrecision.js";
 import type Stripe from "stripe";
 
 const router = Router();
@@ -597,8 +598,8 @@ router.post("/admin/users/:id/operator-buy", ...requireOperator, async (req, res
         trailingStopPercent: cfg.trailingStopPercent,
         maxHoldHours:        cfg.maxHoldHours,
       };
-      stopLoss = parseFloat((entry * (1 - cfg.stopLossPercent / 100)).toFixed(2));
-      takeProfit = parseFloat((entry * (1 + cfg.takeProfitPercent / 100)).toFixed(2));
+      stopLoss = roundOptionalPrice(entry * (1 - cfg.stopLossPercent / 100));
+      takeProfit = roundOptionalPrice(entry * (1 + cfg.takeProfitPercent / 100));
       const orderId = result.exchangeOrderId
         ?? `OPERATOR-LIVE-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const pos = await registerLiveUserFill({
@@ -610,8 +611,8 @@ router.post("/admin/users/:id/operator-buy", ...requireOperator, async (req, res
         sizeUSD:                resolvedSizeUSD,
         signalId:               OPERATOR_BUY_LABEL,
         confidence:             parsed.data.confidence,
-        stopLoss,
-        takeProfit,
+        stopLoss:               stopLoss ?? undefined,
+        takeProfit:             takeProfit ?? undefined,
         exchange:               result.exchange ?? "unknown",
         exchangeOrderId:        orderId,
         entryFeeBroker:         result.brokerFee,
