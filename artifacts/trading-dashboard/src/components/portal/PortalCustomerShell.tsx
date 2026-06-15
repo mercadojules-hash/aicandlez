@@ -6983,6 +6983,15 @@ export function PortalCustomerShell({ operatorPreview = false }: { operatorPrevi
                 { label: "TRADE",     icon: TrendingUp, active: false, href: "/market" },
                 { label: "PORTFOLIO", icon: Wallet,     active: false, href: "/portfolio" },
                 { label: "PROFILE",   icon: UserIcon,   active: false, onClick: () => setAccount(true) },
+                ...(operatorPreview ? [{
+                  label: "ADMIN MODE",
+                  icon:  Shield,
+                  active: false,
+                  onClick: () => {
+                    try { window.localStorage.removeItem("aicandlez:operator-customer-view"); } catch { /* noop */ }
+                    window.location.assign("/admin");
+                  },
+                }] : []),
               ] as const).map((n) => (
                 <a
                   key={n.label}
