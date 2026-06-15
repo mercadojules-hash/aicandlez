@@ -31,7 +31,6 @@ import { __invalidateAdminUserTelemetryCache } from "./adminUserTelemetry.js";
 import { executionStreamBus } from "../lib/executionStreamBus.js";
 import { getUncachableStripeClient } from "../stripeClient.js";
 import { resolvePriceIdForPlan } from "../lib/adminBillingActions.js";
-import { executeCustomerOrder } from "../lib/executionGateway.js";
 import { closeUserPosition, registerLiveUserFill } from "../lib/userSimRegistry.js";
 import { emit as emitTelemetry, genCorrelationId, rememberCorrelation } from "../lib/executionTelemetry.js";
 import { notifyFillHydrated } from "../lib/positionStore.js";
@@ -542,6 +541,7 @@ router.post("/admin/users/:id/operator-buy", ...requireOperator, async (req, res
       label:        OPERATOR_BUY_LABEL,
     }, "[OPERATOR_BUY_REQUESTED] operator requested immediate live buy for user account");
 
+    const { executeCustomerOrder } = await import("../lib/executionGateway.js");
     const result = await executeCustomerOrder({
       trigger:       "manual",
       userId:        ctx.targetId,
