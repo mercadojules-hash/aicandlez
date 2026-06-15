@@ -2450,6 +2450,41 @@ async function runHardStopMonitor() {
         reason = "MAX_HOLD";
       }
 
+      if (isLive) {
+        const currentProfitPct =
+          price !== undefined && p.entryPrice > 0
+            ? (isBuy
+                ? (price - p.entryPrice) / p.entryPrice
+                : (p.entryPrice - price) / p.entryPrice) * 100
+            : null;
+        const peakProfitPct =
+          p.entryPrice > 0 && highWater !== null && lowWater !== null
+            ? (isBuy
+                ? (highWater - p.entryPrice) / p.entryPrice
+                : (p.entryPrice - lowWater) / p.entryPrice) * 100
+            : currentProfitPct;
+        logger.info(
+          {
+            tag:                "TRAIL_DEBUG",
+            correlationId,
+            userId:             p.userId,
+            positionId:         p.positionId,
+            symbol:             p.symbol,
+            side:               p.side,
+            exchange:           p.exchange,
+            entry_price:        p.entryPrice,
+            current_price:      price ?? null,
+            current_profit_pct: currentProfitPct !== null ? parseFloat(currentProfitPct.toFixed(4)) : null,
+            peak_profit_pct:    peakProfitPct !== null ? parseFloat(peakProfitPct.toFixed(4)) : null,
+            trail_distance_pct: trailPct !== null ? parseFloat(trailPct.toFixed(4)) : null,
+            trailing_active:    trailArmed,
+            should_exit:        reason === "TRAILING_STOP",
+            exit_trigger:       trailStop !== null ? parseFloat(trailStop.toFixed(8)) : null,
+          },
+          `[TRAIL DEBUG] ${p.symbol} current=${currentProfitPct !== null ? currentProfitPct.toFixed(2) : "n/a"}% peak=${peakProfitPct !== null ? peakProfitPct.toFixed(2) : "n/a"}% active=${trailArmed ? "YES" : "NO"} trigger=${trailStop ?? "n/a"} exit=${reason === "TRAILING_STOP" ? "YES" : "NO"}`,
+        );
+      }
+
       // Per-position eval row — proves the live exit loop evaluated this position
       // this tick (last-eval timestamp = `evaluatedAt`) and records its full SL /
       // TP / trailing state. Emitted even when price is unavailable so liveness

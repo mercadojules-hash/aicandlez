@@ -35,9 +35,30 @@ import { db, userSettingsTable, getPlanDefaultCap } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/requireAuth.js";
 import { getTradeLimitVerdict } from "../lib/tradeLimitEngine.js";
+import { getExcursion } from "../lib/excursionTracker.js";
+import { getTicker } from "../lib/marketData.js";
 
 const router = Router();
 const requireOperator = [requireAuth, requireRole(["admin", "super-admin"])];
+
+function num(v: unknown): number | null {
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function round(v: number | null, digits = 4): number | null {
+  return v === null || !Number.isFinite(v) ? null : Number(v.toFixed(digits));
+}
+
+async function getTickerPriceForAdmin(symbol: string): Promise<number | null> {
+  const timeout = new Promise<null>((resolve) => {
+    setTimeout(() => resolve(null), 400);
+  });
+  const fetched = getTicker(symbol)
+    .then(ticker => ticker.price > 0 ? ticker.price : null)
+    .catch(() => null);
+  return Promise.race([fetched, timeout]);
+}
 
 // ── Effective trade-cap resolver (list endpoint) ─────────────────────────────
 // Mirrors tradeLimitEngine.resolveCap() so the operator grid + list rows
@@ -800,6 +821,8 @@ router.get("/admin/users/:id", ...requireOperator, async (req, res): Promise<voi
           'maxActivePositions',         s.max_active_positions,
           'stopLossPercent',            s.stop_loss_percent,
           'takeProfitPercent',          s.take_profit_percent,
+          'trailingStopPercent',        s.trailing_stop_percent,
+          'maxHoldHours',               s.max_hold_hours,
           'autoMode',                   s.auto_mode,
           'tradingMode',                s.trading_mode,
           'volumeFilter',               s.volume_filter,
@@ -951,12 +974,221 @@ router.get("/admin/users/:id", ...requireOperator, async (req, res): Promise<voi
     // Aggregates derived in-process so the response is a single self-
     // contained payload the cinematic panel can render without follow-up
     // calls. Math mirrors the per-user numbers in the list endpoint.
+    const symbolsForPrices = [...new Set(positionsRows.map(p => String(p["symbol"] ?? "")).filter(Boolean))];
+    const priceBySymbol = new Map<string, number>();
+    await Promise.all(symbolsForPrices.map(async (symbol) => {
+      const price = await getTickerPriceForAdmin(symbol);
+      if (price !== null) priceBySymbol.set(symbol, price);
+    }));
+
+    const nowForPositions = Date.now();
+    const settingsRecord = settingsJson && typeof settingsJson === "object"
+      ? settingsJson as Record<string, unknown>
+      : {};
+    const accountTrailPct = num(settingsRecord["trailingStopPercent"] ?? settingsRecord["trailing_stop_percent"]);
+    const accountMaxHoldHours = num(settingsRecord["maxHoldHours"] ?? settingsRecord["max_hold_hours"]) ?? 24;
+    const positions: Array<Record<string, unknown>> = positionsRows.map((p): Record<string, unknown> => {
+      const symbol       = String(p["symbol"] ?? "");
+      const sideRaw      = String(p["side"] ?? "BUY").toUpperCase();
+      const isSell       = sideRaw === "SELL" || sideRaw === "SHORT";
+      const entryPrice   = num(p["entry_price"]);
+      const quantity     = num(p["quantity"]);
+      const sizeUsd      = num(p["size_usd"]);
+      const entryTime    = num(p["entry_time"]);
+      const stopLoss     = num(p["stop_loss"]);
+      const takeProfit   = num(p["take_profit"]);
+      const confidence   = num(p["confidence"]);
+      const currentPrice = priceBySymbol.get(symbol) ?? null;
+      const positionId   = String(p["id"] ?? "");
+
+      const unrealizedPnl =
+        currentPrice !== null && entryPrice !== null && quantity !== null
+          ? (isSell ? entryPrice - currentPrice : currentPrice - entryPrice) * quantity
+          : null;
+      const currentProfitPct =
+        currentPrice !== null && entryPrice !== null && entryPrice > 0
+          ? (isSell ? (entryPrice - currentPrice) : (currentPrice - entryPrice)) / entryPrice * 100
+          : null;
+      const unrealizedPnlPct =
+        unrealizedPnl !== null && sizeUsd !== null && sizeUsd > 0
+          ? (unrealizedPnl / sizeUsd) * 100
+          : currentProfitPct;
+
+      const trailDistancePct = accountTrailPct !== null
+        ? accountTrailPct
+        : stopLoss !== null && entryPrice !== null && entryPrice > 0
+          ? Math.abs(entryPrice - stopLoss) / entryPrice * 100
+          : null;
+      const excursion = positionId ? getExcursion(positionId) : undefined;
+      const peakProfitPct = excursion?.mfePct ?? currentProfitPct;
+      const peakProfitUsd = excursion?.mfeUsd ?? unrealizedPnl;
+      const peakTimestamp = excursion?.mfeAt ?? null;
+      const drawdownFromPeakPct =
+        peakProfitPct !== null && currentProfitPct !== null
+          ? peakProfitPct - currentProfitPct
+          : null;
+      const drawdownFromPeakUsd =
+        peakProfitUsd !== null && unrealizedPnl !== null
+          ? peakProfitUsd - unrealizedPnl
+          : null;
+
+      let exitTriggerPrice: number | null = null;
+      let exitTriggerProfitPct: number | null = null;
+      let trailingActive = false;
+      if (
+        entryPrice !== null &&
+        entryPrice > 0 &&
+        peakProfitPct !== null &&
+        trailDistancePct !== null &&
+        trailDistancePct > 0
+      ) {
+        const peakPrice = isSell
+          ? entryPrice * (1 - Math.max(0, peakProfitPct) / 100)
+          : entryPrice * (1 + Math.max(0, peakProfitPct) / 100);
+        exitTriggerPrice = isSell
+          ? peakPrice * (1 + trailDistancePct / 100)
+          : peakPrice * (1 - trailDistancePct / 100);
+        trailingActive = isSell ? exitTriggerPrice < entryPrice : exitTriggerPrice > entryPrice;
+        exitTriggerProfitPct = (isSell
+          ? (entryPrice - exitTriggerPrice) / entryPrice
+          : (exitTriggerPrice - entryPrice) / entryPrice) * 100;
+      }
+      const distanceToExitPct =
+        currentPrice !== null && exitTriggerPrice !== null && currentPrice > 0
+          ? (isSell ? (exitTriggerPrice - currentPrice) : (currentPrice - exitTriggerPrice)) / currentPrice * 100
+          : null;
+      const takeProfitTargetPct =
+        takeProfit !== null && entryPrice !== null && entryPrice > 0
+          ? (isSell ? (entryPrice - takeProfit) : (takeProfit - entryPrice)) / entryPrice * 100
+          : null;
+      const takeProfitDistancePct =
+        takeProfitTargetPct !== null && currentProfitPct !== null
+          ? takeProfitTargetPct - currentProfitPct
+          : null;
+      const stopLossPct =
+        stopLoss !== null && entryPrice !== null && entryPrice > 0
+          ? (isSell ? (entryPrice - stopLoss) : (stopLoss - entryPrice)) / entryPrice * 100
+          : null;
+      const stopLossDistancePct =
+        stopLossPct !== null && currentProfitPct !== null
+          ? currentProfitPct - stopLossPct
+          : null;
+      const minutesOpen =
+        entryTime !== null ? Math.max(0, (nowForPositions - entryTime) / 60_000) : null;
+      const maxHoldMinutes = accountMaxHoldHours > 0 ? accountMaxHoldHours * 60 : null;
+      const maxHoldRemainingMinutes =
+        minutesOpen !== null && maxHoldMinutes !== null
+          ? Math.max(0, maxHoldMinutes - minutesOpen)
+          : null;
+
+      const tpReached = takeProfitDistancePct !== null && takeProfitDistancePct <= 0;
+      const trailTriggered = trailingActive && distanceToExitPct !== null && distanceToExitPct <= 0;
+      const stopBreached = stopLossDistancePct !== null && stopLossDistancePct <= 0;
+      const maxHoldReached = maxHoldRemainingMinutes !== null && maxHoldRemainingMinutes <= 0;
+
+      const exitCandidates = [
+        takeProfitDistancePct !== null && takeProfitDistancePct > 0
+          ? { label: "Take Profit", distance: takeProfitDistancePct }
+          : null,
+        trailingActive && distanceToExitPct !== null && distanceToExitPct > 0
+          ? { label: "Trailing Stop", distance: distanceToExitPct }
+          : null,
+        stopLossDistancePct !== null && stopLossDistancePct > 0
+          ? { label: "Stop Loss", distance: stopLossDistancePct }
+          : null,
+      ].filter((v): v is { label: string; distance: number } => v !== null)
+        .sort((a, b) => a.distance - b.distance);
+
+      let exitModeStatus = "MONITORING";
+      if (stopBreached) exitModeStatus = "STOP LOSS READY";
+      else if (tpReached) exitModeStatus = "TAKE PROFIT READY";
+      else if (trailTriggered) exitModeStatus = "TRAILING EXIT READY";
+      else if (trailingActive) exitModeStatus = "TRAIL TRACKING";
+      else if (maxHoldRemainingMinutes !== null && maxHoldRemainingMinutes <= 30) exitModeStatus = "MAX HOLD WATCH";
+
+      const holdReasons: string[] = [];
+      if (!tpReached) holdReasons.push("TP target not reached");
+      if (!maxHoldReached) holdReasons.push("Max hold not reached");
+      if (!stopBreached) holdReasons.push("Stop loss not breached");
+      if (!trailTriggered) holdReasons.push(trailingActive ? "Trailing stop not triggered" : "Trailing stop not armed yet");
+      holdReasons.push("Trend/reversal logic has not requested an exit");
+
+      const nextLikelyExit =
+        stopBreached ? "Stop Loss" :
+        tpReached ? "Take Profit" :
+        trailTriggered ? "Trailing Stop" :
+        maxHoldReached ? "Max Hold" :
+        exitCandidates[0]?.label ??
+        (maxHoldRemainingMinutes !== null ? "Max Hold" : "Waiting for price data");
+
+      return {
+        ...p,
+        current_price: currentPrice,
+        unrealized_pnl: round(unrealizedPnl, 4),
+        unrealized_pnl_pct: round(unrealizedPnlPct, 4),
+        time_open_ms: entryTime !== null ? Math.max(0, nowForPositions - entryTime) : null,
+        peak_profit_usd: round(peakProfitUsd, 4),
+        peak_profit_pct: round(peakProfitPct, 4),
+        peak_profit_at: peakTimestamp,
+        drawdown_from_peak_usd: round(drawdownFromPeakUsd, 4),
+        drawdown_from_peak_pct: round(drawdownFromPeakPct, 4),
+        minutes_open: round(minutesOpen, 2),
+        exit_mode_status: exitModeStatus,
+        trailing_diagnostics: {
+          current_profit_pct: round(currentProfitPct, 4),
+          peak_profit_pct: round(peakProfitPct, 4),
+          peak_profit_usd: round(peakProfitUsd, 4),
+          peak_profit_at: peakTimestamp,
+          trail_distance_pct: round(trailDistancePct, 4),
+          trailing_active: trailingActive,
+          distance_to_exit_pct: round(distanceToExitPct, 4),
+          exit_trigger_price: round(exitTriggerPrice, 8),
+          exit_trigger_profit_pct: round(exitTriggerProfitPct, 4),
+        },
+        exit_rules: {
+          take_profit: {
+            target_pct: round(takeProfitTargetPct, 4),
+            current_pct: round(currentProfitPct, 4),
+            distance_pct: round(takeProfitDistancePct, 4),
+            trigger_price: round(takeProfit, 8),
+            status: tpReached ? "READY" : takeProfit === null ? "UNAVAILABLE" : "PENDING",
+          },
+          trailing_stop: {
+            peak_pct: round(peakProfitPct, 4),
+            current_pct: round(currentProfitPct, 4),
+            trail_distance_pct: round(drawdownFromPeakPct, 4),
+            configured_distance_pct: round(trailDistancePct, 4),
+            status: trailingActive ? "ARMED" : "NOT_ARMED",
+            trigger_price: round(exitTriggerPrice, 8),
+            distance_pct: round(distanceToExitPct, 4),
+          },
+          stop_loss: {
+            current_pct: round(currentProfitPct, 4),
+            stop_pct: round(stopLossPct, 4),
+            distance_pct: round(stopLossDistancePct, 4),
+            trigger_price: round(stopLoss, 8),
+            status: stopBreached ? "BREACHED" : stopLoss === null ? "UNAVAILABLE" : "SAFE",
+          },
+          max_hold: {
+            minutes_open: round(minutesOpen, 2),
+            max_minutes: round(maxHoldMinutes, 2),
+            remaining_minutes: round(maxHoldRemainingMinutes, 2),
+            status: maxHoldReached ? "READY" : maxHoldMinutes === null ? "DISABLED" : "PENDING",
+          },
+        },
+        ai_decision: {
+          reason_holding: holdReasons,
+          next_likely_exit: nextLikelyExit,
+          confidence: round(confidence, 2),
+        },
+      };
+    });
+
     const closed = closedRows;
     const tradesCount = closed.length;
     const wins        = closed.filter(t => Number(t["realized_pnl"] ?? 0) > 0).length;
     const losses      = tradesCount - wins;
     const realizedPnl = closed.reduce((s, t) => s + Number(t["realized_pnl"] ?? 0), 0);
-    const positions   = positionsRows;
     const exposureUsd = positions.reduce((s, p) => s + Number(p["size_usd"] ?? 0), 0);
     const openLive    = positions.filter(p => p["exchange"] != null).length;
 

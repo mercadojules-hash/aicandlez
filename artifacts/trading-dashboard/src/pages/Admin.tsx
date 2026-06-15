@@ -106,6 +106,23 @@ function fmtPct(n: number | null | undefined, decimals = 1): string {
   return `${n.toFixed(decimals)}%`;
 }
 
+function fmtPrice(n: number | null | undefined): string {
+  if (n === null || n === undefined || !Number.isFinite(n)) return "—";
+  if (Math.abs(n) >= 100) return `$${n.toFixed(2)}`;
+  if (Math.abs(n) >= 1) return `$${n.toFixed(4)}`;
+  return `$${n.toFixed(6)}`;
+}
+
+function fmtSignedDollar(n: number | null | undefined): string {
+  if (n === null || n === undefined || !Number.isFinite(n)) return "—";
+  return `${n >= 0 ? "+" : "-"}$${Math.abs(n).toFixed(2)}`;
+}
+
+function fmtSignedPct(n: number | null | undefined, decimals = 2): string {
+  if (n === null || n === undefined || !Number.isFinite(n)) return "—";
+  return `${n >= 0 ? "+" : ""}${n.toFixed(decimals)}%`;
+}
+
 function fmtAgo(ms: number | null): string {
   if (!ms) return "—";
   const sec = Math.max(0, Math.floor((Date.now() - ms) / 1000));
@@ -1205,6 +1222,16 @@ function fmtMs(value: unknown): string {
   return fmtAgo(n);
 }
 
+function fmtDurationMs(value: unknown): string {
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n) || n <= 0) return "—";
+  const mins = Math.floor(n / 60_000);
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 48) return `${hours}h ${mins % 60}m`;
+  return `${Math.floor(hours / 24)}d ${hours % 24}h`;
+}
+
 function fmtIsoAgo(iso: string | null | undefined): string {
   if (!iso) return "—";
   const ms = Date.parse(iso);
@@ -1236,6 +1263,85 @@ function MetricCell({
         }}>{sub}</div>
       )}
     </div>
+  );
+}
+
+function MetricLine({ label, value, color }: { label: string; value: string; color?: string }) {
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", justifyContent: "space-between",
+      gap: 12, borderBottom: `1px solid ${TAB_C.border}`, paddingBottom: 7,
+    }}>
+      <span style={{ color: TAB_C.faint, fontWeight: 700, letterSpacing: "0.08em" }}>{label}</span>
+      <span style={{ color: color ?? TAB_C.text, fontWeight: 800, textAlign: "right" }}>{value}</span>
+    </div>
+  );
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" ? value as Record<string, unknown> : {};
+}
+
+function ExitRuleBox({ title, rows, status }: {
+  title: string;
+  rows: Array<[string, string]>;
+  status?: string;
+}) {
+  const good = status === "SAFE" || status === "ARMED" || status === "PENDING";
+  const hot = status === "READY" || status === "BREACHED";
+  return (
+    <div style={{
+      border: `1px solid ${hot ? "#ff335566" : good ? "#00ff8a33" : TAB_C.border}`,
+      borderRadius: 4, padding: "8px 9px", background: "#020b14",
+      minWidth: 0,
+    }}>
+      <div style={{
+        display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 6,
+        fontFamily: "monospace", fontSize: 9, fontWeight: 800,
+      }}>
+        <span style={{ color: TAB_C.text, letterSpacing: "0.08em" }}>{title}</span>
+        {status && <span style={{ color: hot ? "#ff6680" : good ? "#00ff8a" : TAB_C.dim }}>{status}</span>}
+      </div>
+      {rows.map(([k, v]) => (
+        <div key={k} style={{
+          display: "flex", justifyContent: "space-between", gap: 8,
+          fontFamily: "monospace", fontSize: 9, lineHeight: 1.55,
+        }}>
+          <span style={{ color: TAB_C.faint }}>{k}</span>
+          <span style={{ color: TAB_C.text, textAlign: "right" }}>{v}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DebugKV({ k, v }: { k: string; v: string }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontFamily: "monospace", fontSize: 9 }}>
+      <span style={{ color: TAB_C.faint }}>{k}</span>
+      <span style={{ color: TAB_C.text, textAlign: "right" }}>{v}</span>
+    </div>
+  );
+}
+
+function ExitReasonBadge({ reason }: { reason: string }) {
+  const normalized = (reason || "UNKNOWN").toUpperCase();
+  const color =
+    normalized.includes("TAKE_PROFIT") ? "#00ff8a" :
+    normalized.includes("TRAILING_STOP") ? "#00aaff" :
+    normalized.includes("STOP_LOSS") ? "#ff3355" :
+    normalized.includes("MAX_HOLD") ? "#ffaa00" :
+    normalized.includes("MANUAL_SELL") ? "#cc55ff" :
+    TAB_C.dim;
+  return (
+    <span style={{
+      border: `1px solid ${color}55`, color, background: `${color}14`,
+      borderRadius: 3, padding: "2px 6px", fontFamily: "monospace",
+      fontSize: 8, fontWeight: 800, letterSpacing: "0.06em",
+      whiteSpace: "nowrap",
+    }}>
+      {normalized}
+    </span>
   );
 }
 
@@ -3514,9 +3620,41 @@ function TradingTab({ detail, loading, clerkUserId }: {
   loading: boolean;
   clerkUserId: string;
 }) {
+  const qc = useQueryClient();
   const agg = detail?.aggregates ?? null;
   const positions = detail?.positions ?? [];
   const closed    = detail?.closedTrades ?? [];
+  const [sellTarget, setSellTarget] = useState<Record<string, unknown> | null>(null);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const [expandedTradeId, setExpandedTradeId] = useState<string | null>(null);
+
+  const manualSell = useMutation({
+    mutationFn: async (position: Record<string, unknown>) => {
+      const res = await authFetch(`/api/admin/users/${encodeURIComponent(clerkUserId)}/manual-sell`, {
+        method: "POST",
+        body: JSON.stringify({
+          positionId: String(position["id"] ?? ""),
+          symbol: String(position["symbol"] ?? ""),
+        }),
+      });
+      const text = await res.text();
+      let json: unknown = null;
+      try { json = text ? JSON.parse(text) : null; } catch { /* noop */ }
+      if (!res.ok) {
+        throw new Error((json as { error?: string } | null)?.error ?? `HTTP ${res.status}`);
+      }
+      return json;
+    },
+    onSuccess: () => {
+      toast({ title: "Manual sell submitted", description: "Position close executed and portfolio refreshed." });
+      setSellTarget(null);
+      qc.invalidateQueries({ queryKey: ["admin-users"] });
+      qc.invalidateQueries({ queryKey: ["admin-user-detail", clerkUserId] });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Manual sell failed", description: err.message, variant: "destructive" });
+    },
+  });
 
   return (
     <div>
@@ -3544,33 +3682,263 @@ function TradingTab({ detail, loading, clerkUserId }: {
       )}
 
       <TabSectionLabel icon={Activity}>OPEN POSITIONS</TabSectionLabel>
+      <div style={{ display: "flex", justifyContent: "flex-end", margin: "-4px 0 8px" }}>
+        <button
+          type="button"
+          onClick={() => setShowDiagnostics(v => !v)}
+          style={{
+            border: `1px solid ${showDiagnostics ? "#00aaff66" : TAB_C.border}`,
+            background: showDiagnostics ? "#00aaff14" : "transparent",
+            color: showDiagnostics ? "#00aaff" : TAB_C.dim,
+            borderRadius: 3, padding: "5px 8px",
+            fontFamily: "monospace", fontSize: 9, fontWeight: 800,
+            letterSpacing: "0.08em", cursor: "pointer",
+          }}
+        >
+          SHOW TRADE DIAGNOSTICS
+        </button>
+      </div>
       {loading && !detail ? null : positions.length === 0 ? (
         <EmptyState>NO OPEN POSITIONS</EmptyState>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {positions.slice(0, 10).map((p, i) => {
-            const live = p["exchange"] != null;
+            const live = p["exchange"] != null && (p["exchange_order_id"] != null || p["exchangeOrderId"] != null);
             const side = String(p["side"] ?? "").toUpperCase();
+            const symbol = String(p["symbol"] ?? "—");
+            const tradeId = String(p["id"] ?? i);
+            const entryPrice = safeNum(p["entry_price"], NaN);
+            const currentPrice = safeNum(p["current_price"], NaN);
+            const pnl = safeNum(p["unrealized_pnl"], NaN);
+            const pnlPct = safeNum(p["unrealized_pnl_pct"], NaN);
+            const diag = asRecord(p["trailing_diagnostics"]);
+            const exitRules = asRecord(p["exit_rules"]);
+            const tp = asRecord(exitRules["take_profit"]);
+            const trail = asRecord(exitRules["trailing_stop"]);
+            const sl = asRecord(exitRules["stop_loss"]);
+            const maxHold = asRecord(exitRules["max_hold"]);
+            const ai = asRecord(p["ai_decision"]);
+            const reasons = Array.isArray(ai["reason_holding"]) ? ai["reason_holding"] as string[] : [];
+            const peakPct = safeNum(diag["peak_profit_pct"], NaN);
+            const peakUsd = safeNum(diag["peak_profit_usd"] ?? p["peak_profit_usd"], NaN);
+            const triggerPct = safeNum(diag["exit_trigger_profit_pct"], NaN);
+            const distancePct = safeNum(diag["distance_to_exit_pct"], NaN);
+            const trailingActive = Boolean(diag["trailing_active"]);
+            const busy = manualSell.isPending && sellTarget?.["id"] === p["id"];
+            const expanded = expandedTradeId === tradeId;
             return (
-              <div key={String(p["id"] ?? i)} style={{
-                display: "grid", gridTemplateColumns: "auto 60px 1fr auto auto",
-                gap: 8, alignItems: "center", padding: "6px 10px",
+              <div key={tradeId} style={{
+                padding: "10px",
                 background: "#000814", border: `1px solid ${live ? "#ff884440" : TAB_C.border}`,
                 borderRadius: 3, fontSize: 9, fontFamily: "monospace",
               }}>
-                <span style={{
-                  fontWeight: 700, color: side === "LONG" ? "#00ff8a" : "#ff3355",
-                  letterSpacing: "0.1em",
-                }}>{side}</span>
-                <span style={{ color: TAB_C.text, fontWeight: 700 }}>{String(p["symbol"] ?? "—")}</span>
-                <span style={{ color: TAB_C.dim }}>
-                  {String(p["exchange"] ?? "PAPER").toUpperCase()} · qty {Number(p["quantity"] ?? 0).toFixed(4)}
-                </span>
-                <span style={{ color: TAB_C.text }}>{fmtDollar(Number(p["size_usd"] ?? 0))}</span>
-                <span style={{ color: TAB_C.faint }}>{fmtMs(p["entry_time"])}</span>
+                <div style={{
+                  display: "grid", gridTemplateColumns: "70px repeat(6, minmax(62px, 1fr)) 72px",
+                  gap: 8, alignItems: "center",
+                }}>
+                  <span style={{
+                    fontWeight: 800, color: side === "BUY" || side === "LONG" ? "#00ff8a" : "#ff3355",
+                    letterSpacing: "0.1em",
+                  }}>{symbol}</span>
+                  <MetricLine label="ENTRY" value={fmtPrice(entryPrice)} />
+                  <MetricLine label="CURRENT" value={fmtPrice(currentPrice)} />
+                  <MetricLine label="P&L $" value={fmtSignedDollar(pnl)} color={pctColor(pnl)} />
+                  <MetricLine label="P&L %" value={fmtSignedPct(pnlPct)} color={pctColor(pnlPct)} />
+                  <MetricLine label="PEAK" value={`${fmtSignedDollar(peakUsd)} · ${fmtSignedPct(peakPct)}`} color={pctColor(peakPct)} />
+                  <MetricLine label="OPEN" value={fmtDurationMs(p["time_open_ms"])} />
+                  {live ? (
+                    <button
+                      type="button"
+                      disabled={manualSell.isPending}
+                      onClick={() => setSellTarget(p)}
+                      style={{
+                        height: 30, borderRadius: 3,
+                        border: "1px solid #ff335588",
+                        background: "#ff33551a",
+                        color: "#ff6680",
+                        fontSize: 9, fontFamily: "monospace", fontWeight: 800,
+                        letterSpacing: "0.08em",
+                        cursor: manualSell.isPending ? "not-allowed" : "pointer",
+                        opacity: busy ? 0.65 : 1,
+                      }}
+                    >
+                      {busy ? "..." : "SELL"}
+                    </button>
+                  ) : <span />}
+                </div>
+
+                <div style={{
+                  marginTop: 8, display: "flex", justifyContent: "space-between",
+                  gap: 10, alignItems: "center",
+                }}>
+                  <div style={{ color: TAB_C.dim }}>
+                    {String(p["exchange"] ?? "PAPER").toUpperCase()} · qty {Number(p["quantity"] ?? 0).toFixed(4)}
+                  </div>
+                  <div style={{
+                    color: trailingActive ? "#00aaff" : TAB_C.text,
+                    fontWeight: 800, letterSpacing: "0.08em",
+                  }}>
+                    STATUS: {String(p["exit_mode_status"] ?? "MONITORING")}
+                  </div>
+                </div>
+
+                <div style={{ marginTop: 9, display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 8 }}>
+                  <ExitRuleBox title="Take Profit" status={String(tp["status"] ?? "—")} rows={[
+                    ["Target", fmtSignedPct(safeNum(tp["target_pct"], NaN))],
+                    ["Current", fmtSignedPct(safeNum(tp["current_pct"], NaN))],
+                    ["Distance", fmtPct(safeNum(tp["distance_pct"], NaN), 2)],
+                  ]} />
+                  <ExitRuleBox title="Trailing Stop" status={String(trail["status"] ?? "—")} rows={[
+                    ["Peak", fmtSignedPct(safeNum(trail["peak_pct"], NaN))],
+                    ["Current", fmtSignedPct(safeNum(trail["current_pct"], NaN))],
+                    ["Trail Distance", fmtPct(safeNum(trail["trail_distance_pct"], NaN), 2)],
+                  ]} />
+                  <ExitRuleBox title="Stop Loss" status={String(sl["status"] ?? "—")} rows={[
+                    ["Current", fmtSignedPct(safeNum(sl["current_pct"], NaN))],
+                    ["Stop", fmtSignedPct(safeNum(sl["stop_pct"], NaN))],
+                    ["Distance", fmtPct(safeNum(sl["distance_pct"], NaN), 2)],
+                  ]} />
+                  <ExitRuleBox title="Max Hold" status={String(maxHold["status"] ?? "—")} rows={[
+                    ["Open", `${Math.round(safeNum(maxHold["minutes_open"], 0))} min`],
+                    ["Limit", safeNum(maxHold["max_minutes"], NaN) ? `${Math.round(safeNum(maxHold["max_minutes"], 0))} min` : "—"],
+                    ["Remaining", safeNum(maxHold["remaining_minutes"], NaN) ? `${Math.round(safeNum(maxHold["remaining_minutes"], 0))} min` : "—"],
+                  ]} />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setExpandedTradeId(expanded ? null : tradeId)}
+                  style={{
+                    marginTop: 9, width: "100%", borderRadius: 3,
+                    border: `1px solid ${TAB_C.border}`, background: "#06111d",
+                    color: "#00aaff", padding: "7px 8px", cursor: "pointer",
+                    fontFamily: "monospace", fontSize: 9, fontWeight: 800,
+                    letterSpacing: "0.08em",
+                  }}
+                >
+                  WHY AM I STILL IN THIS TRADE?
+                </button>
+
+                {expanded && (
+                  <div style={{
+                    marginTop: 8, border: `1px solid ${TAB_C.border}`, borderRadius: 4,
+                    padding: 10, background: "#020b14",
+                  }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 8 }}>
+                      <DebugKV k="Entry" v={fmtPrice(entryPrice)} />
+                      <DebugKV k="Current" v={fmtPrice(currentPrice)} />
+                      <DebugKV k="Profit" v={fmtSignedPct(pnlPct)} />
+                      <DebugKV k="Confidence" v={safeNum(ai["confidence"], NaN) ? String(Math.round(safeNum(ai["confidence"], 0))) : "—"} />
+                    </div>
+                    <div style={{ color: TAB_C.faint, marginBottom: 5, fontWeight: 800 }}>Reason Holding</div>
+                    <div style={{ display: "grid", gap: 3 }}>
+                      {reasons.map((reason) => (
+                        <div key={reason} style={{ color: TAB_C.text }}>- {reason}</div>
+                      ))}
+                    </div>
+                    <div style={{ marginTop: 8, color: "#00aaff", fontWeight: 800 }}>
+                      Next Likely Exit: {String(ai["next_likely_exit"] ?? "—")}
+                    </div>
+                  </div>
+                )}
+
+                {showDiagnostics && (
+                  <div style={{
+                    marginTop: 8, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8,
+                    borderTop: `1px solid ${TAB_C.border}`, paddingTop: 8,
+                  }}>
+                    <DebugKV k="Peak Profit" v={`${fmtSignedDollar(peakUsd)} · ${fmtSignedPct(peakPct)}`} />
+                    <DebugKV k="Peak Timestamp" v={fmtMs(diag["peak_profit_at"])} />
+                    <DebugKV k="Trailing Armed" v={trailingActive ? "YES" : "NO"} />
+                    <DebugKV k="Trailing Trigger" v={fmtPrice(safeNum(diag["exit_trigger_price"], NaN))} />
+                    <DebugKV k="TP Trigger" v={fmtPrice(safeNum(tp["trigger_price"], NaN))} />
+                    <DebugKV k="Stop Price" v={fmtPrice(safeNum(sl["trigger_price"], NaN))} />
+                    <DebugKV k="Max Hold Remaining" v={safeNum(maxHold["remaining_minutes"], NaN) ? `${Math.round(safeNum(maxHold["remaining_minutes"], 0))} min` : "—"} />
+                    <DebugKV k="Drawdown From Peak" v={`${fmtSignedDollar(safeNum(p["drawdown_from_peak_usd"], NaN))} · ${fmtPct(safeNum(p["drawdown_from_peak_pct"], NaN), 2)}`} />
+                  </div>
+                )}
               </div>
             );
           })}
+        </div>
+      )}
+
+      {sellTarget && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 90,
+          background: "rgba(0,0,0,0.72)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          padding: 18,
+        }}>
+          <div style={{
+            width: 360, maxWidth: "100%",
+            background: "#020b14",
+            border: "1px solid #ff335566",
+            borderRadius: 6,
+            boxShadow: "0 24px 80px rgba(0,0,0,0.65)",
+            padding: 16,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+              <div style={{
+                color: "#ff6680", fontFamily: "monospace", fontWeight: 800,
+                letterSpacing: "0.12em", fontSize: 11,
+              }}>
+                CONFIRM MANUAL SELL
+              </div>
+              <button
+                type="button"
+                onClick={() => !manualSell.isPending && setSellTarget(null)}
+                disabled={manualSell.isPending}
+                style={{ background: "transparent", border: 0, color: TAB_C.dim, cursor: "pointer" }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+            {(() => {
+              const diag = (sellTarget["trailing_diagnostics"] && typeof sellTarget["trailing_diagnostics"] === "object")
+                ? sellTarget["trailing_diagnostics"] as Record<string, unknown>
+                : {};
+              const pnl = safeNum(sellTarget["unrealized_pnl"], NaN);
+              const pnlPct = safeNum(sellTarget["unrealized_pnl_pct"], NaN);
+              return (
+                <div style={{ display: "grid", gap: 8, fontFamily: "monospace", fontSize: 10 }}>
+                  <MetricLine label="SYMBOL" value={String(sellTarget["symbol"] ?? "—")} />
+                  <MetricLine label="CURRENT P/L" value={`${fmtSignedDollar(pnl)} · ${fmtSignedPct(pnlPct)}`} color={pctColor(pnl)} />
+                  <MetricLine label="ENTRY PRICE" value={fmtPrice(safeNum(sellTarget["entry_price"], NaN))} />
+                  <MetricLine label="CURRENT PRICE" value={fmtPrice(safeNum(sellTarget["current_price"], NaN))} />
+                  <MetricLine label="TRAILING" value={Boolean(diag["trailing_active"]) ? "ARMED" : "NO"} />
+                </div>
+              );
+            })()}
+            <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+              <button
+                type="button"
+                onClick={() => setSellTarget(null)}
+                disabled={manualSell.isPending}
+                style={{
+                  flex: 1, height: 34, borderRadius: 3,
+                  border: `1px solid ${TAB_C.border}`, background: "transparent",
+                  color: TAB_C.dim, fontFamily: "monospace", fontSize: 10, fontWeight: 700,
+                  cursor: manualSell.isPending ? "wait" : "pointer",
+                }}
+              >
+                CANCEL
+              </button>
+              <button
+                type="button"
+                onClick={() => manualSell.mutate(sellTarget)}
+                disabled={manualSell.isPending}
+                style={{
+                  flex: 1, height: 34, borderRadius: 3,
+                  border: "1px solid #ff335588", background: "#ff335522",
+                  color: "#ff6680", fontFamily: "monospace", fontSize: 10, fontWeight: 800,
+                  letterSpacing: "0.08em", cursor: manualSell.isPending ? "wait" : "pointer",
+                }}
+              >
+                {manualSell.isPending ? "SELLING..." : "SELL NOW"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -3583,9 +3951,10 @@ function TradingTab({ detail, loading, clerkUserId }: {
             const pnl  = Number(t["realized_pnl"] ?? 0);
             const live = t["exchange"] != null;
             const side = String(t["side"] ?? "").toUpperCase();
+            const closeReason = String(t["close_reason"] ?? "exit");
             return (
               <div key={String(t["id"] ?? i)} style={{
-                display: "grid", gridTemplateColumns: "auto 60px 1fr auto auto",
+                display: "grid", gridTemplateColumns: "auto 60px 1fr auto auto auto",
                 gap: 8, alignItems: "center", padding: "6px 10px",
                 background: "#000814", border: `1px solid ${TAB_C.border}`,
                 borderRadius: 3, fontSize: 9, fontFamily: "monospace",
@@ -3596,8 +3965,9 @@ function TradingTab({ detail, loading, clerkUserId }: {
                 }}>{side}</span>
                 <span style={{ color: TAB_C.text, fontWeight: 700 }}>{String(t["symbol"] ?? "—")}</span>
                 <span style={{ color: TAB_C.dim }}>
-                  {live ? String(t["exchange"]).toUpperCase() : "PAPER"} · {String(t["close_reason"] ?? "exit")}
+                  {live ? String(t["exchange"]).toUpperCase() : "PAPER"}
                 </span>
+                <ExitReasonBadge reason={closeReason} />
                 <span style={{ color: pctColor(pnl), fontWeight: 700 }}>{fmtDollar(pnl)}</span>
                 <span style={{ color: TAB_C.faint }}>{fmtMs(t["exit_time"])}</span>
               </div>

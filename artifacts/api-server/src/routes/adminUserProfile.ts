@@ -18,9 +18,10 @@
 import { Router, type Request, type Response } from "express";
 import { randomUUID } from "node:crypto";
 import { z } from "zod/v4";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import {
   db,
+  simPositionsTable,
   usersTable,
   userSettingsTable,
   userAdminActionsTable,
@@ -30,6 +31,7 @@ import { __invalidateAdminUserTelemetryCache } from "./adminUserTelemetry.js";
 import { executionStreamBus } from "../lib/executionStreamBus.js";
 import { getUncachableStripeClient } from "../stripeClient.js";
 import { resolvePriceIdForPlan } from "../lib/adminBillingActions.js";
+import { closeUserPosition } from "../lib/userSimRegistry.js";
 import type Stripe from "stripe";
 
 const router = Router();
@@ -484,6 +486,116 @@ router.patch("/admin/users/:id/complimentary", ...requireSuperAdmin, async (req,
   } catch (err) {
     res.status(500).json(serialize5xx(req, err, "complimentary", {
       targetId: ctx.targetId, complimentary, expiresAt,
+    }));
+  }
+});
+
+// ── Manual live position close (operator) ───────────────────────────────────
+//
+// Routes through the same closeUserPosition path as AI exits, so live broker
+// liquidation, duplicate-close protection, trade persistence, account
+// settlement, fee handling, and portfolio refresh all stay canonical.
+const ManualSellBody = z.object({
+  positionId: z.string().trim().min(1, "positionId is required"),
+  symbol:     z.string().trim().min(1).max(30).optional(),
+  note:       z.string().trim().max(2_000).optional(),
+});
+
+router.post("/admin/users/:id/manual-sell", ...requireOperator, async (req, res): Promise<void> => {
+  const ctx = resolveActor(req, res);
+  if (!ctx) return;
+  const parsed = ManualSellBody.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json(serialize4xx(req, parsed.error, "manual-sell"));
+    return;
+  }
+  const { positionId, symbol, note } = parsed.data;
+
+  try {
+    const [position] = await db.select().from(simPositionsTable)
+      .where(and(
+        eq(simPositionsTable.id, positionId),
+        eq(simPositionsTable.userId, ctx.targetId),
+      ))
+      .limit(1);
+    if (!position) {
+      res.status(404).json({ error: "Open position not found for target user" });
+      return;
+    }
+    if (symbol && symbol.toUpperCase() !== position.symbol.toUpperCase()) {
+      res.status(409).json({ error: "Position symbol mismatch", expected: position.symbol, received: symbol });
+      return;
+    }
+    if (!position.exchange || !position.exchangeOrderId) {
+      res.status(400).json({ error: "Manual SELL is restricted to live exchange positions" });
+      return;
+    }
+
+    req.log.warn({
+      tag:        "MANUAL_SELL_REQUESTED",
+      operatorId: ctx.actorId,
+      targetUserId: ctx.targetId,
+      positionId,
+      symbol:     position.symbol,
+      exchange:   position.exchange,
+      quantity:   position.quantity,
+    }, "[MANUAL_SELL_REQUESTED] operator requested immediate live close");
+
+    const result = await closeUserPosition(ctx.targetId, positionId, "MANUAL_SELL");
+    if (!result.success || !result.trade) {
+      const alreadyClosing = String(result.error ?? "").toLowerCase().includes("in flight");
+      res.status(alreadyClosing ? 409 : 400).json({
+        ok: false,
+        error: result.error ?? "Manual sell failed",
+        errorCode: result.errorCode,
+      });
+      return;
+    }
+
+    const auditId = await writeAudit({
+      actorId:  ctx.actorId,
+      targetId: ctx.targetId,
+      action:   "MANUAL_SELL",
+      payload: {
+        note: note?.trim() || "Manual live position close from admin Live Trades panel",
+        operatorId:   ctx.actorId,
+        targetUserId: ctx.targetId,
+        positionId,
+        symbol:       result.trade.symbol,
+        exchange:     result.trade.exchange ?? position.exchange,
+        quantity:     result.trade.quantity,
+        entryPrice:   result.trade.entryPrice,
+        exitPrice:    result.trade.exitPrice,
+        realizedPnL:  result.trade.realizedPnL,
+        realizedPnLPct: result.trade.realizedPnLPct,
+        closeReason:  result.trade.closeReason,
+      },
+    });
+
+    executionStreamBus.emitEvent({
+      type:     "position_closed",
+      severity: result.trade.realizedPnL < 0 ? "warn" : "success",
+      symbol:   result.trade.symbol,
+      side:     result.trade.side === "SELL" ? "SELL" : "BUY",
+      price:    result.trade.exitPrice,
+      mode:     "live",
+      exchange: result.trade.exchange ?? position.exchange,
+      reason:   "MANUAL_SELL",
+      message:  `MANUAL_SELL close — LIVE ${result.trade.symbol} @ $${result.trade.exitPrice.toFixed(2)}`,
+      details:  {
+        auditId,
+        operatorId: ctx.actorId,
+        userId:     ctx.targetId,
+        positionId,
+        realizedPnLPct: result.trade.realizedPnLPct,
+      },
+    });
+
+    res.json({ ok: true, auditId, trade: result.trade });
+  } catch (err) {
+    res.status(500).json(serialize5xx(req, err, "manual-sell", {
+      targetId: ctx.targetId,
+      positionId,
     }));
   }
 });
