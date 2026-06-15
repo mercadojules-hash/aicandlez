@@ -10,6 +10,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { Line, LineChart, ResponsiveContainer, YAxis } from "recharts";
 import { Zap, ChevronDown, Sparkles, Activity, Target as TargetIcon, CheckCircle2 } from "lucide-react";
 import type { SymBreakdown } from "../types";
@@ -998,6 +999,91 @@ export function SignalRow({ spec, breakdown }: Props) {
   const circ = 2 * Math.PI * radius;
   const dash = (conf / 100) * circ;
 
+  const operatorBuyConfirmModal = operatorBuyConfirmOpen && typeof document !== "undefined"
+    ? createPortal(
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Confirm operator buy ${spec.label}`}
+        style={{
+          position: "fixed", inset: 0, zIndex: 2147483647,
+          display: "grid", placeItems: "center",
+          padding: 18, background: "rgba(0,0,0,0.72)",
+          fontFamily: N.FONT_MONO,
+        }}
+        onClick={() => {
+          if (!operatorBuyPending) setOperatorBuyConfirmOpen(false);
+        }}
+      >
+        <div
+          style={{
+            width: "min(460px, 100%)",
+            maxHeight: "calc(100dvh - 36px)",
+            overflowY: "auto",
+            background: "#050806",
+            border: `1px solid ${N.BRAND}66`,
+            boxShadow: `0 0 32px ${N.BRAND}22, inset 0 0 20px ${N.BRAND}08`,
+            borderRadius: 6,
+            padding: 16,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div style={{
+            color: N.BRAND_BRT, fontSize: 10, fontWeight: 900,
+            letterSpacing: "0.22em", marginBottom: 10,
+          }}>
+            CONFIRM OPERATOR BUY
+          </div>
+          <div style={{ color: N.TEXT_0, fontSize: 16, fontWeight: 900, lineHeight: 1.35 }}>
+            Buy ${OPERATOR_BUY_SIZE_USD} of {spec.label} and hand management to AI?
+          </div>
+          <div style={{
+            marginTop: 12, display: "grid",
+            gridTemplateColumns: "1fr 1fr", gap: 8,
+            color: N.TEXT_2, fontSize: 10,
+          }}>
+            <div>Symbol <span style={{ color: N.TEXT_0, fontWeight: 800 }}>{spec.symbol}</span></div>
+            <div>AI Confidence <span style={{ color: N.BRAND_BRT, fontWeight: 800 }}>{confActive ? `${conf}%` : "—"}</span></div>
+            <div>Estimated Entry <span style={{ color: N.TEXT_0, fontWeight: 800 }}>${fmt(entry)}</span></div>
+            <div>Label <span style={{ color: N.BRAND_BRT, fontWeight: 800 }}>OPERATOR_ENTERED</span></div>
+          </div>
+          <div style={{ marginTop: 12, color: N.TEXT_3, fontSize: 10, lineHeight: 1.45 }}>
+            This sends a real market BUY through the user-scoped execution path. AI exit management attaches stop loss, take profit, trailing stop, and max hold protections after fill.
+          </div>
+          <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end", gap: 8 }}>
+            <button
+              type="button"
+              disabled={operatorBuyPending}
+              onClick={() => setOperatorBuyConfirmOpen(false)}
+              style={{
+                padding: "8px 12px", border: `1px solid ${N.BORDER_HI}`,
+                background: "transparent", color: N.TEXT_2,
+                fontFamily: N.FONT_MONO, fontSize: 10, fontWeight: 900,
+                letterSpacing: "0.12em", cursor: operatorBuyPending ? "wait" : "pointer",
+              }}
+            >
+              CANCEL
+            </button>
+            <button
+              type="button"
+              disabled={operatorBuyPending}
+              onClick={executeOperatorBuy}
+              style={{
+                padding: "8px 12px", border: `1px solid ${N.BRAND_BRT}`,
+                background: `${N.BRAND}18`, color: N.BRAND_BRT,
+                fontFamily: N.FONT_MONO, fontSize: 10, fontWeight: 900,
+                letterSpacing: "0.12em", cursor: operatorBuyPending ? "wait" : "pointer",
+              }}
+            >
+              {operatorBuyPending ? "BUYING..." : "BUY NOW"}
+            </button>
+          </div>
+        </div>
+      </div>,
+      document.body,
+    )
+    : null;
+
   return (
     <div style={{ borderBottom: `1px solid ${N.BORDER}` }}>
     <div
@@ -1194,85 +1280,7 @@ export function SignalRow({ spec, breakdown }: Props) {
         )}
       </div>
     </div>
-    {operatorBuyConfirmOpen && (
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={`Confirm operator buy ${spec.label}`}
-        style={{
-          position: "fixed", inset: 0, zIndex: 2147482000,
-          display: "grid", placeItems: "center",
-          padding: 18, background: "rgba(0,0,0,0.72)",
-          fontFamily: N.FONT_MONO,
-        }}
-        onClick={() => {
-          if (!operatorBuyPending) setOperatorBuyConfirmOpen(false);
-        }}
-      >
-        <div
-          style={{
-            width: "min(460px, 100%)",
-            background: "#050806",
-            border: `1px solid ${N.BRAND}66`,
-            boxShadow: `0 0 32px ${N.BRAND}22, inset 0 0 20px ${N.BRAND}08`,
-            borderRadius: 6,
-            padding: 16,
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div style={{
-            color: N.BRAND_BRT, fontSize: 10, fontWeight: 900,
-            letterSpacing: "0.22em", marginBottom: 10,
-          }}>
-            CONFIRM OPERATOR BUY
-          </div>
-          <div style={{ color: N.TEXT_0, fontSize: 16, fontWeight: 900, lineHeight: 1.35 }}>
-            Buy ${OPERATOR_BUY_SIZE_USD} of {spec.label} and hand management to AI?
-          </div>
-          <div style={{
-            marginTop: 12, display: "grid",
-            gridTemplateColumns: "1fr 1fr", gap: 8,
-            color: N.TEXT_2, fontSize: 10,
-          }}>
-            <div>Symbol <span style={{ color: N.TEXT_0, fontWeight: 800 }}>{spec.symbol}</span></div>
-            <div>AI Confidence <span style={{ color: N.BRAND_BRT, fontWeight: 800 }}>{confActive ? `${conf}%` : "—"}</span></div>
-            <div>Estimated Entry <span style={{ color: N.TEXT_0, fontWeight: 800 }}>${fmt(entry)}</span></div>
-            <div>Label <span style={{ color: N.BRAND_BRT, fontWeight: 800 }}>OPERATOR_ENTERED</span></div>
-          </div>
-          <div style={{ marginTop: 12, color: N.TEXT_3, fontSize: 10, lineHeight: 1.45 }}>
-            This sends a real market BUY through the user-scoped execution path. AI exit management attaches stop loss, take profit, trailing stop, and max hold protections after fill.
-          </div>
-          <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end", gap: 8 }}>
-            <button
-              type="button"
-              disabled={operatorBuyPending}
-              onClick={() => setOperatorBuyConfirmOpen(false)}
-              style={{
-                padding: "8px 12px", border: `1px solid ${N.BORDER_HI}`,
-                background: "transparent", color: N.TEXT_2,
-                fontFamily: N.FONT_MONO, fontSize: 10, fontWeight: 900,
-                letterSpacing: "0.12em", cursor: operatorBuyPending ? "wait" : "pointer",
-              }}
-            >
-              CANCEL
-            </button>
-            <button
-              type="button"
-              disabled={operatorBuyPending}
-              onClick={executeOperatorBuy}
-              style={{
-                padding: "8px 12px", border: `1px solid ${N.BRAND_BRT}`,
-                background: `${N.BRAND}18`, color: N.BRAND_BRT,
-                fontFamily: N.FONT_MONO, fontSize: 10, fontWeight: 900,
-                letterSpacing: "0.12em", cursor: operatorBuyPending ? "wait" : "pointer",
-              }}
-            >
-              {operatorBuyPending ? "BUYING..." : "BUY NOW"}
-            </button>
-          </div>
-        </div>
-      </div>
-    )}
+    {operatorBuyConfirmModal}
     {insightsEnabled && breakdown && (
       <WhyNotTradeStrip
         conf={conf}
