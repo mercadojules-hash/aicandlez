@@ -11,6 +11,8 @@ export const STRATEGY_V2_DEFAULT_SYMBOL_BLOCKLIST = [
 
 export const STRATEGY_V2_RSI_MIN = 60;
 export const STRATEGY_V2_RSI_MAX = 82;
+export const STRATEGY_V2_RSI_CONTINUATION_MIN = 45;
+export const STRATEGY_V2_RSI_CONTINUATION_MIN_SCORE = 65;
 
 export type StrategyV2BlockReason =
   | "strategy_v2_shorts_disabled"
@@ -40,6 +42,7 @@ export interface StrategyV2GateInput {
   fastSnap?: StrategyV2SnapshotInput;
   slowSnap?: StrategyV2SnapshotInput;
   blocklist?: Iterable<string>;
+  compositeScore?: number;
 }
 
 export interface StrategyV2GateDecision {
@@ -114,7 +117,7 @@ export function evaluateStrategyV2Gate(input: StrategyV2GateInput): StrategyV2Ga
     return block("strategy_v2_ema_not_aligned");
   }
 
-  if (!rsiInRange(readRsi(input.fast, input.fastSnap)) || !rsiInRange(readRsi(input.slow, input.slowSnap))) {
+  if (!rsiPairInRange(readRsi(input.fast, input.fastSnap), readRsi(input.slow, input.slowSnap), input.compositeScore)) {
     return block("strategy_v2_rsi_out_of_range");
   }
 
@@ -198,4 +201,24 @@ function readRsi(decision: StrategyV2DecisionInput, snapshot?: StrategyV2Snapsho
 
 function rsiInRange(value: number | null): boolean {
   return value !== null && value >= STRATEGY_V2_RSI_MIN && value <= STRATEGY_V2_RSI_MAX;
+}
+
+function rsiPairInRange(fastRsi: number | null, slowRsi: number | null, compositeScore?: number): boolean {
+  if (rsiInRange(fastRsi) && rsiInRange(slowRsi)) return true;
+  if (
+    !Number.isFinite(compositeScore) ||
+    (compositeScore ?? 0) < STRATEGY_V2_RSI_CONTINUATION_MIN_SCORE ||
+    fastRsi === null ||
+    slowRsi === null
+  ) {
+    return false;
+  }
+
+  const bothBelowHardCeiling = fastRsi <= STRATEGY_V2_RSI_MAX && slowRsi <= STRATEGY_V2_RSI_MAX;
+  const bothAboveContinuationFloor =
+    fastRsi >= STRATEGY_V2_RSI_CONTINUATION_MIN &&
+    slowRsi >= STRATEGY_V2_RSI_CONTINUATION_MIN;
+  const oneTimeframeInOriginalBand = rsiInRange(fastRsi) || rsiInRange(slowRsi);
+
+  return bothBelowHardCeiling && bothAboveContinuationFloor && oneTimeframeInOriginalBand;
 }

@@ -71,8 +71,38 @@ describe("evaluateStrategyV2Gate", () => {
     expect(d.reason).toBe("strategy_v2_rsi_out_of_range");
   });
 
+  it("allows high-composite continuation when one timeframe RSI is below 60 but above continuation floor", () => {
+    const d = decide({
+      compositeScore: 65,
+      fastSnap: { rsi: 76.9, ema9: 109, ema21: 100 },
+      slowSnap: { rsi: 48.9, ema9: 205, ema21: 200 },
+    });
+    expect(d.allowed).toBe(true);
+    expect(d.reason).toBeNull();
+  });
+
+  it("keeps low-composite continuation blocked below the original RSI floor", () => {
+    const d = decide({
+      compositeScore: 64.9,
+      fastSnap: { rsi: 76.9, ema9: 109, ema21: 100 },
+      slowSnap: { rsi: 48.9, ema9: 205, ema21: 200 },
+    });
+    expect(d.allowed).toBe(false);
+    expect(d.reason).toBe("strategy_v2_rsi_out_of_range");
+  });
+
+  it("blocks high-composite continuation when both timeframes are below the original RSI band", () => {
+    const d = decide({
+      compositeScore: 80,
+      fastSnap: { rsi: 55, ema9: 109, ema21: 100 },
+      slowSnap: { rsi: 48, ema9: 205, ema21: 200 },
+    });
+    expect(d.allowed).toBe(false);
+    expect(d.reason).toBe("strategy_v2_rsi_out_of_range");
+  });
+
   it("blocks RSI above 82", () => {
-    const d = decide({ slowSnap: { rsi: 82.1, ema9: 205, ema21: 200 } });
+    const d = decide({ compositeScore: 90, slowSnap: { rsi: 82.1, ema9: 205, ema21: 200 } });
     expect(d.allowed).toBe(false);
     expect(d.reason).toBe("strategy_v2_rsi_out_of_range");
   });

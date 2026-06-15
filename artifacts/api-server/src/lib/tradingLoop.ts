@@ -3926,6 +3926,7 @@ async function tick() {
         slow: mtf.slow,
         fastSnap: mtf.fastSnap,
         slowSnap: mtf.slowSnap,
+        compositeScore: mtf.displayConfidence,
       });
       const strategyV2GatePass = strategyV2Gate.allowed;
 
