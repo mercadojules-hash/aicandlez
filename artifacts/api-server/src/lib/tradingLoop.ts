@@ -628,6 +628,222 @@ async function countOpenTradePositionsForSymbol(symbol: string): Promise<number>
   return rows[0]?.value ?? 0;
 }
 
+type EntryDecisionOutcome = "ENTERED" | "SKIPPED";
+type EntrySkipReason =
+  | "Capacity Full"
+  | "Liquidity Guard"
+  | "Blocked Asset"
+  | "Confidence Too Low"
+  | "Risk Filter"
+  | "Duplicate Exposure"
+  | "Existing Position";
+
+interface EntryDecisionDraft {
+  ts: number;
+  symbol: string;
+  side: "BUY" | "SELL";
+  confidence: number;
+  compositeScore: number;
+  outcome: EntryDecisionOutcome;
+  skipReason: EntrySkipReason | null;
+  rawReason: string | null;
+  rejectionGate: string | null;
+  reachedExecution: boolean;
+  executionAttempted: boolean;
+}
+
+interface OpenPositionScore {
+  symbol: string;
+  positionId: string;
+  score: number;
+  confidence: number | null;
+  source: "current_breakdown" | "entry_signal";
+}
+
+function classifyEntrySkipReason(
+  rejectionGate: string | null,
+  rejectionReason: string | null,
+): EntrySkipReason {
+  const gate = (rejectionGate ?? "").toLowerCase();
+  const reason = (rejectionReason ?? "").toLowerCase();
+  const haystack = `${gate} ${reason}`;
+
+  if (
+    haystack.includes("confidence") ||
+    haystack.includes("below ") ||
+    haystack.includes("floor")
+  ) {
+    return "Confidence Too Low";
+  }
+  if (
+    haystack.includes("operator book full") ||
+    haystack.includes("max active") ||
+    haystack.includes("position_limit") ||
+    haystack.includes("position limit") ||
+    haystack.includes("plan_max_positions") ||
+    haystack.includes("concurrent_live_cap") ||
+    haystack.includes("trade_limit") ||
+    haystack.includes("buying power") ||
+    haystack.includes("insufficient") ||
+    haystack.includes("balance") ||
+    haystack.includes("cash") ||
+    haystack.includes("capital") ||
+    haystack.includes("allocation")
+  ) {
+    return "Capacity Full";
+  }
+  if (
+    haystack.includes("per_symbol_cap") ||
+    haystack.includes("per-symbol cap") ||
+    haystack.includes("existing position") ||
+    haystack.includes("already open")
+  ) {
+    return "Existing Position";
+  }
+  if (
+    haystack.includes("duplicate") ||
+    haystack.includes("correlation") ||
+    haystack.includes("duplicate_asset")
+  ) {
+    return "Duplicate Exposure";
+  }
+  if (
+    haystack.includes("blocklist") ||
+    haystack.includes("blocked asset") ||
+    haystack.includes("symbol_blocked") ||
+    haystack.includes("strategy_v2_symbol_blocked") ||
+    haystack.includes("unsupported_symbol") ||
+    haystack.includes("unsupported symbol") ||
+    haystack.includes("exchange eligibility")
+  ) {
+    return "Blocked Asset";
+  }
+  if (
+    haystack.includes("liquidity") ||
+    haystack.includes("volume") ||
+    haystack.includes("spread") ||
+    haystack.includes("sideways")
+  ) {
+    return "Liquidity Guard";
+  }
+  return "Risk Filter";
+}
+
+async function getLowestOpenPositionScore(): Promise<OpenPositionScore | null> {
+  const openRows = await db
+    .select({
+      id:       tradesTable.id,
+      symbol:   tradesTable.symbol,
+      signalId: tradesTable.signalId,
+    })
+    .from(tradesTable)
+    .where(openGlobalPositionsPredicate());
+
+  if (openRows.length === 0) return null;
+
+  const signalIds = Array.from(new Set(
+    openRows
+      .map((row) => row.signalId)
+      .filter((id): id is string => typeof id === "string" && id.length > 0),
+  ));
+  const signalScores = new Map<string, number>();
+  if (signalIds.length > 0) {
+    const signalRows = await db
+      .select({ id: signalsTable.id, confidence: signalsTable.confidence })
+      .from(signalsTable)
+      .where(inArray(signalsTable.id, signalIds));
+    for (const row of signalRows) {
+      if (Number.isFinite(row.confidence)) signalScores.set(row.id, row.confidence);
+    }
+  }
+
+  let lowest: OpenPositionScore | null = null;
+  for (const row of openRows) {
+    const current = engineStats.symbolBreakdowns[row.symbol];
+    const currentScore = current && Number.isFinite(current.displayConfidence)
+      ? current.displayConfidence
+      : null;
+    const entryScore = row.signalId ? signalScores.get(row.signalId) ?? null : null;
+    const score = currentScore ?? entryScore;
+    if (score === null || !Number.isFinite(score)) continue;
+    const candidate: OpenPositionScore = {
+      symbol:     row.symbol,
+      positionId: row.id,
+      score,
+      confidence: current && Number.isFinite(current.avgConfidence)
+        ? current.avgConfidence
+        : entryScore,
+      source: currentScore !== null ? "current_breakdown" : "entry_signal",
+    };
+    if (!lowest || candidate.score < lowest.score) lowest = candidate;
+  }
+
+  return lowest;
+}
+
+async function recordEntryDecisions(drafts: EntryDecisionDraft[]): Promise<void> {
+  if (drafts.length === 0) return;
+
+  try {
+    const lowestOpen = drafts.some((d) => d.skipReason === "Capacity Full")
+      ? await getLowestOpenPositionScore()
+      : null;
+
+    const ranked = drafts
+      .map((draft, index) => ({ draft, index }))
+      .sort((a, b) =>
+        b.draft.compositeScore - a.draft.compositeScore ||
+        b.draft.confidence - a.draft.confidence ||
+        a.index - b.index,
+      );
+    const finalRanks = new Map<number, number>();
+    ranked.forEach((item, index) => finalRanks.set(item.index, index + 1));
+
+    const rows = drafts.map((draft, index) => {
+      const finalRank = finalRanks.get(index) ?? index + 1;
+      const missedOpportunity =
+        draft.skipReason === "Capacity Full" &&
+        lowestOpen !== null &&
+        draft.compositeScore > lowestOpen.score;
+      const message = missedOpportunity
+        ? `[ENTRY_DECISION] MISSED_OPPORTUNITY ${draft.symbol} ${draft.side} rank=${finalRank} score=${draft.compositeScore.toFixed(1)} > open ${lowestOpen.symbol} score=${lowestOpen.score.toFixed(1)}`
+        : `[ENTRY_DECISION] ${draft.outcome}${draft.skipReason ? ` (${draft.skipReason})` : ""} ${draft.symbol} ${draft.side} rank=${finalRank} score=${draft.compositeScore.toFixed(1)}`;
+
+      return {
+        id:      genId(),
+        type:    "trade",
+        level:   missedOpportunity ? "warn" : draft.outcome === "ENTERED" ? "success" : "info",
+        message,
+        details: {
+          tag:             "ENTRY_DECISION",
+          outcome:         draft.outcome,
+          skipReason:      draft.skipReason,
+          symbol:          draft.symbol,
+          side:            draft.side,
+          confidence:      draft.confidence,
+          finalRank,
+          compositeScore:  draft.compositeScore,
+          timestamp:       draft.ts,
+          rawReason:       draft.rawReason,
+          rejectionGate:   draft.rejectionGate,
+          reachedExecution: draft.reachedExecution,
+          executionAttempted: draft.executionAttempted,
+          missedOpportunity,
+          candidateScore:  draft.compositeScore,
+          lowestRankedOpenPosition: lowestOpen,
+        },
+      };
+    });
+
+    await db.insert(logsTable).values(rows);
+  } catch (err) {
+    logger.warn(
+      { err: err instanceof Error ? err.message : String(err) },
+      "[ENTRY_DECISION] failed to persist entry decision telemetry",
+    );
+  }
+}
+
 // Rehydrate open global-engine positions from the `trades` table into the in-memory
 // simulationEngine on boot, and rebuild positionMeta so the trailing-stop monitor +
 // journal have entry context. Returns the number restored.
@@ -3577,6 +3793,8 @@ async function tick() {
     return;
   }
 
+  const entryDecisionDrafts: EntryDecisionDraft[] = [];
+
   for (const symbol of SUPPORTED_SYMBOLS) {
     try {
       const mtf = await computeMTFDecision(symbol);
@@ -3945,6 +4163,22 @@ async function tick() {
 
         recordSignalTrace(trace);
 
+        entryDecisionDrafts.push({
+          ts:                 trace.ts,
+          symbol,
+          side:               fnSide,
+          confidence:         mtf.avgConfidence,
+          compositeScore:     mtf.displayConfidence,
+          outcome:            trace.finalResult === "EXECUTED" ? "ENTERED" : "SKIPPED",
+          skipReason:         trace.finalResult === "EXECUTED"
+            ? null
+            : classifyEntrySkipReason(trace.rejectionGate, trace.rejectionReason),
+          rawReason:          trace.rejectionReason,
+          rejectionGate:      trace.rejectionGate,
+          reachedExecution:   trace.reachedExecution,
+          executionAttempted: trace.executionAttempted,
+        });
+
         logger.info(
           {
             tag:        "SIGNAL_FUNNEL",
@@ -3977,6 +4211,8 @@ async function tick() {
       if (engineStats.errors.length > 20) engineStats.errors.shift();
     }
   }
+
+  await recordEntryDecisions(entryDecisionDrafts);
 
   // TEMP [VOL_GATE_TEST] — controlled live-test funnel snapshot (cumulative
   // since boot) emitted once per tick so Render logs carry a time-series of
