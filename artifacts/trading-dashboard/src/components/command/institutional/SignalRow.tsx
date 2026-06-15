@@ -37,18 +37,10 @@ const apiBaseUrl: string = (
   (import.meta.env["VITE_API_BASE_URL"] as string | undefined) ?? ""
 ).replace(/\/$/, "");
 
-const OPERATOR_BUY_FALLBACK_SIZE_USD = 600;
-
-interface RuntimeHealthResponse {
-  runtimeConfig?: {
-    tradeSizeOverrideUsd?: number | null;
-  };
-}
-
-function normalizeTradeSizeOverride(value: unknown): number {
-  const n = Number(value);
-  return Number.isFinite(n) && n > 0 ? n : OPERATOR_BUY_FALLBACK_SIZE_USD;
-}
+const OPERATOR_BUY_DEFAULT_SIZE_USD = 100;
+const OPERATOR_BUY_SIZE_STORAGE_KEY = "acl_operator_buy_size_v1";
+const OPERATOR_BUY_SIZE_EVENT = "acl-operator-buy-size-change";
+const OPERATOR_BUY_SIZE_PRESETS = [10, 20, 50, 100, 250, 500] as const;
 
 // ── DEV-only customer-preview gate ───────────────────────────────────────────
 // Mirrors `shouldForceCustomerPreview()` in Portal.tsx. When an admin opens the
@@ -162,25 +154,49 @@ function useLiveOrderCap(enabled: boolean): LiveOrderCapInfo {
   };
 }
 
-function useRuntimeTradeSizeOverride(enabled: boolean): number {
-  const { getToken } = useAuth();
-  const { data } = useQuery<number>({
-    queryKey: ["runtime-config", "trade-size-override"],
-    enabled,
-    staleTime: 30_000,
-    gcTime:    5 * 60_000,
-    queryFn: async () => {
-      const token = await getToken().catch(() => null);
-      const res = await authFetch(`${apiBaseUrl}/api/healthz`, {
-        credentials: "include",
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-      });
-      if (!res.ok) throw new Error(`healthz HTTP ${res.status}`);
-      const body = (await res.json()) as RuntimeHealthResponse;
-      return normalizeTradeSizeOverride(body.runtimeConfig?.tradeSizeOverrideUsd);
-    },
-  });
-  return data ?? OPERATOR_BUY_FALLBACK_SIZE_USD;
+function readStoredOperatorBuySize(): number {
+  if (typeof window === "undefined") return OPERATOR_BUY_DEFAULT_SIZE_USD;
+  try {
+    const raw = window.localStorage.getItem(OPERATOR_BUY_SIZE_STORAGE_KEY);
+    if (!raw) return OPERATOR_BUY_DEFAULT_SIZE_USD;
+    const n = Number(raw);
+    return (OPERATOR_BUY_SIZE_PRESETS as readonly number[]).includes(n)
+      ? n
+      : OPERATOR_BUY_DEFAULT_SIZE_USD;
+  } catch {
+    return OPERATOR_BUY_DEFAULT_SIZE_USD;
+  }
+}
+
+function writeStoredOperatorBuySize(n: number) {
+  if (typeof window === "undefined") return;
+  try { window.localStorage.setItem(OPERATOR_BUY_SIZE_STORAGE_KEY, String(n)); } catch { /* noop */ }
+}
+
+function useOperatorBuySize(): [number, (n: number) => void] {
+  const [size, setSizeState] = useState<number>(() => readStoredOperatorBuySize());
+  useEffect(() => {
+    const sync = () => setSizeState(readStoredOperatorBuySize());
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === OPERATOR_BUY_SIZE_STORAGE_KEY) sync();
+    };
+    window.addEventListener("storage", onStorage);
+    window.addEventListener(OPERATOR_BUY_SIZE_EVENT, sync);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener(OPERATOR_BUY_SIZE_EVENT, sync);
+    };
+  }, []);
+
+  const setSize = (n: number) => {
+    const next = (OPERATOR_BUY_SIZE_PRESETS as readonly number[]).includes(n)
+      ? n
+      : OPERATOR_BUY_DEFAULT_SIZE_USD;
+    writeStoredOperatorBuySize(next);
+    setSizeState(next);
+    try { window.dispatchEvent(new Event(OPERATOR_BUY_SIZE_EVENT)); } catch { /* noop */ }
+  };
+  return [size, setSize];
 }
 
 /**
@@ -335,7 +351,7 @@ export function SignalRow({ spec, breakdown }: Props) {
   // role fixes that and keeps the customer-portal branch untouched for
   // non-admin users.
   const { isAdmin: isOperatorRole, loading: roleLoading } = useUserRole();
-  const operatorBuySizeUSD = useRuntimeTradeSizeOverride(isOperatorRole);
+  const [operatorBuySizeUSD, setOperatorBuySizeUSD] = useOperatorBuySize();
 
   // Phase 6 — Plan-aware customer intelligence layer.
   //
@@ -358,7 +374,7 @@ export function SignalRow({ spec, breakdown }: Props) {
     portalMode.isCustomerPortal &&
     portalMode.mode === "LIVE" &&
     portalMode.canUseLive;
-  const showOperatorSizeBadge = isOperatorRole && !roleLoading;
+  const showOperatorSizePicker = isOperatorRole && !roleLoading;
   const capInfo = useLiveOrderCap(showSizePicker);
 
   // If the stored preferred size now exceeds the user's cap (e.g. after a
@@ -589,7 +605,7 @@ export function SignalRow({ spec, breakdown }: Props) {
     console.info("[OPERATOR_BUY_REQUEST]", {
       symbol: spec.symbol,
       sizeUSD: operatorBuySizeUSD,
-      runtimeTradeSizeOverrideUsd: operatorBuySizeUSD,
+      operatorBuySizeUSD,
       confidence: confActive ? conf : null,
     });
     toast({
@@ -645,7 +661,7 @@ export function SignalRow({ spec, breakdown }: Props) {
           symbol: spec.symbol,
           requestPayloadSizeUSD: operatorBuySizeUSD,
           responseSizeUSD: body.sizeUSD ?? body.effectiveSizeUSD ?? null,
-          runtimeTradeSizeOverrideUsd: body.runtimeTradeSizeOverrideUsd ?? operatorBuySizeUSD,
+          runtimeTradeSizeOverrideUsd: body.runtimeTradeSizeOverrideUsd ?? null,
           exchange: body.exchange ?? null,
           positionId: body.positionId ?? null,
         });
@@ -1266,20 +1282,11 @@ export function SignalRow({ spec, breakdown }: Props) {
               nextTier={capInfo.nextTier}
             />
           )}
-          {showOperatorSizeBadge && (
-            <span
-              title="Operator buy notional from active runtime configuration"
-              className="text-[9px] font-extrabold tracking-[0.16em] px-2 py-1 rounded tabular-nums"
-              style={{
-                color: N.BRAND,
-                background: `${N.BRAND}1c`,
-                border: `1px solid ${N.BRAND}70`,
-                boxShadow: `0 0 4px ${N.BRAND}40`,
-                fontFamily: N.FONT_MONO,
-              }}
-            >
-              ${operatorBuySizeUSD}
-            </span>
+          {showOperatorSizePicker && (
+            <OperatorBuySizePicker
+              size={operatorBuySizeUSD}
+              onChange={setOperatorBuySizeUSD}
+            />
           )}
           <ActionPill
             label="BUY"
@@ -1926,6 +1933,88 @@ function DataCell({ label, value, color }: { label: string; value: string; color
         style={{ color, lineHeight: 1.05 }}>
         {value}
       </span>
+    </div>
+  );
+}
+
+function OperatorBuySizePicker({
+  size, onChange,
+}: {
+  size:     number;
+  onChange: (n: number) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ position: "relative" }}>
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        title="Operator buy notional"
+        aria-label="Operator buy size"
+        aria-expanded={open}
+        className="text-[9px] font-extrabold tracking-[0.16em] px-2 py-1 rounded transition-all tabular-nums"
+        style={{
+          color: N.BRAND,
+          background: `${N.BRAND}1c`,
+          border: `1px solid ${N.BRAND}70`,
+          boxShadow: `0 0 4px ${N.BRAND}40`,
+          fontFamily: N.FONT_MONO,
+        }}
+      >
+        ${size}
+      </button>
+      {open && (
+        <>
+          <div
+            onClick={() => setOpen(false)}
+            style={{ position: "fixed", inset: 0, zIndex: 40 }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              top: "calc(100% + 4px)",
+              right: 0,
+              zIndex: 50,
+              background: "#050A07",
+              border: `1px solid ${N.BRAND}55`,
+              boxShadow: `0 0 7px ${N.BRAND}30, 0 8px 24px rgba(0,0,0,0.252)`,
+              borderRadius: 6,
+              padding: 8,
+              minWidth: 156,
+              fontFamily: N.FONT_MONO,
+            }}
+          >
+            <div className="text-[8.5px] font-bold tracking-[0.2em] mb-1.5"
+              style={{ color: N.TEXT_3 }}>
+              OPERATOR BUY SIZE
+            </div>
+            <div className="grid grid-cols-2 gap-1">
+              {OPERATOR_BUY_SIZE_PRESETS.map(p => {
+                const active = size === p;
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => {
+                      onChange(p);
+                      setOpen(false);
+                    }}
+                    className="text-[10px] font-extrabold tabular-nums py-1 rounded transition-all"
+                    style={{
+                      color: active ? "#000" : N.BRAND,
+                      background: active ? N.BRAND : `${N.BRAND}14`,
+                      border: `1px solid ${N.BRAND}${active ? "" : "55"}`,
+                      fontFamily: N.FONT_MONO,
+                    }}
+                  >
+                    ${p}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
