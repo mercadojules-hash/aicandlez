@@ -1,4 +1,5 @@
 import { runMigrations } from "stripe-replit-sync";
+import { pool } from "@workspace/db";
 
 // ── Stripe schema migrations ───────────────────────────────────────────────────
 // Run as a separate process (not bundled by esbuild) so that __dirname
@@ -16,6 +17,13 @@ if (!databaseUrl) {
 try {
   await runMigrations({ databaseUrl });
   console.log("[migrate] Stripe schema migrations complete");
+  if (pool) {
+    await pool.query(`
+      ALTER TABLE sim_positions
+        ADD COLUMN IF NOT EXISTS manual_exit_target_price real
+    `);
+    console.log("[migrate] Manual target exit schema ready");
+  }
   process.exit(0);
 } catch (err) {
   // Non-fatal — server can still start without Stripe schema

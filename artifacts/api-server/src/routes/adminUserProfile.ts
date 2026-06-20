@@ -36,6 +36,7 @@ import { emit as emitTelemetry, genCorrelationId, rememberCorrelation } from "..
 import { notifyFillHydrated } from "../lib/positionStore.js";
 import { getTradeSizeOverrideUsd } from "../lib/tradeSizeOverride.js";
 import { roundOptionalPrice } from "../lib/pricePrecision.js";
+import { setManualExitTarget } from "../lib/manualTargetExit.js";
 import type Stripe from "stripe";
 
 const router = Router();
@@ -509,6 +510,11 @@ const ManualSellBody = z.object({
   note:       z.string().trim().max(2_000).optional(),
 });
 
+const ManualTargetBody = z.object({
+  targetPrice: z.number().positive().nullable(),
+  note:        z.string().trim().max(2_000).optional(),
+});
+
 const OperatorBuyBody = z.object({
   symbol:     z.string().trim().min(2, "symbol is required").max(30),
   sizeUSD:    z.number().min(1).max(100_000).optional(),
@@ -517,6 +523,83 @@ const OperatorBuyBody = z.object({
 });
 
 const OPERATOR_BUY_LABEL = "OPERATOR_ENTERED";
+
+router.put("/admin/users/:id/positions/:positionId/manual-target", ...requireOperator, async (req, res): Promise<void> => {
+  const ctx = resolveActor(req, res, { allowSelf: true });
+  if (!ctx) return;
+
+  const positionId = String(req.params["positionId"] ?? "").trim();
+  const parsed = ManualTargetBody.safeParse(req.body ?? {});
+  if (!positionId) {
+    res.status(400).json({ error: "positionId is required" });
+    return;
+  }
+  if (!parsed.success) {
+    res.status(400).json(serialize4xx(req, parsed.error, "manual-target"));
+    return;
+  }
+
+  try {
+    const [position] = await db.select().from(simPositionsTable)
+      .where(and(
+        eq(simPositionsTable.id, positionId),
+        eq(simPositionsTable.userId, ctx.targetId),
+      ))
+      .limit(1);
+    if (!position) {
+      res.status(404).json({ error: "Open position not found for target user" });
+      return;
+    }
+
+    const before = position.manualExitTargetPrice ?? null;
+    const result = await setManualExitTarget({
+      userId:      ctx.targetId,
+      positionId,
+      targetPrice: parsed.data.targetPrice,
+    });
+    if (!result.ok) {
+      res.status(404).json({ error: result.error });
+      return;
+    }
+
+    const action = parsed.data.targetPrice === null
+      ? "CLEAR_MANUAL_EXIT_TARGET"
+      : before === null
+        ? "SET_MANUAL_EXIT_TARGET"
+        : "UPDATE_MANUAL_EXIT_TARGET";
+    const auditId = await writeAudit({
+      actorId:  ctx.actorId,
+      targetId: ctx.targetId,
+      action,
+      payload: {
+        note: parsed.data.note?.trim() || "Operator manual exit target update",
+        operatorId:   ctx.actorId,
+        targetUserId: ctx.targetId,
+        positionId,
+        symbol:       position.symbol,
+        side:         position.side,
+        exchange:     position.exchange ?? null,
+        previousTargetPrice: before,
+        targetPrice:         parsed.data.targetPrice,
+      },
+    });
+
+    res.json({
+      ok: true,
+      auditId,
+      action,
+      userId: ctx.targetId,
+      positionId,
+      symbol: position.symbol,
+      manualExitTargetPrice: parsed.data.targetPrice,
+    });
+  } catch (err) {
+    res.status(500).json(serialize5xx(req, err, "manual-target", {
+      targetId: ctx.targetId,
+      positionId,
+    }));
+  }
+});
 
 router.post("/admin/users/:id/operator-buy", ...requireOperator, async (req, res): Promise<void> => {
   const ctx = resolveActor(req, res, { allowSelf: true });

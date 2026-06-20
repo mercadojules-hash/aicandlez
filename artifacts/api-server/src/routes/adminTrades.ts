@@ -42,6 +42,7 @@ router.get("/admin/positions", ...requireOperator, async (req, res): Promise<voi
           t.mode                                          AS mode,
           EXTRACT(EPOCH FROM t.timestamp)::bigint * 1000  AS entry_time,
           NULL::text                                      AS exchange,
+          NULL::real                                      AS manual_exit_target_price,
           NULL::real                                      AS entry_fee_broker,
           NULL::text                                      AS entry_fee_broker_currency,
           'global'::text                                  AS source
@@ -63,6 +64,7 @@ router.get("/admin/positions", ...requireOperator, async (req, res): Promise<voi
           'simulation'::text                              AS mode,
           p.entry_time                                    AS entry_time,
           p.exchange                                      AS exchange,
+          p.manual_exit_target_price                      AS manual_exit_target_price,
           p.entry_fee_broker                              AS entry_fee_broker,
           p.entry_fee_broker_currency                     AS entry_fee_broker_currency,
           'sim'::text                                     AS source

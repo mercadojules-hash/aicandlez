@@ -15,6 +15,7 @@ export const simPositionsTable = pgTable("sim_positions", {
   signalId:   text("signal_id"),
   stopLoss:   real("stop_loss"),
   takeProfit: real("take_profit"),
+  manualExitTargetPrice: real("manual_exit_target_price"),
   // Engine avgConfidence (%) at the moment this position was opened. Carried so
   // closed trades can be bucketed by confidence band for performance analysis
   // (e.g. the 50–64 confidence experiment). NULL for positions opened before

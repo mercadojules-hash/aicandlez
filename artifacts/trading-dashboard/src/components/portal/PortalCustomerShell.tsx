@@ -5274,6 +5274,7 @@ function AdminOpenPositionsCommandCenter({
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [expandedTradeId, setExpandedTradeId] = useState<string | null>(null);
   const [sellTarget, setSellTarget] = useState<PortalOpenPositionRow | null>(null);
+  const [manualTargetInputs, setManualTargetInputs] = useState<Record<string, string>>({});
 
   const manualSell = useMutation({
     mutationFn: async (position: PortalOpenPositionRow) => {
@@ -5304,6 +5305,44 @@ function AdminOpenPositionsCommandCenter({
     },
     onError: (err: Error) => {
       toast({ title: "Manual sell failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const manualTarget = useMutation({
+    mutationFn: async (input: { position: PortalOpenPositionRow; targetPrice: number | null }) => {
+      if (!clerkUserId) throw new Error("Admin user id unavailable");
+      const res = await authFetch(
+        `/api/admin/users/${encodeURIComponent(clerkUserId)}/positions/${encodeURIComponent(input.position.id)}/manual-target`,
+        {
+          method: "PUT",
+          body: JSON.stringify({
+            targetPrice: input.targetPrice,
+            note: input.targetPrice === null
+              ? "Manual target cancelled from Command Center"
+              : "Manual target armed from Command Center",
+          }),
+        },
+      );
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(String((json as { error?: unknown }).error ?? `HTTP ${res.status}`));
+      }
+      return json as { manualExitTargetPrice?: number | null };
+    },
+    onSuccess: (_data, vars) => {
+      toast({
+        title: vars.targetPrice === null ? "Manual target cancelled" : "Manual target armed",
+        description: vars.targetPrice === null ? "Position returned to normal AI exit monitoring." : "Position will close when the target is reached.",
+      });
+      if (vars.targetPrice === null) {
+        setManualTargetInputs(prev => ({ ...prev, [vars.position.id]: "" }));
+      }
+      void qc.invalidateQueries({ queryKey: ["customer-simulation-account"] });
+      void qc.invalidateQueries({ queryKey: ["admin-user-detail", clerkUserId] });
+      void qc.invalidateQueries({ queryKey: RUNTIME_STATE_QUERY_KEY });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Manual target failed", description: err.message, variant: "destructive" });
     },
   });
 
@@ -5372,6 +5411,13 @@ function AdminOpenPositionsCommandCenter({
             const currentPrice = portalMetricNum(raw["current_price"], row.last);
             const pnl = portalMetricNum(raw["unrealized_pnl"], row.pnl);
             const pnlPct = portalMetricNum(raw["unrealized_pnl_pct"], row.pnlPct);
+            const existingManualTarget = portalMetricNum(
+              raw["manual_exit_target_price"] ?? raw["manualExitTargetPrice"],
+            );
+            const manualInputValue =
+              manualTargetInputs[row.id] ??
+              (Number.isFinite(existingManualTarget) && existingManualTarget > 0 ? String(existingManualTarget) : "");
+            const manualTargetValue = Number(manualInputValue);
             const peakUsd = portalMetricNum(raw["peak_profit_usd"] ?? diag["peak_profit_usd"]);
             const peakPct = portalMetricNum(raw["peak_profit_pct"] ?? diag["peak_profit_pct"]);
             const drawdownUsd = portalMetricNum(raw["drawdown_from_peak_usd"]);
@@ -5391,6 +5437,7 @@ function AdminOpenPositionsCommandCenter({
             const trailingActive = Boolean(diag["trailing_active"]);
             const status = String(raw["exit_mode_status"] ?? (trailingActive ? "TRAIL TRACKING" : "MONITORING"));
             const pnlColor = pnl > 0 ? T.NEON : pnl < 0 ? T.RED : T.TEXT_2;
+            const targetBusy = manualTarget.isPending;
 
             return (
               <div key={row.id} style={{
@@ -5400,7 +5447,7 @@ function AdminOpenPositionsCommandCenter({
               }}>
                 <div className="cd-admin-command-row" style={{
                   display: "grid",
-                  gridTemplateColumns: "minmax(150px, 1.2fr) repeat(8, minmax(96px, 1fr)) minmax(126px, 0.9fr)",
+                  gridTemplateColumns: "minmax(150px, 1.2fr) repeat(9, minmax(92px, 1fr)) minmax(174px, 0.95fr)",
                   gap: 6, alignItems: "stretch",
                 }}>
                   <div style={{
@@ -5424,11 +5471,71 @@ function AdminOpenPositionsCommandCenter({
                   <PortalCommandMetric label="CURRENT" value={fmtPrice(currentPrice)} />
                   <PortalCommandMetric label="P/L $" value={portalFmtSignedDollar(pnl)} color={pnlColor} />
                   <PortalCommandMetric label="P/L %" value={portalFmtSignedPct(pnlPct)} color={pnlColor} />
+                  <PortalCommandMetric
+                    label="MANUAL TARGET"
+                    value={Number.isFinite(existingManualTarget) && existingManualTarget > 0 ? fmtPrice(existingManualTarget) : "—"}
+                    color={Number.isFinite(existingManualTarget) && existingManualTarget > 0 ? T.AMBER : T.TEXT_3}
+                  />
                   <PortalCommandMetric label="PEAK $" value={portalFmtSignedDollar(peakUsd)} color={Number.isFinite(peakUsd) ? portalPnlColor(peakUsd) : T.TEXT_3} />
                   <PortalCommandMetric label="PEAK %" value={portalFmtSignedPct(peakPct)} color={Number.isFinite(peakPct) ? portalPnlColor(peakPct) : T.TEXT_3} />
                   <PortalCommandMetric label="RETENTION" value={Number.isFinite(retentionPct) ? `${retentionPct.toFixed(1)}%` : "—"} color={retentionColor} />
                   <PortalCommandMetric label="DRAWDOWN" value={`${portalFmtSignedDollar(drawdownUsd)} · ${portalFmtPct(drawdownPct)}`} color={drawdownPct > 0 ? T.AMBER : T.TEXT_3} />
-                  <div style={{ display: "grid", gap: 6, gridTemplateRows: "1fr 1fr" }}>
+                  <div style={{ display: "grid", gap: 6, gridTemplateRows: "1fr 1fr 1fr" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 54px 58px", gap: 5 }}>
+                      <input
+                        value={manualInputValue}
+                        placeholder="Target"
+                        onChange={(e) => setManualTargetInputs(prev => ({ ...prev, [row.id]: e.target.value }))}
+                        style={{
+                          minWidth: 0, minHeight: 27, padding: "5px 7px",
+                          border: "1px solid rgba(255,170,0,0.36)",
+                          background: "rgba(0,0,0,0.28)",
+                          color: T.TEXT_0,
+                          fontFamily: T.FONT_MONO,
+                          fontSize: 9,
+                          fontWeight: 800,
+                          outline: "none",
+                        }}
+                      />
+                      <button
+                        type="button"
+                        disabled={!isLive || !clerkUserId || targetBusy || !(manualTargetValue > 0)}
+                        onClick={() => manualTarget.mutate({ position: row, targetPrice: manualTargetValue })}
+                        title={isLive ? "Arm manual target exit" : "Manual target exits are for live exchange positions"}
+                        style={{
+                          minHeight: 27,
+                          border: "1px solid rgba(255,170,0,0.48)",
+                          background: "rgba(255,170,0,0.12)",
+                          color: T.AMBER,
+                          fontFamily: T.FONT_MONO,
+                          fontSize: 8,
+                          fontWeight: 900,
+                          letterSpacing: "0.06em",
+                          cursor: !isLive || !clerkUserId || targetBusy || !(manualTargetValue > 0) ? "not-allowed" : "pointer",
+                        }}
+                      >
+                        ARM
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!isLive || !clerkUserId || targetBusy || !(Number.isFinite(existingManualTarget) && existingManualTarget > 0)}
+                        onClick={() => manualTarget.mutate({ position: row, targetPrice: null })}
+                        title="Cancel manual target exit"
+                        style={{
+                          minHeight: 27,
+                          border: "1px solid rgba(255,255,255,0.16)",
+                          background: "rgba(255,255,255,0.04)",
+                          color: T.TEXT_2,
+                          fontFamily: T.FONT_MONO,
+                          fontSize: 8,
+                          fontWeight: 900,
+                          letterSpacing: "0.06em",
+                          cursor: !isLive || !clerkUserId || targetBusy || !(Number.isFinite(existingManualTarget) && existingManualTarget > 0) ? "not-allowed" : "pointer",
+                        }}
+                      >
+                        CANCEL
+                      </button>
+                    </div>
                     <button
                       type="button"
                       disabled={!isLive || !clerkUserId || manualSell.isPending}

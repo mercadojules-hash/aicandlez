@@ -44,6 +44,7 @@ import { evaluateStrategyV2Gate, isStrategyV2Enabled } from "./strategyV2Gate.js
 import { updateExcursion, pruneExcursions } from "./excursionTracker.js";
 import { logger } from "./logger.js";
 import { roundOptionalPrice, roundPrice } from "./pricePrecision.js";
+import { runManualTargetExitMonitor } from "./manualTargetExit.js";
 
 function genId() { return crypto.randomUUID(); }
 
@@ -4268,7 +4269,10 @@ async function runHardStopMonitorGuarded() {
   if (stopMonitorRunning) return;
   stopMonitorRunning = true;
   try {
-    await runHardStopMonitor();
+    await Promise.all([
+      runHardStopMonitor(),
+      runManualTargetExitMonitor(),
+    ]);
   } finally {
     stopMonitorRunning = false;
   }
