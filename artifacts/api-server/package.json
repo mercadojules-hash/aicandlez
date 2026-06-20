@@ -38,6 +38,7 @@
     "helmet": "^8.1.0",
     "http-proxy-middleware": "^4.0.0",
     "openai": "^6.42.0",
+    "pg": "^8.20.0",
     "pino": "^9",
     "pino-http": "^10",
     "stripe": "^22.1.1",
