@@ -87,6 +87,13 @@ interface AssetSpec {
   anchor: number;
 }
 
+interface BuyNowConfirmInput {
+  symbol: string;
+  sellTargetPrice: number | null;
+  positionSizeUSD: number;
+  confidence: number | null;
+}
+
 const AVAILABLE_OPERATOR_ASSETS: AssetSpec[] = [
   { symbol: "BCHUSD", label: "BCH", accent: "#8dc351", anchor: 420 },
   { symbol: "INJUSD", label: "INJ", accent: "#cc55ff", anchor: 19 },
@@ -1081,6 +1088,101 @@ function buttonStyle(color: string, disabled = false): React.CSSProperties {
   };
 }
 
+function BuyNowConfirmModal({
+  input,
+  pending,
+  onCancel,
+  onConfirm,
+}: {
+  input: BuyNowConfirmInput;
+  pending: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const asset = AVAILABLE_OPERATOR_ASSETS.find((a) => a.symbol === input.symbol);
+  const { livePrice, state, lastUpdated } = useLiveCandles({
+    symbol: input.symbol,
+    syntheticAnchor: asset?.anchor ?? 100,
+    limit: 48,
+    timeframe: "5m",
+    pollMs: 15_000,
+  });
+  const estimatedQuantity = projectedQuantity(livePrice, input.positionSizeUSD);
+  const estimatedFee = estimatedFeesUSD(input.positionSizeUSD);
+  const estimatedTotalCost = estimatedFee == null ? input.positionSizeUSD : input.positionSizeUSD + estimatedFee;
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Confirm BUY NOW"
+      onClick={() => {
+        if (!pending) onCancel();
+      }}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 40,
+        display: "grid",
+        placeItems: "center",
+        padding: 18,
+        background: "rgba(0,0,0,0.74)",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "min(520px, 100%)",
+          border: `1px solid ${T.green}77`,
+          background: "#020b08",
+          boxShadow: `0 0 34px ${T.green}22`,
+          padding: 16,
+          display: "grid",
+          gap: 12,
+        }}
+      >
+        <div style={{ color: T.green, fontSize: 10, fontWeight: 950, letterSpacing: "0.18em" }}>CONFIRM BUY NOW</div>
+        <div style={{ color: T.text, fontSize: 16, fontWeight: 950, lineHeight: 1.35 }}>
+          Market buy {input.symbol} for {moneyFull(input.positionSizeUSD, 0)}?
+        </div>
+        <div style={{
+          border: `1px solid ${T.green}44`,
+          background: "rgba(102,255,102,0.055)",
+          padding: "10px 11px",
+          display: "grid",
+          gap: 9,
+        }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <RailValue label="CURRENT PRICE" value={price(livePrice)} color={state === "live" ? T.green : T.amber} strong />
+            <RailValue label="INVESTMENT" value={moneyFull(input.positionSizeUSD, 2)} color={T.text} strong />
+            <RailValue label="ESTIMATED QUANTITY" value={quantityText(estimatedQuantity, asset?.label ?? input.symbol.replace(/USD$/, ""))} color={T.cyan} />
+            <RailValue label="ESTIMATED FEE" value={moneyFull(estimatedFee, 2)} color={T.faint} />
+            <RailValue label="ESTIMATED TOTAL COST" value={moneyFull(estimatedTotalCost, 2)} color={T.green} />
+            <RailValue label="LIVE SOURCE" value={`${state.toUpperCase()} · ${clockTime(lastUpdated)}`} color={state === "live" ? T.green : T.amber} />
+          </div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <RailValue label="SELL TARGET" value={price(input.sellTargetPrice)} color={T.amber} />
+          <RailValue label="CONFIDENCE" value={unsignedPct(input.confidence)} color={confidenceColor(input.confidence)} />
+          <RailValue label="LABEL" value="OPERATOR_ENTERED" color={T.cyan} />
+          <RailValue label="MODE" value="LIVE MARKET BUY" color={T.green} />
+        </div>
+        <div style={{ color: T.faint, fontSize: 10, lineHeight: 1.5 }}>
+          This uses the existing operator-buy path. Existing exit protections attach after fill; workstation sell target is armed when a position id is returned.
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+          <button type="button" disabled={pending} onClick={onCancel} style={buttonStyle(T.faint, pending)}>
+            CANCEL
+          </button>
+          <button type="button" disabled={pending} onClick={onConfirm} style={buttonStyle(T.green, pending)}>
+            {pending ? "BUYING..." : "BUY NOW"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function LiveTradeRow({
   row,
   sellTarget,
@@ -1350,12 +1452,7 @@ export default function OperatorWorkstation() {
   const [selectedSymbols, setSelectedSymbols] = useState<string[]>(DEFAULT_OPERATOR_SYMBOLS);
   const [pinnedSymbols, setPinnedSymbols] = useState<string[]>(DEFAULT_PINNED_SYMBOLS);
   const [assetSearch, setAssetSearch] = useState("");
-  const [buyNowConfirm, setBuyNowConfirm] = useState<null | {
-    symbol: string;
-    sellTargetPrice: number | null;
-    positionSizeUSD: number;
-    confidence: number | null;
-  }>(null);
+  const [buyNowConfirm, setBuyNowConfirm] = useState<BuyNowConfirmInput | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1474,7 +1571,7 @@ export default function OperatorWorkstation() {
   });
 
   const buyNow = useMutation({
-    mutationFn: async (input: { symbol: string; sellTargetPrice: number | null; positionSizeUSD: number; confidence: number | null }) => {
+    mutationFn: async (input: BuyNowConfirmInput) => {
       if (!userId) throw new Error("Operator user id unavailable");
       const buyRes = await api(`/api/admin/users/${encodeURIComponent(userId)}/operator-buy`, {
         method: "POST",
@@ -1698,58 +1795,12 @@ export default function OperatorWorkstation() {
         )}
       </main>
       {buyNowConfirm && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Confirm BUY NOW"
-          onClick={() => {
-            if (!buyNow.isPending) setBuyNowConfirm(null);
-          }}
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 40,
-            display: "grid",
-            placeItems: "center",
-            padding: 18,
-            background: "rgba(0,0,0,0.74)",
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: "min(480px, 100%)",
-              border: `1px solid ${T.green}77`,
-              background: "#020b08",
-              boxShadow: `0 0 34px ${T.green}22`,
-              padding: 16,
-              display: "grid",
-              gap: 12,
-            }}
-          >
-            <div style={{ color: T.green, fontSize: 10, fontWeight: 950, letterSpacing: "0.18em" }}>CONFIRM BUY NOW</div>
-            <div style={{ color: T.text, fontSize: 16, fontWeight: 950, lineHeight: 1.35 }}>
-              Market buy {buyNowConfirm.symbol} for {moneyFull(buyNowConfirm.positionSizeUSD, 0)}?
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-              <RailValue label="SELL TARGET" value={price(buyNowConfirm.sellTargetPrice)} color={T.amber} />
-              <RailValue label="CONFIDENCE" value={unsignedPct(buyNowConfirm.confidence)} color={confidenceColor(buyNowConfirm.confidence)} />
-              <RailValue label="LABEL" value="OPERATOR_ENTERED" color={T.cyan} />
-              <RailValue label="MODE" value="LIVE MARKET BUY" color={T.green} />
-            </div>
-            <div style={{ color: T.faint, fontSize: 10, lineHeight: 1.5 }}>
-              This uses the existing operator-buy path. Existing exit protections attach after fill; workstation sell target is armed when a position id is returned.
-            </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-              <button type="button" disabled={buyNow.isPending} onClick={() => setBuyNowConfirm(null)} style={buttonStyle(T.faint, buyNow.isPending)}>
-                CANCEL
-              </button>
-              <button type="button" disabled={buyNow.isPending} onClick={() => buyNow.mutate(buyNowConfirm)} style={buttonStyle(T.green, buyNow.isPending)}>
-                {buyNow.isPending ? "BUYING..." : "BUY NOW"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <BuyNowConfirmModal
+          input={buyNowConfirm}
+          pending={buyNow.isPending}
+          onCancel={() => setBuyNowConfirm(null)}
+          onConfirm={() => buyNow.mutate(buyNowConfirm)}
+        />
       )}
     </div>
   );
