@@ -312,7 +312,7 @@ interface UserDetailAggregates {
   feeRecords: number;
   profitablePnl: number;
   tradesPerDay: number;
-  lifetimeDays: number;
+  lifetimeDays: number | null;
   avgConfidence: number | null;
   avgLatencyMs: number | null;
   errorEventCount: number;
@@ -4052,7 +4052,7 @@ function TradingTab({ detail, loading, clerkUserId }: {
           <MetricCell label="FEES PAID"     value={fmtDollar(agg?.feesGenerated ?? 0)}
             color="#cc55ff" sub={agg ? `${agg.feeRecords} fee events` : undefined} />
           <MetricCell label="TRADES/DAY"    value={agg?.tradesPerDay != null ? agg.tradesPerDay.toFixed(2) : "—"}
-            sub={agg ? `${agg.lifetimeDays.toFixed(0)}d lifetime` : undefined} />
+            sub={agg?.lifetimeDays != null ? `${agg.lifetimeDays.toFixed(0)}d lifetime` : undefined} />
           <MetricCell label="PROFITABLE PNL" value={fmtDollar(agg?.profitablePnl ?? 0)} color="#00ff8a" />
         </div>
       )}
