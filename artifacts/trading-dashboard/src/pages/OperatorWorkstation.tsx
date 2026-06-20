@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { useAuth, useUser } from "@clerk/react";
+import { useAuth, useClerk, useUser } from "@clerk/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
@@ -8,6 +8,7 @@ import {
   Crosshair,
   History,
   LineChart,
+  LogOut,
   Loader2,
   PauseCircle,
   Radio,
@@ -21,6 +22,7 @@ import { API_BASE_URL } from "@/lib/authFetch";
 import { toast } from "@/hooks/use-toast";
 import { useLiveCandles, type LivePoint } from "@/components/command/institutional/useLiveCandles";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useRuntimeState } from "@/hooks/useRuntimeState";
 
 type ApiInit = RequestInit & { expectsJson?: boolean };
 
@@ -38,6 +40,9 @@ interface PlannedTradeRow {
   targetPositionId?: string | null;
   completedTradeId?: string | null;
   lastError?: string | null;
+  createdAt?: string | Date | null;
+  completedAt?: number | null;
+  lastCheckedAt?: number | null;
 }
 
 interface PlannedTradesResponse {
@@ -47,6 +52,7 @@ interface PlannedTradesResponse {
 interface UserDetailResponse {
   positions: Array<Record<string, unknown>>;
   closedTrades: Array<Record<string, unknown>>;
+  simAccount?: Record<string, unknown> | null;
   aggregates?: Record<string, unknown> | null;
 }
 
@@ -82,8 +88,10 @@ const OPERATOR_ASSETS: AssetSpec[] = [
   { symbol: "ETHUSD", label: "ETH", accent: "#66ff66", anchor: 1_750 },
   { symbol: "SOLUSD", label: "SOL", accent: "#ffaa00", anchor: 72 },
   { symbol: "INJUSD", label: "INJ", accent: "#cc55ff", anchor: 5 },
-  { symbol: "XRPUSD", label: "XRP", accent: "#ff6680", anchor: 1.15 },
   { symbol: "LINKUSD", label: "LINK", accent: "#5ad7ff", anchor: 8 },
+  { symbol: "XRPUSD", label: "XRP", accent: "#ff6680", anchor: 1.15 },
+  { symbol: "AAVEUSD", label: "AAVE", accent: "#b5f56a", anchor: 120 },
+  { symbol: "COMPUSD", label: "COMP", accent: "#ffcf5a", anchor: 38 },
 ];
 
 const WORKSTATION_EMAILS = new Set(["teedelgado@gmail.com", "info@mixtapepsd.com"]);
@@ -102,6 +110,9 @@ const T = {
   cyan: "#00e5ff",
   font: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
 };
+
+const ROUND_TRIP_FEE_RATE = 0.004;
+const ACTIVE_PLAN_STATUSES = new Set(["Waiting", "Triggering Buy", "Sell Armed", "Selling"]);
 
 function useOperatorApi() {
   const { getToken } = useAuth();
@@ -150,6 +161,12 @@ function money(value: unknown, decimals = 2): string {
   return `$${x.toFixed(decimals)}`;
 }
 
+function moneyFull(value: unknown, decimals = 2): string {
+  const x = maybeNum(value);
+  if (x == null) return "—";
+  return `$${x.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`;
+}
+
 function signedMoney(value: unknown): string {
   const x = maybeNum(value);
   if (x == null) return "—";
@@ -180,6 +197,19 @@ function age(ms: unknown): string {
   return `${Math.floor(sec / 86400)}d`;
 }
 
+function openAge(row: Record<string, unknown>): string {
+  const raw = field(row, "entry_time", "entryTime")
+    ?? field(row, "opened_at", "openedAt")
+    ?? field(row, "created_at", "createdAt");
+  const direct = maybeNum(raw);
+  if (direct != null) return age(direct > 10_000_000_000 ? direct : direct * 1000);
+  if (typeof raw === "string") {
+    const parsed = Date.parse(raw);
+    return Number.isFinite(parsed) ? age(parsed) : "—";
+  }
+  return "—";
+}
+
 function field(row: Record<string, unknown>, snake: string, camel?: string): unknown {
   return row[snake] ?? (camel ? row[camel] : undefined);
 }
@@ -194,10 +224,10 @@ function rowId(row: Record<string, unknown>, fallback: string): string {
 
 function planState(status: string): string {
   switch (status) {
-    case "Waiting": return "ARMED";
-    case "Triggering Buy": return "BOUGHT";
-    case "Sell Armed": return "WAITING_FOR_TARGET";
-    case "Selling": return "WAITING_FOR_TARGET";
+    case "Waiting": return "WAITING_FOR_BUY";
+    case "Triggering Buy": return "BUY EXECUTED";
+    case "Sell Armed": return "WAITING_FOR_SELL";
+    case "Selling": return "SELL EXECUTING";
     case "Completed": return "COMPLETED";
     case "Cancelled": return "CANCELLED";
     case "Failed": return "FAILED";
@@ -211,12 +241,84 @@ function statusColor(status: string): string {
   if (s === "COMPLETED") return T.green;
   if (s === "CANCELLED") return T.faint;
   if (s === "FAILED") return T.red;
-  if (s === "WAITING_FOR_TARGET") return T.amber;
+  if (s === "WAITING_FOR_SELL" || s === "SELL EXECUTING") return T.amber;
   return T.cyan;
 }
 
 function confidenceOf(b?: EngineSymbolBreakdown): number | null {
   return maybeNum(b?.displayConfidence ?? b?.avgConfidence);
+}
+
+function trendOf(b: EngineSymbolBreakdown | undefined, pctChange?: number | null): string {
+  const raw = String(b?.trend1H ?? b?.marketCondition ?? b?.agreedAction ?? "").toUpperCase();
+  if (raw.includes("BULL") || raw.includes("UP") || raw === "BUY") return "UP";
+  if (raw.includes("BEAR") || raw.includes("DOWN") || raw === "SELL") return "DOWN";
+  if (pctChange != null && Math.abs(pctChange) >= 0.05) return pctChange >= 0 ? "UP" : "DOWN";
+  return "FLAT";
+}
+
+function trendColor(trend: string): string {
+  if (trend === "UP") return T.green;
+  if (trend === "DOWN") return T.red;
+  return T.amber;
+}
+
+function activePlan(plan: PlannedTradeRow | undefined): boolean {
+  return !!plan && ACTIVE_PLAN_STATUSES.has(plan.status);
+}
+
+function expectedProfitUSD(buy: unknown, sell: unknown, size: unknown): number | null {
+  const b = maybeNum(buy);
+  const s = maybeNum(sell);
+  const z = maybeNum(size);
+  if (b == null || s == null || z == null || b <= 0 || z <= 0) return null;
+  return z * ((s - b) / b);
+}
+
+function estimatedFeesUSD(size: unknown): number | null {
+  const z = maybeNum(size);
+  if (z == null || z <= 0) return null;
+  return z * ROUND_TRIP_FEE_RATE;
+}
+
+function expectedReturnPct(buy: unknown, sell: unknown): number | null {
+  const b = maybeNum(buy);
+  const s = maybeNum(sell);
+  if (b == null || s == null || b <= 0) return null;
+  return ((s - b) / b) * 100;
+}
+
+function distanceText(current: unknown, target: unknown): string {
+  const c = maybeNum(current);
+  const t = maybeNum(target);
+  if (c == null || t == null || c <= 0) return "—";
+  const delta = t - c;
+  return `${signedMoney(delta)} · ${pct((delta / c) * 100)}`;
+}
+
+function rowTimeMs(row: Record<string, unknown>): number | null {
+  const raw = field(row, "exit_time", "exitTime") ?? field(row, "created_at", "createdAt");
+  const direct = maybeNum(raw);
+  if (direct != null) return direct > 10_000_000_000 ? direct : direct * 1000;
+  if (typeof raw === "string") {
+    const parsed = Date.parse(raw);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function todayRealizedPnl(rows: Array<Record<string, unknown>>): number {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  return rows.reduce((sum, row) => {
+    const ts = rowTimeMs(row);
+    if (ts == null || ts < start.getTime()) return sum;
+    return sum + n(field(row, "realized_pnl", "realizedPnl"));
+  }, 0);
+}
+
+function positionSize(row: Record<string, unknown>): number {
+  return n(field(row, "size_usd", "sizeUSD") ?? field(row, "capital_invested", "capitalInvested"));
 }
 
 function StrikeLine({ points, color }: { points: LivePoint[]; color: string }) {
@@ -267,6 +369,154 @@ function Metric({ label, value, color = T.text }: { label: string; value: string
   );
 }
 
+function SummaryMetric({ label, value, color = T.text }: { label: string; value: string; color?: string }) {
+  return (
+    <div style={{ minWidth: 96 }}>
+      <div style={{ color: T.faint, fontSize: 9, fontWeight: 900, letterSpacing: "0.11em", whiteSpace: "nowrap" }}>{label}</div>
+      <div style={{ color, fontSize: 15, fontWeight: 950, marginTop: 3, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{value}</div>
+    </div>
+  );
+}
+
+function SummaryBar({
+  displayName,
+  accountName,
+  availableCash,
+  investedCapital,
+  availableCapital,
+  accountValue,
+  openPositions,
+  plannedTradesCount,
+  todayPnl,
+  openPnl,
+  tradeSize,
+  maxHoldLabel,
+  engine,
+  onSignOut,
+}: {
+  displayName: string;
+  accountName: string;
+  availableCash: number | null;
+  investedCapital: number;
+  availableCapital: number | null;
+  accountValue: number | null;
+  openPositions: number;
+  plannedTradesCount: number;
+  todayPnl: number | null;
+  openPnl: number | null;
+  tradeSize: number | null;
+  maxHoldLabel: string;
+  engine: EngineStatusResponse | undefined;
+  onSignOut: () => void;
+}) {
+  const aiLive = !!engine?.running && !engine.killSwitch;
+  return (
+    <section style={{
+      borderBottom: `1px solid ${T.border}`,
+      background: "linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.014))",
+      padding: "10px 16px",
+      display: "grid",
+      gridTemplateColumns: "minmax(190px, 0.42fr) minmax(0, 1fr)",
+      gap: 14,
+      alignItems: "center",
+    }}>
+      <div style={{ display: "grid", gap: 4, minWidth: 0 }}>
+        <div style={{ color: T.text, fontSize: 13, fontWeight: 950, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{displayName}</div>
+        <div style={{ color: T.muted, fontSize: 10, fontWeight: 800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{accountName}</div>
+        <button type="button" onClick={onSignOut} style={{
+          justifySelf: "start",
+          height: 24,
+          border: `1px solid ${T.border}`,
+          background: "rgba(255,255,255,0.035)",
+          color: T.faint,
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          padding: "0 8px",
+          fontFamily: T.font,
+          fontSize: 9,
+          fontWeight: 900,
+          letterSpacing: "0.10em",
+          cursor: "pointer",
+        }}>
+          <LogOut size={11} /> SIGN OUT
+        </button>
+      </div>
+      <div style={{ display: "flex", gap: 16, alignItems: "center", overflowX: "auto", minWidth: 0 }}>
+        <SummaryMetric label="AVAILABLE CASH" value={moneyFull(availableCash, 0)} color={T.green} />
+        <SummaryMetric label="INVESTED" value={moneyFull(investedCapital, 0)} />
+        <SummaryMetric label="AVAILABLE CAPITAL" value={moneyFull(availableCapital, 0)} color={T.cyan} />
+        <SummaryMetric label="ACCOUNT VALUE" value={moneyFull(accountValue, 0)} />
+        <SummaryMetric label="OPEN POSITIONS" value={String(openPositions)} color={openPositions > 0 ? T.amber : T.faint} />
+        <SummaryMetric label="PLANNED TRADES" value={String(plannedTradesCount)} color={plannedTradesCount > 0 ? T.cyan : T.faint} />
+        <SummaryMetric label="TODAY P/L" value={signedMoney(todayPnl)} color={(todayPnl ?? 0) >= 0 ? T.green : T.red} />
+        <SummaryMetric label="OPEN P/L" value={signedMoney(openPnl)} color={(openPnl ?? 0) >= 0 ? T.green : T.red} />
+        <SummaryMetric label="TRADE SIZE" value={moneyFull(tradeSize, 0)} />
+        <SummaryMetric label="MAX HOLD" value={maxHoldLabel} color={T.amber} />
+        <SummaryMetric label="AI STATUS" value={aiLive ? "LIVE" : "IDLE"} color={aiLive ? T.green : T.faint} />
+        <SummaryMetric label="KILL SWITCH" value={engine?.killSwitch ? "ACTIVE" : "CLEAR"} color={engine?.killSwitch ? T.red : T.cyan} />
+      </div>
+    </section>
+  );
+}
+
+function RadarTile({ asset, breakdown }: { asset: AssetSpec; breakdown?: EngineSymbolBreakdown }) {
+  const { livePrice, summary, state } = useLiveCandles({
+    symbol: asset.symbol,
+    syntheticAnchor: asset.anchor,
+    limit: 48,
+    timeframe: "5m",
+    pollMs: 20_000,
+  });
+  const confidence = confidenceOf(breakdown);
+  const trend = trendOf(breakdown, summary.pct);
+  return (
+    <div style={{
+      minWidth: 138,
+      border: `1px solid ${T.border}`,
+      background: `${asset.accent}0e`,
+      padding: "8px 10px",
+      display: "grid",
+      gap: 5,
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
+        <span style={{ color: asset.accent, fontSize: 13, fontWeight: 950, letterSpacing: "0.08em" }}>{asset.label}</span>
+        <span style={{ color: T.faint, fontSize: 8, fontWeight: 900, letterSpacing: "0.10em" }}>{state.toUpperCase()}</span>
+      </div>
+      <div style={{ color: T.text, fontSize: 14, fontWeight: 950, fontVariantNumeric: "tabular-nums" }}>{price(livePrice)}</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, fontSize: 9, fontWeight: 900 }}>
+        <span style={{ color: summary.up ? T.green : T.red }}>{pct(summary.pct)}</span>
+        <span style={{ color: confidence == null ? T.faint : asset.accent }}>{confidence == null ? "AI —" : `${confidence.toFixed(0)}%`}</span>
+        <span style={{ color: trendColor(trend) }}>{trend}</span>
+      </div>
+    </div>
+  );
+}
+
+function MarketRadar({ engine }: { engine: EngineStatusResponse | undefined }) {
+  return (
+    <section style={{
+      borderBottom: `1px solid ${T.border}`,
+      background: "#00070d",
+      padding: "10px 14px",
+      display: "grid",
+      gridTemplateColumns: "112px minmax(0, 1fr)",
+      gap: 10,
+      alignItems: "stretch",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, color: T.text, fontSize: 11, fontWeight: 950, letterSpacing: "0.12em" }}>
+        <LineChart size={14} color={T.cyan} />
+        MARKET RADAR
+      </div>
+      <div style={{ display: "flex", gap: 8, overflowX: "auto", minWidth: 0 }}>
+        {OPERATOR_ASSETS.map((asset) => (
+          <RadarTile key={asset.symbol} asset={asset} breakdown={engine?.symbolBreakdowns?.[asset.symbol]} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function OperatorWorkstationCard({
   asset,
   position,
@@ -296,10 +546,20 @@ function OperatorWorkstationCard({
   const pnl = maybeNum(field(position ?? {}, "unrealized_pnl", "unrealizedPnl"));
   const pnlPct = maybeNum(field(position ?? {}, "unrealized_pnl_pct", "unrealizedPnlPct"));
   const aiConfidence = confidenceOf(breakdown);
+  const trend = trendOf(breakdown, summary.pct);
   const [buy, setBuy] = useState("");
   const [sell, setSell] = useState("");
   const [size, setSize] = useState("10");
   const canArm = maybeNum(buy) != null && maybeNum(size) != null && !busy;
+  const plannedBuy = plan?.buyTargetPrice ?? maybeNum(buy);
+  const plannedSell = plan?.sellTargetPrice ?? maybeNum(sell);
+  const plannedSize = plan?.positionSizeUSD ?? maybeNum(size);
+  const grossProfit = expectedProfitUSD(plannedBuy, plannedSell, plannedSize);
+  const fees = estimatedFeesUSD(plannedSize);
+  const netProfit = grossProfit == null ? null : grossProfit - (fees ?? 0);
+  const expectedReturn = expectedReturnPct(plannedBuy, plannedSell);
+  const liveMode = !!position;
+  const targetPrice = plannedSell ?? maybeNum(field(position ?? {}, "manual_exit_target_price", "manualExitTargetPrice"));
 
   return (
     <section style={{
@@ -312,7 +572,7 @@ function OperatorWorkstationCard({
       <div style={{ padding: "12px 13px 8px", display: "flex", justifyContent: "space-between", gap: 12 }}>
         <div>
           <div style={{ color: asset.accent, fontSize: 24, fontWeight: 950, letterSpacing: "0.08em" }}>{asset.label}</div>
-          <div style={{ color: T.faint, fontSize: 10, fontWeight: 800, letterSpacing: "0.14em" }}>{asset.symbol} · {state.toUpperCase()}</div>
+          <div style={{ color: liveMode ? T.green : T.faint, fontSize: 10, fontWeight: 800, letterSpacing: "0.14em" }}>{asset.symbol} · {liveMode ? "LIVE POSITION" : state.toUpperCase()}</div>
         </div>
         <div style={{ textAlign: "right" }}>
           <div style={{ color: T.text, fontSize: 22, fontWeight: 950, fontVariantNumeric: "tabular-nums" }}>{price(current)}</div>
@@ -323,15 +583,25 @@ function OperatorWorkstationCard({
       <StrikeLine points={points} color={asset.accent} />
 
       <div style={{ padding: "10px 13px", display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
-        <Metric label="ENTRY" value={price(entry)} />
-        <Metric label="P/L $" value={signedMoney(pnl)} color={(pnl ?? 0) >= 0 ? T.green : T.red} />
-        <Metric label="P/L %" value={pct(pnlPct)} color={(pnlPct ?? 0) >= 0 ? T.green : T.red} />
+        <Metric label={liveMode ? "ENTRY PRICE" : "BUY TARGET"} value={price(liveMode ? entry : plannedBuy)} />
+        <Metric label={liveMode ? "CURRENT P/L $" : "SELL TARGET"} value={liveMode ? signedMoney(pnl) : price(plannedSell)} color={liveMode ? (pnl ?? 0) >= 0 ? T.green : T.red : T.text} />
+        <Metric label={liveMode ? "CURRENT P/L %" : "SIZE"} value={liveMode ? pct(pnlPct) : moneyFull(plannedSize, 0)} color={liveMode ? (pnlPct ?? 0) >= 0 ? T.green : T.red : T.text} />
         <Metric label="AI CONF" value={aiConfidence == null ? "—" : `${aiConfidence.toFixed(1)}%`} color={asset.accent} />
-        <Metric label="STATUS" value={position ? String(field(position, "exit_mode_status") ?? "OPEN") : "NO POSITION"} color={position ? T.green : T.faint} />
-        <Metric label="PLAN" value={plan ? planState(plan.status) : "PLANNED"} color={plan ? statusColor(plan.status) : T.faint} />
+        <Metric label="TREND" value={trend} color={trendColor(trend)} />
+        <Metric label={liveMode ? "DISTANCE TO TARGET" : "PLAN STATUS"} value={liveMode ? distanceText(current, targetPrice) : plan ? planState(plan.status) : "READY"} color={liveMode ? T.amber : plan ? statusColor(plan.status) : T.faint} />
+        {!liveMode && <Metric label="EXPECTED PROFIT" value={signedMoney(netProfit)} color={(netProfit ?? 0) >= 0 ? T.green : T.red} />}
+        {!liveMode && <Metric label="EXPECTED RETURN" value={expectedReturn == null ? "—" : pct(expectedReturn)} color={(expectedReturn ?? 0) >= 0 ? T.green : T.red} />}
+        {!liveMode && <Metric label="ESTIMATED FEES" value={moneyFull(fees, 2)} color={T.faint} />}
+        {!liveMode && <Metric label="DISTANCE TO BUY" value={distanceText(current, plannedBuy)} color={T.cyan} />}
+        {!liveMode && <Metric label="DISTANCE TO SELL" value={distanceText(current, plannedSell)} color={T.amber} />}
       </div>
 
       <div style={{ padding: "10px 13px 13px", borderTop: `1px solid ${T.border}`, display: "grid", gap: 8 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8, color: T.faint, fontSize: 9, fontWeight: 900, letterSpacing: "0.08em" }}>
+          <span>EXPECTED {signedMoney(grossProfit)}</span>
+          <span>FEES {moneyFull(fees, 2)}</span>
+          <span>NET {signedMoney(netProfit)}</span>
+        </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 0.82fr", gap: 8 }}>
           <label style={{ display: "grid", gap: 4 }}>
             <span style={{ color: T.faint, fontSize: 9, fontWeight: 900, letterSpacing: "0.12em" }}>BUY TARGET PRICE</span>
@@ -346,7 +616,7 @@ function OperatorWorkstationCard({
             <input value={size} onChange={(e) => setSize(e.target.value)} placeholder="100" inputMode="decimal" style={inputStyle()} />
           </label>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: plan && !["Completed", "Cancelled", "Expired", "Failed"].includes(plan.status) ? "1fr 120px" : "1fr", gap: 8 }}>
+        <div style={{ display: "grid", gridTemplateColumns: activePlan(plan) ? "1fr 120px" : "1fr", gap: 8 }}>
           <button
             type="button"
             disabled={!canArm}
@@ -361,9 +631,9 @@ function OperatorWorkstationCard({
           >
             {busy ? "ARMING..." : "ARM TRADE"}
           </button>
-          {plan && !["Completed", "Cancelled", "Expired", "Failed"].includes(plan.status) && (
+          {plan && activePlan(plan) && (
             <button type="button" disabled={busy} onClick={() => onCancel(plan.id)} style={buttonStyle(T.red, busy)}>
-              CANCEL
+              CANCEL TRADE
             </button>
           )}
         </div>
@@ -425,21 +695,16 @@ function LiveTradeRow({
   const symbol = rowSymbol(row);
   const id = rowId(row, symbol);
   const pnl = maybeNum(field(row, "unrealized_pnl", "unrealizedPnl"));
+  const pnlPct = maybeNum(field(row, "unrealized_pnl_pct", "unrealizedPnlPct"));
   return (
-    <div style={{ borderTop: `1px solid ${T.border}`, padding: "9px 0", display: "grid", gap: 7 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "0.8fr 0.9fr 0.9fr 0.9fr", gap: 8, alignItems: "center" }}>
+    <div style={{ borderTop: `1px solid ${T.border}`, padding: "8px 0", display: "grid", gap: 7 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "0.7fr 0.9fr 0.9fr 0.85fr 0.7fr 0.7fr 70px 62px", gap: 7, alignItems: "center" }}>
         <div style={{ color: T.text, fontWeight: 950 }}>{symbol}</div>
         <div>{price(field(row, "entry_price", "entryPrice"))}</div>
         <div>{price(field(row, "current_price", "currentPrice"))}</div>
         <div style={{ color: (pnl ?? 0) >= 0 ? T.green : T.red }}>{signedMoney(pnl)}</div>
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 88px 78px", gap: 6 }}>
-        <input
-          value={target}
-          onChange={(e) => setTarget(e.target.value)}
-          placeholder={sellTarget ? `Target ${price(sellTarget.sellTargetPrice)}` : "Sell target price"}
-          style={inputStyle()}
-        />
+        <div style={{ color: (pnlPct ?? 0) >= 0 ? T.green : T.red }}>{pct(pnlPct)}</div>
+        <div>{openAge(row)}</div>
         {sellTarget && !["Completed", "Cancelled", "Expired", "Failed"].includes(sellTarget.status) ? (
           <button type="button" disabled={busy} onClick={() => onCancelTarget(sellTarget.id)} style={buttonStyle(T.red, busy)}>CANCEL</button>
         ) : (
@@ -457,12 +722,44 @@ function LiveTradeRow({
         )}
         <button type="button" disabled={busy} onClick={() => onManualSell(row)} style={buttonStyle(T.red, busy)}>SELL</button>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 6, color: T.faint, fontSize: 9 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) repeat(3, minmax(0, 0.8fr))", gap: 6, color: T.faint, fontSize: 9 }}>
+        <input
+          value={target}
+          onChange={(e) => setTarget(e.target.value)}
+          placeholder={sellTarget ? `Target ${price(sellTarget.sellTargetPrice)}` : "Sell target price"}
+          style={{ ...inputStyle(), height: 28, fontSize: 10 }}
+        />
         <span>Retention {retention(row)}</span>
-        <span>Drawdown {pct(field(row, "drawdown_from_peak_pct", "drawdownFromPeakPct"))}</span>
         <span>Max Hold {maxHold(row)}</span>
         <span>{sellTarget ? planState(sellTarget.status) : String(field(row, "exit_mode_status") ?? "MONITORING")}</span>
       </div>
+    </div>
+  );
+}
+
+function PlannedTradeRowView({ row, onCancelTarget, busy }: { row: PlannedTradeRow; onCancelTarget: (id: string) => void; busy: boolean }) {
+  const net = (() => {
+    const gross = expectedProfitUSD(row.buyTargetPrice, row.sellTargetPrice, row.positionSizeUSD);
+    if (gross == null) return null;
+    return gross - (estimatedFeesUSD(row.positionSizeUSD) ?? 0);
+  })();
+  return (
+    <div style={{ borderTop: `1px solid ${T.border}`, padding: "9px 0", display: "grid", gap: 7 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "0.7fr 1fr 1fr 0.9fr", gap: 8, alignItems: "center" }}>
+        <span style={{ color: T.text, fontWeight: 950 }}>{row.symbol}</span>
+        <span>BUY {price(row.buyTargetPrice)}</span>
+        <span>SELL {price(row.sellTargetPrice)}</span>
+        <span>{moneyFull(row.positionSizeUSD, 0)}</span>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 86px", gap: 8, alignItems: "center" }}>
+        <div style={{ color: statusColor(row.status), fontSize: 9, fontWeight: 900, letterSpacing: "0.08em" }}>
+          STATUS {planState(row.status)} · NET {signedMoney(net)}
+        </div>
+        {activePlan(row) && (
+          <button type="button" disabled={busy} onClick={() => onCancelTarget(row.id)} style={buttonStyle(T.red, busy)}>CANCEL</button>
+        )}
+      </div>
+      {row.lastError && <div style={{ color: T.red, fontSize: 9, fontWeight: 800 }}>{row.lastError}</div>}
     </div>
   );
 }
@@ -487,15 +784,24 @@ function maxHold(row: Record<string, unknown>): string {
 
 function HistoryRow({ row }: { row: Record<string, unknown> }) {
   const pnl = maybeNum(field(row, "realized_pnl", "realizedPnl"));
+  const reason = String(field(row, "close_reason", "closeReason") ?? "—");
+  const reasonColor = exitReasonColor(reason, pnl);
   return (
     <div style={{ display: "grid", gridTemplateColumns: "0.75fr 0.8fr 0.8fr 0.8fr 1fr", gap: 8, borderTop: `1px solid ${T.border}`, padding: "8px 0" }}>
       <span style={{ color: T.text, fontWeight: 900 }}>{rowSymbol(row)}</span>
       <span>{price(field(row, "entry_price", "entryPrice"))}</span>
       <span>{price(field(row, "exit_price", "exitPrice"))}</span>
-      <span style={{ color: (pnl ?? 0) >= 0 ? T.green : T.red }}>{signedMoney(pnl)}</span>
-      <span style={{ color: T.muted }}>{String(field(row, "close_reason", "closeReason") ?? "—")}</span>
+      <span style={{ color: reasonColor }}>{signedMoney(pnl)}</span>
+      <span style={{ color: reasonColor }}>{reason}</span>
     </div>
   );
+}
+
+function exitReasonColor(reason: string, pnl: number | null): string {
+  const normalized = reason.toLowerCase();
+  if (normalized.includes("max") && normalized.includes("hold")) return T.amber;
+  if (normalized.includes("manual")) return T.cyan;
+  return (pnl ?? 0) >= 0 ? T.green : T.red;
 }
 
 function SidePanel({
@@ -516,18 +822,19 @@ function SidePanel({
   busy: boolean;
 }) {
   const sellTargets = plannedTrades.filter((p) => p.planType === "SELL_TARGET");
+  const activePlans = plannedTrades.filter(activePlan);
   const findTarget = (row: Record<string, unknown>) => {
     const id = rowId(row, "");
     return sellTargets.find((p) => p.targetPositionId === id || p.enteredPositionId === id);
   };
   return (
-    <aside style={{ display: "grid", gridTemplateRows: "minmax(260px, 1fr) minmax(220px, 0.86fr)", gap: 12, minHeight: 0 }}>
+    <aside style={{ display: "grid", gridTemplateRows: "minmax(300px, 40fr) minmax(150px, 20fr) minmax(300px, 40fr)", gap: 12, minHeight: 0 }}>
       <section style={panelStyle()}>
         <PanelTitle icon={Activity} title="LIVE TRADES" sub={`${positions.length} open`} />
-        <div style={{ color: T.faint, fontSize: 9, display: "grid", gridTemplateColumns: "0.8fr 0.9fr 0.9fr 0.9fr", gap: 8, paddingBottom: 6 }}>
-          <span>SYMBOL</span><span>ENTRY</span><span>CURRENT</span><span>P/L</span>
+        <div style={{ color: T.faint, fontSize: 8, display: "grid", gridTemplateColumns: "0.7fr 0.9fr 0.9fr 0.85fr 0.7fr 0.7fr 70px 62px", gap: 7, paddingBottom: 6 }}>
+          <span>SYMBOL</span><span>ENTRY</span><span>CURRENT</span><span>P/L $</span><span>P/L %</span><span>TIME</span><span>TARGET</span><span>SELL</span>
         </div>
-        <div style={{ overflowY: "auto", minHeight: 0 }}>
+        <div style={{ overflowY: "auto", minHeight: 0, maxHeight: 438 }}>
           {positions.length === 0 ? <Empty label="NO LIVE POSITIONS" /> : positions.slice(0, 12).map((row, i) => (
             <LiveTradeRow
               key={rowId(row, String(i))}
@@ -542,12 +849,23 @@ function SidePanel({
         </div>
       </section>
       <section style={panelStyle()}>
+        <PanelTitle icon={Target} title="PLANNED TRADES" sub={`${activePlans.length} armed`} />
+        <div style={{ color: T.faint, fontSize: 9, display: "grid", gridTemplateColumns: "0.7fr 1fr 1fr 0.9fr", gap: 8, paddingBottom: 6 }}>
+          <span>SYMBOL</span><span>BUY TARGET</span><span>SELL TARGET</span><span>SIZE</span>
+        </div>
+        <div style={{ overflowY: "auto", minHeight: 0 }}>
+          {activePlans.length === 0 ? <Empty label="NO ARMED PLANS" /> : activePlans.map((row) => (
+            <PlannedTradeRowView key={row.id} row={row} onCancelTarget={onCancelTarget} busy={busy} />
+          ))}
+        </div>
+      </section>
+      <section style={panelStyle()}>
         <PanelTitle icon={History} title="TRADE HISTORY" sub={`${closedTrades.length} recent`} />
         <div style={{ color: T.faint, fontSize: 9, display: "grid", gridTemplateColumns: "0.75fr 0.8fr 0.8fr 0.8fr 1fr", gap: 8, paddingBottom: 6 }}>
           <span>SYMBOL</span><span>ENTRY</span><span>EXIT</span><span>PROFIT</span><span>REASON</span>
         </div>
         <div style={{ overflowY: "auto", minHeight: 0 }}>
-          {closedTrades.length === 0 ? <Empty label="NO CLOSED TRADES" /> : closedTrades.slice(0, 14).map((row, i) => (
+          {closedTrades.length === 0 ? <Empty label="NO CLOSED TRADES" /> : closedTrades.slice(0, 30).map((row, i) => (
             <HistoryRow key={rowId(row, String(i))} row={row} />
           ))}
         </div>
@@ -600,7 +918,9 @@ export default function OperatorWorkstation() {
   const api = useOperatorApi();
   const qc = useQueryClient();
   const { user } = useUser();
+  const { signOut } = useClerk();
   const { email, isSuperAdmin } = useUserRole();
+  const runtimeQuery = useRuntimeState();
   const userId = user?.id ?? null;
   const normalizedEmail = (email ?? user?.primaryEmailAddress?.emailAddress ?? "").toLowerCase();
   const isPersonalOperator = WORKSTATION_EMAILS.has(normalizedEmail);
@@ -715,18 +1035,39 @@ export default function OperatorWorkstation() {
 
   const positions = detailQuery.data?.positions ?? [];
   const closedTrades = detailQuery.data?.closedTrades ?? [];
+  const simAccount = detailQuery.data?.simAccount ?? null;
   const plannedTrades = (plannedQuery.data?.plannedTrades ?? []).filter((p) => !userId || p.userId === userId);
   const plannedBySymbol = (symbol: string) => plannedTrades.find((p) =>
     p.symbol === symbol &&
     (p.planType ?? "PLANNED_BUY") === "PLANNED_BUY" &&
-    !["Completed", "Cancelled", "Expired", "Failed"].includes(p.status)
+    activePlan(p)
   );
   const positionBySymbol = (symbol: string) => positions.find((p) => rowSymbol(p) === symbol);
   const busy = armPlannedBuy.isPending || cancelPlan.isPending || armSellTarget.isPending || manualSell.isPending;
   const engine = engineQuery.data;
+  const runtime = runtimeQuery.data;
+  const activeConn = runtime?.connectedExchanges.find((c) => c.exchange === runtime.activeExchange) ?? runtime?.connectedExchanges[0];
+  const liveCash = activeConn?.usdBreakdown
+    ? n(activeConn.usdBreakdown.cash) + n(activeConn.usdBreakdown.stablecoin)
+    : null;
+  const simCash = maybeNum(field(simAccount ?? {}, "cash_balance", "cashBalance"));
+  const availableCash = liveCash ?? simCash;
+  const investedCapital = positions.reduce((sum, row) => sum + positionSize(row), 0);
+  const openPnl = positions.reduce((sum, row) => sum + n(field(row, "unrealized_pnl", "unrealizedPnl")), 0);
+  const reservedPlannedCapital = plannedTrades.filter(activePlan).reduce((sum, row) => sum + n(row.positionSizeUSD), 0);
+  const availableCapital = availableCash == null ? null : Math.max(0, availableCash - reservedPlannedCapital);
+  const accountValue = maybeNum(activeConn?.usdBreakdown?.accountValue)
+    ?? maybeNum(activeConn?.usdBreakdown?.total)
+    ?? maybeNum(activeConn?.totalEquityUSD)
+    ?? (availableCash == null ? null : availableCash + investedCapital + openPnl);
+  const todayPnl = todayRealizedPnl(closedTrades);
+  const tradeSize = plannedTrades.find(activePlan)?.positionSizeUSD ?? 100;
+  const maxHoldLabel = positions.map(maxHold).find((v) => v !== "—") ?? "3H";
+  const displayName = user?.fullName ?? user?.firstName ?? (normalizedEmail || "Operator");
+  const accountName = normalizedEmail || "AICandlez operator account";
 
   return (
-    <div style={{ minHeight: "100dvh", background: T.bg, color: T.muted, fontFamily: T.font, display: "grid", gridTemplateRows: "auto 1fr" }}>
+    <div style={{ minHeight: "100dvh", background: T.bg, color: T.muted, fontFamily: T.font, display: "grid", gridTemplateRows: "auto auto auto 1fr" }}>
       <header style={{
         borderBottom: `1px solid ${T.border}`,
         background: "linear-gradient(180deg, #030d16 0%, #000508 100%)",
@@ -750,6 +1091,23 @@ export default function OperatorWorkstation() {
           <TopPill icon={engine?.testMode ? Loader2 : Zap} label={engine?.testMode ? "TEST MODE" : "LIVE MODE"} color={engine?.testMode ? T.amber : T.green} />
         </div>
       </header>
+      <SummaryBar
+        displayName={displayName}
+        accountName={accountName}
+        availableCash={availableCash}
+        investedCapital={investedCapital}
+        availableCapital={availableCapital}
+        accountValue={accountValue}
+        openPositions={positions.length}
+        plannedTradesCount={plannedTrades.filter(activePlan).length}
+        todayPnl={todayPnl}
+        openPnl={openPnl}
+        tradeSize={tradeSize}
+        maxHoldLabel={maxHoldLabel}
+        engine={engine}
+        onSignOut={() => void signOut({ redirectUrl: "/" })}
+      />
+      <MarketRadar engine={engine} />
 
       <main style={{ padding: 14, display: "grid", gridTemplateColumns: "minmax(680px, 1fr) minmax(360px, 0.34fr)", gap: 14, minHeight: 0 }}>
         <section style={{ minHeight: 0, overflowY: "auto", paddingRight: 2 }}>
