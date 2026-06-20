@@ -177,10 +177,22 @@ function signedMoney(value: unknown): string {
   return `${x >= 0 ? "+" : "-"}${money(Math.abs(x), 2)}`;
 }
 
+function feeMoney(value: unknown): string {
+  const x = maybeNum(value);
+  if (x == null) return "—";
+  return `-${moneyFull(Math.abs(x), 2)}`;
+}
+
 function pct(value: unknown, decimals = 2): string {
   const x = maybeNum(value);
   if (x == null) return "—";
   return `${x >= 0 ? "+" : ""}${x.toFixed(decimals)}%`;
+}
+
+function unsignedPct(value: unknown, decimals = 0): string {
+  const x = maybeNum(value);
+  if (x == null) return "—";
+  return `${x.toFixed(decimals)}%`;
 }
 
 function price(value: unknown): string {
@@ -253,6 +265,13 @@ function confidenceOf(b?: EngineSymbolBreakdown): number | null {
   return maybeNum(b?.displayConfidence ?? b?.avgConfidence);
 }
 
+function confidenceColor(confidence: number | null): string {
+  if (confidence == null) return T.faint;
+  if (confidence >= 70) return T.green;
+  if (confidence >= 50) return T.amber;
+  return T.red;
+}
+
 function trendOf(b: EngineSymbolBreakdown | undefined, pctChange?: number | null): string {
   const raw = String(b?.trend1H ?? b?.marketCondition ?? b?.agreedAction ?? "").toUpperCase();
   if (raw.includes("BULL") || raw.includes("UP") || raw === "BUY") return "UP";
@@ -292,6 +311,18 @@ function expectedReturnPct(buy: unknown, sell: unknown): number | null {
   return ((s - b) / b) * 100;
 }
 
+function projectedQuantity(buy: unknown, size: unknown): number | null {
+  const b = maybeNum(buy);
+  const z = maybeNum(size);
+  if (b == null || z == null || b <= 0 || z <= 0) return null;
+  return z / b;
+}
+
+function quantityText(quantity: number | null, label: string): string {
+  if (quantity == null) return "—";
+  return `${quantity.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 6 })} ${label}`;
+}
+
 function distanceText(current: unknown, target: unknown): string {
   const c = maybeNum(current);
   const t = maybeNum(target);
@@ -325,12 +356,19 @@ function positionSize(row: Record<string, unknown>): number {
   return n(field(row, "size_usd", "sizeUSD") ?? field(row, "capital_invested", "capitalInvested"));
 }
 
-function StrikeLine({ points, color }: { points: LivePoint[]; color: string }) {
-  const { path, fillPath, up } = useMemo(() => {
+function pointTimeLabel(index: number, total: number): string {
+  const minutesBack = Math.max(0, total - 1 - index) * 5;
+  const ts = Date.now() - minutesBack * 60_000;
+  return new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(new Date(ts));
+}
+
+function StrikeLine({ points, color, current }: { points: LivePoint[]; color: string; current: number | null }) {
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const { path, fillPath, up, coords, high, low } = useMemo(() => {
     const w = 520;
     const h = 154;
     const source = points.length > 1 ? points.slice(-80) : [];
-    if (!source.length) return { path: "", fillPath: "", up: true };
+    if (!source.length) return { path: "", fillPath: "", up: true, coords: [] as Array<{ x: number; y: number; close: number; index: number }>, high: null as null | { x: number; y: number; close: number }, low: null as null | { x: number; y: number; close: number } };
     const values = source.map((p) => p.close);
     const min = Math.min(...values);
     const max = Math.max(...values);
@@ -338,29 +376,91 @@ function StrikeLine({ points, color }: { points: LivePoint[]; color: string }) {
     const coords = source.map((p, i) => {
       const x = (i / Math.max(1, source.length - 1)) * w;
       const y = h - ((p.close - min) / range) * h;
-      return [x, y] as const;
+      return { x, y, close: p.close, index: i };
     });
-    const line = coords.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+    const line = coords.map(({ x, y }, i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
     const fill = `${line} L${w},${h} L0,${h} Z`;
-    return { path: line, fillPath: fill, up: values[values.length - 1] >= values[0] };
+    const highPoint = coords.reduce((best, point) => point.close > best.close ? point : best, coords[0]);
+    const lowPoint = coords.reduce((best, point) => point.close < best.close ? point : best, coords[0]);
+    return { path: line, fillPath: fill, up: values[values.length - 1] >= values[0], coords, high: highPoint, low: lowPoint };
   }, [points]);
+  const hover = hoverIndex == null ? null : coords[hoverIndex] ?? null;
+  const diff = hover && current && current > 0 ? ((hover.close - current) / current) * 100 : null;
+  const gradientId = `fill-${color.replace(/[^a-z0-9]/gi, "")}`;
 
   return (
-    <svg viewBox="0 0 520 154" preserveAspectRatio="none" style={{ width: "100%", height: 154, display: "block" }}>
-      <defs>
-        <linearGradient id={`fill-${color.replace(/[^a-z0-9]/gi, "")}`} x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.28" />
-          <stop offset="100%" stopColor={color} stopOpacity="0.02" />
-        </linearGradient>
-      </defs>
-      <rect x="0" y="0" width="520" height="154" fill="rgba(0,0,0,0.18)" />
-      {[0, 1, 2, 3].map((i) => (
-        <line key={i} x1="0" x2="520" y1={20 + i * 34} y2={20 + i * 34} stroke="rgba(255,255,255,0.045)" />
-      ))}
-      {fillPath && <path d={fillPath} fill={`url(#fill-${color.replace(/[^a-z0-9]/gi, "")})`} />}
-      {path && <path d={path} fill="none" stroke={up ? color : T.red} strokeWidth="2.2" vectorEffect="non-scaling-stroke" />}
-      {path && <circle cx="510" cy="76" r="3.5" fill={up ? color : T.red} opacity="0.9" />}
-    </svg>
+    <div
+      onMouseMove={(event) => {
+        if (!coords.length) return;
+        const rect = event.currentTarget.getBoundingClientRect();
+        const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+        setHoverIndex(Math.round(ratio * (coords.length - 1)));
+      }}
+      onMouseLeave={() => setHoverIndex(null)}
+      style={{ position: "relative", height: 176, borderTop: `1px solid ${T.border}`, borderBottom: `1px solid ${T.border}`, background: "rgba(0,0,0,0.16)" }}
+    >
+      <svg viewBox="0 0 520 154" preserveAspectRatio="none" style={{ width: "100%", height: 154, display: "block" }}>
+        <defs>
+          <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.28" />
+            <stop offset="100%" stopColor={color} stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
+        <rect x="0" y="0" width="520" height="154" fill="rgba(0,0,0,0.18)" />
+        {[0, 1, 2, 3].map((i) => (
+          <line key={i} x1="0" x2="520" y1={20 + i * 34} y2={20 + i * 34} stroke="rgba(255,255,255,0.045)" />
+        ))}
+        {fillPath && <path d={fillPath} fill={`url(#${gradientId})`} />}
+        {path && <path d={path} fill="none" stroke={up ? color : T.red} strokeWidth="2.2" vectorEffect="non-scaling-stroke" />}
+        {high && (
+          <g>
+            <line x1={Math.max(0, high.x - 8)} x2={Math.min(520, high.x + 8)} y1={high.y} y2={high.y} stroke={T.green} strokeWidth="1.5" />
+            <circle cx={high.x} cy={high.y} r="3.8" fill={T.green} stroke="#001106" strokeWidth="1.5" />
+          </g>
+        )}
+        {low && (
+          <g>
+            <line x1={Math.max(0, low.x - 8)} x2={Math.min(520, low.x + 8)} y1={low.y} y2={low.y} stroke={T.red} strokeWidth="1.5" />
+            <circle cx={low.x} cy={low.y} r="3.8" fill={T.red} stroke="#150006" strokeWidth="1.5" />
+          </g>
+        )}
+        {hover && (
+          <g>
+            <line x1={hover.x} x2={hover.x} y1="0" y2="154" stroke={T.cyan} strokeWidth="1.2" strokeDasharray="4 4" opacity="0.9" />
+            <line x1="0" x2="520" y1={hover.y} y2={hover.y} stroke={T.cyan} strokeWidth="1" strokeDasharray="3 5" opacity="0.65" />
+            <circle cx={hover.x} cy={hover.y} r="4.6" fill={T.cyan} stroke="#001116" strokeWidth="1.5" />
+          </g>
+        )}
+        {path && <circle cx="510" cy="76" r="3.5" fill={up ? color : T.red} opacity="0.9" />}
+      </svg>
+      <div style={{ height: 22, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, padding: "0 10px", alignItems: "center", color: T.faint, fontSize: 9, fontWeight: 900, letterSpacing: "0.04em" }}>
+        <span style={{ color: T.green }}>High: {price(high?.close)}</span>
+        <span style={{ color: T.red, textAlign: "right" }}>Low: {price(low?.close)}</span>
+      </div>
+      {hover && (
+        <div style={{
+          position: "absolute",
+          top: 8,
+          left: hover.x > 350 ? 12 : Math.min(356, hover.x + 14),
+          minWidth: 152,
+          border: `1px solid ${T.cyan}88`,
+          background: "rgba(0,8,14,0.94)",
+          boxShadow: `0 0 18px ${T.cyan}22`,
+          padding: "8px 9px",
+          color: T.text,
+          fontSize: 10,
+          fontWeight: 900,
+          lineHeight: 1.65,
+          pointerEvents: "none",
+          zIndex: 3,
+        }}>
+          <div>Price: {price(hover.close)}</div>
+          <div>Time: {pointTimeLabel(hover.index, coords.length)}</div>
+          <div>Current: {price(current)}</div>
+          <div style={{ color: (diff ?? 0) >= 0 ? T.green : T.red }}>Difference: {pct(diff)}</div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -369,6 +469,15 @@ function Metric({ label, value, color = T.text }: { label: string; value: string
     <div style={{ minWidth: 0 }}>
       <div style={{ color: T.faint, fontSize: 9, fontWeight: 800, letterSpacing: "0.12em" }}>{label}</div>
       <div style={{ color, fontSize: 13, fontWeight: 900, marginTop: 3, fontVariantNumeric: "tabular-nums" }}>{value}</div>
+    </div>
+  );
+}
+
+function ProjectionValue({ label, value, color = T.text }: { label: string; value: string; color?: string }) {
+  return (
+    <div style={{ minWidth: 0 }}>
+      <div style={{ color: T.faint, fontSize: 8, fontWeight: 950, letterSpacing: "0.10em", whiteSpace: "nowrap" }}>{label}</div>
+      <div style={{ color, fontSize: 12, fontWeight: 950, marginTop: 4, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{value}</div>
     </div>
   );
 }
@@ -558,18 +667,20 @@ function OperatorWorkstationCard({
   const plannedBuy = plan?.buyTargetPrice ?? maybeNum(buy);
   const plannedSell = plan?.sellTargetPrice ?? maybeNum(sell);
   const plannedSize = plan?.positionSizeUSD ?? maybeNum(size);
+  const quantity = projectedQuantity(plannedBuy, plannedSize);
   const grossProfit = expectedProfitUSD(plannedBuy, plannedSell, plannedSize);
   const fees = estimatedFeesUSD(plannedSize);
   const netProfit = grossProfit == null ? null : grossProfit - (fees ?? 0);
   const expectedReturn = expectedReturnPct(plannedBuy, plannedSell);
   const liveMode = !!position;
   const targetPrice = plannedSell ?? maybeNum(field(position ?? {}, "manual_exit_target_price", "manualExitTargetPrice"));
+  const confidenceColorValue = confidenceColor(aiConfidence);
 
   return (
     <section style={{
       border: `1px solid ${plan ? statusColor(plan.status) : "rgba(255,255,255,0.10)"}`,
       background: `linear-gradient(180deg, ${asset.accent}12 0%, rgba(0,0,0,0.10) 45%, rgba(0,0,0,0.28) 100%)`,
-      minHeight: 410,
+      minHeight: 548,
       display: "grid",
       gridTemplateRows: "auto auto 1fr auto",
     }}>
@@ -578,19 +689,34 @@ function OperatorWorkstationCard({
           <div style={{ color: asset.accent, fontSize: 24, fontWeight: 950, letterSpacing: "0.08em" }}>{asset.label}</div>
           <div style={{ color: liveMode ? T.green : T.faint, fontSize: 10, fontWeight: 800, letterSpacing: "0.14em" }}>{asset.symbol} · {liveMode ? "LIVE POSITION" : state.toUpperCase()}</div>
         </div>
-        <div style={{ textAlign: "right" }}>
-          <div style={{ color: T.text, fontSize: 22, fontWeight: 950, fontVariantNumeric: "tabular-nums" }}>{price(current)}</div>
-          <div style={{ color: summary.up ? T.green : T.red, fontSize: 11, fontWeight: 800 }}>{pct(summary.pct)}</div>
+        <div style={{ display: "grid", justifyItems: "end", gap: 6 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end" }}>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ color: T.text, fontSize: 22, fontWeight: 950, fontVariantNumeric: "tabular-nums" }}>{price(current)}</div>
+              <div style={{ color: summary.up ? T.green : T.red, fontSize: 11, fontWeight: 800 }}>{pct(summary.pct)}</div>
+            </div>
+            <div style={{
+              minWidth: 58,
+              border: `1px solid ${confidenceColorValue}88`,
+              background: `${confidenceColorValue}18`,
+              color: confidenceColorValue,
+              padding: "5px 7px",
+              textAlign: "center",
+            }}>
+              <div style={{ fontSize: 8, fontWeight: 950, letterSpacing: "0.10em" }}>CONF</div>
+              <div style={{ fontSize: 14, fontWeight: 950, marginTop: 2, fontVariantNumeric: "tabular-nums" }}>{unsignedPct(aiConfidence)}</div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <StrikeLine points={points} color={asset.accent} />
+      <StrikeLine points={points} color={asset.accent} current={current} />
 
       <div style={{ padding: "10px 13px", display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
         <Metric label={liveMode ? "ENTRY PRICE" : "BUY TARGET"} value={price(liveMode ? entry : plannedBuy)} />
         <Metric label={liveMode ? "CURRENT P/L $" : "SELL TARGET"} value={liveMode ? signedMoney(pnl) : price(plannedSell)} color={liveMode ? (pnl ?? 0) >= 0 ? T.green : T.red : T.text} />
         <Metric label={liveMode ? "CURRENT P/L %" : "SIZE"} value={liveMode ? pct(pnlPct) : moneyFull(plannedSize, 0)} color={liveMode ? (pnlPct ?? 0) >= 0 ? T.green : T.red : T.text} />
-        <Metric label="AI CONF" value={aiConfidence == null ? "—" : `${aiConfidence.toFixed(1)}%`} color={asset.accent} />
+        <Metric label="AI CONF" value={unsignedPct(aiConfidence)} color={confidenceColorValue} />
         <Metric label="TREND" value={trend} color={trendColor(trend)} />
         <Metric label={liveMode ? "DISTANCE TO TARGET" : "PLAN STATUS"} value={liveMode ? distanceText(current, targetPrice) : plan ? planState(plan.status) : "READY"} color={liveMode ? T.amber : plan ? statusColor(plan.status) : T.faint} />
         {!liveMode && <Metric label="EXPECTED PROFIT" value={signedMoney(netProfit)} color={(netProfit ?? 0) >= 0 ? T.green : T.red} />}
@@ -601,10 +727,36 @@ function OperatorWorkstationCard({
       </div>
 
       <div style={{ padding: "10px 13px 13px", borderTop: `1px solid ${T.border}`, display: "grid", gap: 8 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8, color: T.faint, fontSize: 9, fontWeight: 900, letterSpacing: "0.08em" }}>
-          <span>EXPECTED {signedMoney(grossProfit)}</span>
-          <span>FEES {moneyFull(fees, 2)}</span>
-          <span>NET {signedMoney(netProfit)}</span>
+        <div style={{
+          border: `1px solid ${T.border}`,
+          background: "rgba(0,7,13,0.74)",
+          padding: "9px 10px",
+          display: "grid",
+          gridTemplateColumns: "minmax(150px, 1.15fr) repeat(3, minmax(0, 1fr))",
+          gap: 10,
+          alignItems: "center",
+        }}>
+          <div>
+            <div style={{ color: T.faint, fontSize: 9, fontWeight: 950, letterSpacing: "0.12em" }}>TRADE PROJECTION</div>
+            <div style={{
+              color: (netProfit ?? 0) >= 0 ? T.green : T.red,
+              fontSize: 24,
+              fontWeight: 950,
+              marginTop: 4,
+              fontVariantNumeric: "tabular-nums",
+              lineHeight: 1,
+            }}>
+              {signedMoney(netProfit)}
+            </div>
+            <div style={{ color: T.faint, fontSize: 9, fontWeight: 900, marginTop: 5 }}>NET PROFIT</div>
+          </div>
+          <ProjectionValue label="QUANTITY" value={quantityText(quantity, asset.label)} color={T.text} />
+          <ProjectionValue label="GROSS PROFIT" value={signedMoney(grossProfit)} color={(grossProfit ?? 0) >= 0 ? T.green : T.red} />
+          <ProjectionValue label="EST. FEES" value={feeMoney(fees)} color={T.faint} />
+          <ProjectionValue label="RETURN" value={expectedReturn == null ? "—" : pct(expectedReturn)} color={(expectedReturn ?? 0) >= 0 ? T.green : T.red} />
+          <ProjectionValue label="CONFIDENCE" value={unsignedPct(aiConfidence)} color={confidenceColorValue} />
+          <ProjectionValue label="BUY TARGET" value={price(plannedBuy)} color={T.cyan} />
+          <ProjectionValue label="SELL TARGET" value={price(plannedSell)} color={T.amber} />
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 0.82fr", gap: 8 }}>
           <label style={{ display: "grid", gap: 4 }}>
