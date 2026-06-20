@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth, useClerk, useUser } from "@clerk/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -11,7 +11,11 @@ import {
   LogOut,
   Loader2,
   PauseCircle,
+  Plus,
   Radio,
+  Search,
+  ShoppingCart,
+  Star,
   Target,
   TrendingDown,
   TrendingUp,
@@ -83,20 +87,38 @@ interface AssetSpec {
   anchor: number;
 }
 
-const OPERATOR_ASSETS: AssetSpec[] = [
-  { symbol: "BTCUSD", label: "BTC", accent: "#00e5ff", anchor: 64_000 },
-  { symbol: "ETHUSD", label: "ETH", accent: "#66ff66", anchor: 1_750 },
-  { symbol: "SOLUSD", label: "SOL", accent: "#ffaa00", anchor: 72 },
-  { symbol: "INJUSD", label: "INJ", accent: "#cc55ff", anchor: 5 },
-  { symbol: "LINKUSD", label: "LINK", accent: "#5ad7ff", anchor: 8 },
-  { symbol: "XRPUSD", label: "XRP", accent: "#ff6680", anchor: 1.15 },
-  { symbol: "AAVEUSD", label: "AAVE", accent: "#b5f56a", anchor: 120 },
-  { symbol: "COMPUSD", label: "COMP", accent: "#ffcf5a", anchor: 38 },
-  { symbol: "DOGEUSD", label: "DOGE", accent: "#d6c15d", anchor: 0.14 },
-  { symbol: "ADAUSD", label: "ADA", accent: "#7aa7ff", anchor: 0.4 },
-  { symbol: "AVAXUSD", label: "AVAX", accent: "#ff5f5f", anchor: 18 },
-  { symbol: "ATOMUSD", label: "ATOM", accent: "#a78bfa", anchor: 3.5 },
+const AVAILABLE_OPERATOR_ASSETS: AssetSpec[] = [
+  { symbol: "BCHUSD", label: "BCH", accent: "#8dc351", anchor: 420 },
+  { symbol: "INJUSD", label: "INJ", accent: "#cc55ff", anchor: 19 },
+  { symbol: "SOLUSD", label: "SOL", accent: "#ffaa00", anchor: 86 },
+  { symbol: "COMPUSD", label: "COMP", accent: "#ffcf5a", anchor: 56 },
+  { symbol: "BTCUSD", label: "BTC", accent: "#00e5ff", anchor: 77_000 },
+  { symbol: "ETHUSD", label: "ETH", accent: "#66ff66", anchor: 2_150 },
+  { symbol: "LINKUSD", label: "LINK", accent: "#5ad7ff", anchor: 9.7 },
+  { symbol: "XRPUSD", label: "XRP", accent: "#ff6680", anchor: 1.35 },
+  { symbol: "AAVEUSD", label: "AAVE", accent: "#b5f56a", anchor: 195 },
+  { symbol: "DOGEUSD", label: "DOGE", accent: "#d6c15d", anchor: 0.11 },
+  { symbol: "ADAUSD", label: "ADA", accent: "#7aa7ff", anchor: 0.25 },
+  { symbol: "AVAXUSD", label: "AVAX", accent: "#ff5f5f", anchor: 9.3 },
+  { symbol: "ATOMUSD", label: "ATOM", accent: "#a78bfa", anchor: 6.2 },
+  { symbol: "DOTUSD", label: "DOT", accent: "#e6007a", anchor: 5.5 },
+  { symbol: "MATICUSD", label: "MATIC", accent: "#8247e5", anchor: 0.55 },
+  { symbol: "SUIUSD", label: "SUI", accent: "#6fbcf0", anchor: 2.1 },
+  { symbol: "ARBUSD", label: "ARB", accent: "#28a0f0", anchor: 0.85 },
+  { symbol: "OPUSD", label: "OP", accent: "#ff0420", anchor: 1.5 },
+  { symbol: "PEPEUSD", label: "PEPE", accent: "#4fd269", anchor: 0.00001 },
+  { symbol: "BONKUSD", label: "BONK", accent: "#ff7a1a", anchor: 0.000022 },
+  { symbol: "LTCUSD", label: "LTC", accent: "#b8bfd6", anchor: 85 },
+  { symbol: "UNIUSD", label: "UNI", accent: "#ff66c4", anchor: 8.4 },
+  { symbol: "NEARUSD", label: "NEAR", accent: "#f5f7f8", anchor: 3.6 },
+  { symbol: "APTUSD", label: "APT", accent: "#9af2dd", anchor: 7.1 },
 ];
+
+const DEFAULT_OPERATOR_SYMBOLS = [
+  "BCHUSD", "INJUSD", "SOLUSD", "COMPUSD", "BTCUSD", "ETHUSD",
+  "LINKUSD", "XRPUSD", "AAVEUSD", "DOGEUSD", "ADAUSD", "AVAXUSD", "ATOMUSD",
+];
+const DEFAULT_PINNED_SYMBOLS = ["BCHUSD", "INJUSD", "SOLUSD", "COMPUSD", "BTCUSD", "ETHUSD"];
 
 const WORKSTATION_EMAILS = new Set(["teedelgado@gmail.com", "info@mixtapepsd.com"]);
 
@@ -290,6 +312,36 @@ function activePlan(plan: PlannedTradeRow | undefined): boolean {
   return !!plan && ACTIVE_PLAN_STATUSES.has(plan.status);
 }
 
+function normalizeAssetSymbol(input: string): string {
+  const compact = input.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (!compact) return "";
+  if (compact.endsWith("USD")) return compact;
+  return `${compact}USD`;
+}
+
+function assetAliases(asset: AssetSpec): string[] {
+  const base = asset.label.toUpperCase();
+  return [
+    asset.symbol,
+    `${base}USD`,
+    `${base}-USD`,
+    base,
+    asset.label,
+    asset.label === "BCH" ? "BITCOIN CASH" : "",
+    asset.label === "MATIC" ? "POLYGON" : "",
+  ].filter(Boolean);
+}
+
+function clockTime(ms: unknown): string {
+  const ts = maybeNum(ms);
+  if (!ts) return "—";
+  return new Intl.DateTimeFormat(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(new Date(ts));
+}
+
 function expectedProfitUSD(buy: unknown, sell: unknown, size: unknown): number | null {
   const b = maybeNum(buy);
   const s = maybeNum(sell);
@@ -354,6 +406,23 @@ function todayRealizedPnl(rows: Array<Record<string, unknown>>): number {
 
 function positionSize(row: Record<string, unknown>): number {
   return n(field(row, "size_usd", "sizeUSD") ?? field(row, "capital_invested", "capitalInvested"));
+}
+
+function liveModeMath(current: unknown, entry: unknown, quantity: unknown, side: string): number | null {
+  const c = maybeNum(current);
+  const e = maybeNum(entry);
+  const q = maybeNum(quantity);
+  if (c == null || e == null || q == null || e <= 0 || q <= 0) return null;
+  const short = side.toUpperCase() === "SELL" || side.toUpperCase() === "SHORT";
+  return (short ? e - c : c - e) * q;
+}
+
+function liveModePct(current: unknown, entry: unknown, side: string): number | null {
+  const c = maybeNum(current);
+  const e = maybeNum(entry);
+  if (c == null || e == null || e <= 0) return null;
+  const short = side.toUpperCase() === "SELL" || side.toUpperCase() === "SHORT";
+  return ((short ? e - c : c - e) / e) * 100;
 }
 
 function pointTimeLabel(index: number, total: number): string {
@@ -606,7 +675,7 @@ function RadarTile({ asset, breakdown }: { asset: AssetSpec; breakdown?: EngineS
   );
 }
 
-function MarketRadar({ engine }: { engine: EngineStatusResponse | undefined }) {
+function MarketRadar({ assets, engine }: { assets: AssetSpec[]; engine: EngineStatusResponse | undefined }) {
   return (
     <section style={{
       borderBottom: `1px solid ${T.border}`,
@@ -622,8 +691,141 @@ function MarketRadar({ engine }: { engine: EngineStatusResponse | undefined }) {
         MARKET RADAR
       </div>
       <div style={{ display: "flex", gap: 6, overflowX: "auto", minWidth: 0 }}>
-        {OPERATOR_ASSETS.map((asset) => (
+        {assets.map((asset) => (
           <RadarTile key={asset.symbol} asset={asset} breakdown={engine?.symbolBreakdowns?.[asset.symbol]} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function AssetControlBar({
+  assets,
+  selectedSymbols,
+  pinnedSymbols,
+  search,
+  suggestions,
+  onSearch,
+  onAdd,
+  onTogglePin,
+}: {
+  assets: AssetSpec[];
+  selectedSymbols: string[];
+  pinnedSymbols: string[];
+  search: string;
+  suggestions: AssetSpec[];
+  onSearch: (value: string) => void;
+  onAdd: (asset: AssetSpec) => void;
+  onTogglePin: (symbol: string) => void;
+}) {
+  const selectedSet = new Set(selectedSymbols);
+  const pinnedSet = new Set(pinnedSymbols);
+  const pinnedAssets = pinnedSymbols
+    .map((symbol) => assets.find((asset) => asset.symbol === symbol))
+    .filter((asset): asset is AssetSpec => !!asset);
+
+  return (
+    <section style={{
+      borderBottom: `1px solid ${T.border}`,
+      background: "linear-gradient(180deg, rgba(0,229,255,0.045), rgba(0,0,0,0.16))",
+      padding: "10px 14px",
+      display: "grid",
+      gridTemplateColumns: "minmax(260px, 0.38fr) minmax(0, 1fr)",
+      gap: 10,
+      alignItems: "center",
+    }}>
+      <div style={{ position: "relative", minWidth: 0 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "28px minmax(0, 1fr) 92px", alignItems: "center", border: `1px solid ${T.border}`, background: "#00070d" }}>
+          <Search size={14} color={T.cyan} style={{ marginLeft: 8 }} />
+          <input
+            value={search}
+            onChange={(e) => onSearch(e.target.value)}
+            placeholder="Search Asset Symbol"
+            style={{ ...inputStyle(), border: "none", height: 38, paddingLeft: 0 }}
+          />
+          <button
+            type="button"
+            disabled={!suggestions[0]}
+            onClick={() => suggestions[0] && onAdd(suggestions[0])}
+            style={{ ...buttonStyle(T.cyan, !suggestions[0]), height: 38, borderTop: "none", borderRight: "none", borderBottom: "none" }}
+          >
+            <Plus size={12} style={{ verticalAlign: "-2px", marginRight: 4 }} />
+            ADD
+          </button>
+        </div>
+        {search.trim().length > 0 && suggestions.length > 0 && (
+          <div style={{
+            position: "absolute",
+            top: 42,
+            left: 0,
+            right: 0,
+            zIndex: 10,
+            border: `1px solid ${T.cyan}66`,
+            background: "rgba(0,7,13,0.98)",
+            boxShadow: `0 12px 28px ${T.cyan}18`,
+            maxHeight: 224,
+            overflowY: "auto",
+          }}>
+            {suggestions.map((asset) => {
+              const alreadyAdded = selectedSet.has(asset.symbol);
+              return (
+                <button
+                  key={asset.symbol}
+                  type="button"
+                  onClick={() => onAdd(asset)}
+                  style={{
+                    width: "100%",
+                    border: "none",
+                    borderBottom: `1px solid ${T.border}`,
+                    background: alreadyAdded ? "rgba(255,255,255,0.025)" : "transparent",
+                    color: T.text,
+                    fontFamily: T.font,
+                    padding: "8px 10px",
+                    display: "grid",
+                    gridTemplateColumns: "74px 84px 1fr",
+                    gap: 8,
+                    alignItems: "center",
+                    textAlign: "left",
+                    cursor: "pointer",
+                  }}
+                >
+                  <span style={{ color: asset.accent, fontSize: 12, fontWeight: 950 }}>{asset.symbol}</span>
+                  <span style={{ color: T.muted, fontSize: 10, fontWeight: 900 }}>{asset.label}-USD</span>
+                  <span style={{ color: alreadyAdded ? T.green : T.faint, fontSize: 10, fontWeight: 800 }}>
+                    {alreadyAdded ? "ADDED" : asset.label === "BCH" ? "Bitcoin Cash" : "Exchange-supported"}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+      <div style={{ display: "flex", gap: 6, alignItems: "center", overflowX: "auto", minWidth: 0 }}>
+        <span style={{ color: T.faint, fontSize: 9, fontWeight: 950, letterSpacing: "0.12em", whiteSpace: "nowrap" }}>PINNED FIRST</span>
+        {pinnedAssets.map((asset) => (
+          <button
+            key={asset.symbol}
+            type="button"
+            onClick={() => onTogglePin(asset.symbol)}
+            style={{
+              height: 28,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+              border: `1px solid ${asset.accent}66`,
+              background: `${asset.accent}16`,
+              color: asset.accent,
+              padding: "0 8px",
+              fontFamily: T.font,
+              fontSize: 10,
+              fontWeight: 950,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            <Star size={11} fill={pinnedSet.has(asset.symbol) ? asset.accent : "none"} />
+            {asset.label}
+          </button>
         ))}
       </div>
     </section>
@@ -632,19 +834,25 @@ function MarketRadar({ engine }: { engine: EngineStatusResponse | undefined }) {
 
 function OperatorWorkstationCard({
   asset,
+  pinned,
   position,
   plan,
   breakdown,
   onArm,
+  onBuyNow,
   onCancel,
+  onTogglePin,
   busy,
 }: {
   asset: AssetSpec;
+  pinned: boolean;
   position: Record<string, unknown> | undefined;
   plan: PlannedTradeRow | undefined;
   breakdown: EngineSymbolBreakdown | undefined;
   onArm: (input: { symbol: string; buyTargetPrice: number; sellTargetPrice: number | null; positionSizeUSD: number }) => void;
+  onBuyNow: (input: { symbol: string; sellTargetPrice: number | null; positionSizeUSD: number; confidence: number | null }) => void;
   onCancel: (id: string) => void;
+  onTogglePin: (symbol: string) => void;
   busy: boolean;
 }) {
   const { points, livePrice, state, summary } = useLiveCandles({
@@ -654,16 +862,20 @@ function OperatorWorkstationCard({
     timeframe: "5m",
     pollMs: 15_000,
   });
-  const current = maybeNum(field(position ?? {}, "current_price", "currentPrice")) ?? livePrice;
+  const current = livePrice ?? maybeNum(field(position ?? {}, "current_price", "currentPrice"));
   const entry = maybeNum(field(position ?? {}, "entry_price", "entryPrice"));
-  const pnl = maybeNum(field(position ?? {}, "unrealized_pnl", "unrealizedPnl"));
-  const pnlPct = maybeNum(field(position ?? {}, "unrealized_pnl_pct", "unrealizedPnlPct"));
+  const side = String(field(position ?? {}, "side") ?? "BUY");
+  const liveQuantity = maybeNum(field(position ?? {}, "quantity")) ?? (entry && positionSize(position ?? {}) > 0 ? positionSize(position ?? {}) / entry : null);
+  const livePnl = liveModeMath(current, entry, liveQuantity, side);
+  const pnl = livePnl ?? maybeNum(field(position ?? {}, "unrealized_pnl", "unrealizedPnl"));
+  const pnlPct = liveModePct(current, entry, side) ?? maybeNum(field(position ?? {}, "unrealized_pnl_pct", "unrealizedPnlPct"));
   const aiConfidence = confidenceOf(breakdown);
   const trend = trendOf(breakdown, summary.pct);
   const [buy, setBuy] = useState("");
   const [sell, setSell] = useState("");
   const [size, setSize] = useState("10");
   const canArm = maybeNum(buy) != null && maybeNum(size) != null && !busy;
+  const canBuyNow = maybeNum(size) != null && !busy;
   const plannedBuy = plan?.buyTargetPrice ?? maybeNum(buy);
   const plannedSell = plan?.sellTargetPrice ?? maybeNum(sell);
   const plannedSize = plan?.positionSizeUSD ?? maybeNum(size);
@@ -686,7 +898,26 @@ function OperatorWorkstationCard({
     }}>
       <div style={{ padding: "12px 13px 8px", display: "flex", justifyContent: "space-between", gap: 12 }}>
         <div>
-          <div style={{ color: asset.accent, fontSize: 24, fontWeight: 950, letterSpacing: "0.08em" }}>{asset.label}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <button
+              type="button"
+              aria-label={pinned ? `Unpin ${asset.label}` : `Pin ${asset.label}`}
+              onClick={() => onTogglePin(asset.symbol)}
+              style={{
+                width: 28,
+                height: 28,
+                display: "grid",
+                placeItems: "center",
+                border: `1px solid ${pinned ? asset.accent : T.border}`,
+                background: pinned ? `${asset.accent}18` : "rgba(255,255,255,0.025)",
+                color: pinned ? asset.accent : T.faint,
+                cursor: "pointer",
+              }}
+            >
+              <Star size={14} fill={pinned ? asset.accent : "none"} />
+            </button>
+            <div style={{ color: asset.accent, fontSize: 24, fontWeight: 950, letterSpacing: "0.08em" }}>{asset.label}</div>
+          </div>
           <div style={{ color: liveMode ? T.green : T.faint, fontSize: 10, fontWeight: 800, letterSpacing: "0.14em" }}>{asset.symbol} · {liveMode ? "LIVE POSITION" : state.toUpperCase()}</div>
         </div>
         <div style={{ display: "grid", justifyItems: "end", gap: 6 }}>
@@ -772,7 +1003,7 @@ function OperatorWorkstationCard({
             <input value={size} onChange={(e) => setSize(e.target.value)} placeholder="100" inputMode="decimal" style={inputStyle()} />
           </label>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: activePlan(plan) ? "1fr 120px" : "1fr", gap: 8 }}>
+        <div style={{ display: "grid", gridTemplateColumns: activePlan(plan) ? "1fr 1fr 120px" : "1fr 1fr", gap: 8 }}>
           <button
             type="button"
             disabled={!canArm}
@@ -786,6 +1017,24 @@ function OperatorWorkstationCard({
             style={buttonStyle(asset.accent, !canArm)}
           >
             {busy ? "ARMING..." : "ARM TRADE"}
+          </button>
+          <button
+            type="button"
+            disabled={!canBuyNow}
+            onClick={() => {
+              const positionSizeUSD = maybeNum(size);
+              if (positionSizeUSD == null) return;
+              onBuyNow({
+                symbol: asset.symbol,
+                sellTargetPrice: maybeNum(sell),
+                positionSizeUSD,
+                confidence: aiConfidence,
+              });
+            }}
+            style={buttonStyle(T.green, !canBuyNow)}
+          >
+            <ShoppingCart size={12} style={{ verticalAlign: "-2px", marginRight: 5 }} />
+            BUY NOW
           </button>
           {plan && activePlan(plan) && (
             <button type="button" disabled={busy} onClick={() => onCancel(plan.id)} style={buttonStyle(T.red, busy)}>
@@ -850,16 +1099,35 @@ function LiveTradeRow({
   const [target, setTarget] = useState("");
   const symbol = rowSymbol(row);
   const id = rowId(row, symbol);
-  const pnl = maybeNum(field(row, "unrealized_pnl", "unrealizedPnl"));
-  const pnlPct = maybeNum(field(row, "unrealized_pnl_pct", "unrealizedPnlPct"));
+  const asset = AVAILABLE_OPERATOR_ASSETS.find((a) => a.symbol === symbol);
+  const { livePrice, state, lastUpdated } = useLiveCandles({
+    symbol,
+    syntheticAnchor: asset?.anchor ?? maybeNum(field(row, "current_price", "currentPrice")) ?? maybeNum(field(row, "entry_price", "entryPrice")) ?? 100,
+    limit: 48,
+    timeframe: "5m",
+    pollMs: 15_000,
+  });
+  const entry = maybeNum(field(row, "entry_price", "entryPrice"));
+  const current = livePrice ?? maybeNum(field(row, "current_price", "currentPrice"));
+  const side = String(field(row, "side") ?? "BUY");
+  const sizeUsd = positionSize(row);
+  const quantity = maybeNum(field(row, "quantity")) ?? (entry && sizeUsd > 0 ? sizeUsd / entry : null);
+  const pnl = liveModeMath(current, entry, quantity, side) ?? maybeNum(field(row, "unrealized_pnl", "unrealizedPnl"));
+  const pnlPct = liveModePct(current, entry, side) ?? maybeNum(field(row, "unrealized_pnl_pct", "unrealizedPnlPct"));
+  const resolvedTarget = sellTarget?.sellTargetPrice ?? maybeNum(field(row, "manual_exit_target_price", "manualExitTargetPrice"));
   return (
     <div style={{ borderTop: `1px solid ${T.border}`, padding: "9px 0", display: "grid", gap: 8 }}>
       <div style={{ display: "grid", gridTemplateColumns: "0.8fr 1fr 1fr 1fr 0.8fr", gap: 8, alignItems: "end" }}>
         <RailValue label="SYMBOL" value={symbol} color={T.text} strong />
-        <RailValue label="ENTRY" value={price(field(row, "entry_price", "entryPrice"))} />
-        <RailValue label="CURRENT" value={price(field(row, "current_price", "currentPrice"))} />
+        <RailValue label="ENTRY PRICE" value={price(entry)} />
+        <RailValue label="CURRENT PRICE" value={price(current)} />
         <RailValue label="P/L" value={`${signedMoney(pnl)} ${pct(pnlPct)}`} color={(pnl ?? 0) >= 0 ? T.green : T.red} />
         <RailValue label="TIME" value={openAge(row)} />
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 7 }}>
+        <RailValue label="SELL TARGET" value={price(resolvedTarget)} color={T.amber} />
+        <RailValue label="DISTANCE TO TARGET" value={distanceText(current, resolvedTarget)} color={T.cyan} />
+        <RailValue label="LAST UPDATE" value={`${clockTime(lastUpdated)} · ${state.toUpperCase()}`} color={state === "live" ? T.green : T.amber} />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 72px 62px", gap: 7, alignItems: "center" }}>
         <input
@@ -904,11 +1172,12 @@ function RailValue({ label, value, color = T.muted, strong = false }: { label: s
 }
 
 function PlannedTradeRowView({ row, onCancelTarget, busy }: { row: PlannedTradeRow; onCancelTarget: (id: string) => void; busy: boolean }) {
+  const gross = expectedProfitUSD(row.buyTargetPrice, row.sellTargetPrice, row.positionSizeUSD);
   const net = (() => {
-    const gross = expectedProfitUSD(row.buyTargetPrice, row.sellTargetPrice, row.positionSizeUSD);
     if (gross == null) return null;
     return gross - (estimatedFeesUSD(row.positionSizeUSD) ?? 0);
   })();
+  const expectedReturn = expectedReturnPct(row.buyTargetPrice, row.sellTargetPrice);
   return (
     <div style={{ borderTop: `1px solid ${T.border}`, padding: "9px 0", display: "grid", gap: 7 }}>
       <div style={{ display: "grid", gridTemplateColumns: "0.7fr 1fr 1fr 0.9fr", gap: 8, alignItems: "center" }}>
@@ -919,7 +1188,7 @@ function PlannedTradeRowView({ row, onCancelTarget, busy }: { row: PlannedTradeR
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 86px", gap: 8, alignItems: "center" }}>
         <div style={{ color: statusColor(row.status), fontSize: 9, fontWeight: 900, letterSpacing: "0.08em" }}>
-          STATUS {planState(row.status)} · NET {signedMoney(net)}
+          STATUS {planState(row.status)} · EXPECTED PROFIT {signedMoney(net)} · EXPECTED RETURN {expectedReturn == null ? "—" : pct(expectedReturn)}
         </div>
         {activePlan(row) && (
           <button type="button" disabled={busy} onClick={() => onCancelTarget(row.id)} style={buttonStyle(T.red, busy)}>CANCEL</button>
@@ -1077,6 +1346,76 @@ export default function OperatorWorkstation() {
   const userId = user?.id ?? null;
   const normalizedEmail = (email ?? user?.primaryEmailAddress?.emailAddress ?? "").toLowerCase();
   const isPersonalOperator = WORKSTATION_EMAILS.has(normalizedEmail);
+  const operatorStorageKey = `operator-workstation-assets:${userId ?? (normalizedEmail || "anonymous")}`;
+  const [selectedSymbols, setSelectedSymbols] = useState<string[]>(DEFAULT_OPERATOR_SYMBOLS);
+  const [pinnedSymbols, setPinnedSymbols] = useState<string[]>(DEFAULT_PINNED_SYMBOLS);
+  const [assetSearch, setAssetSearch] = useState("");
+  const [buyNowConfirm, setBuyNowConfirm] = useState<null | {
+    symbol: string;
+    sellTargetPrice: number | null;
+    positionSizeUSD: number;
+    confidence: number | null;
+  }>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const raw = window.localStorage.getItem(operatorStorageKey);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as { selectedSymbols?: unknown; pinnedSymbols?: unknown };
+      const selected = Array.isArray(parsed.selectedSymbols)
+        ? parsed.selectedSymbols.map(String).filter((s) => AVAILABLE_OPERATOR_ASSETS.some((a) => a.symbol === s))
+        : [];
+      const pinned = Array.isArray(parsed.pinnedSymbols)
+        ? parsed.pinnedSymbols.map(String).filter((s) => AVAILABLE_OPERATOR_ASSETS.some((a) => a.symbol === s))
+        : [];
+      if (selected.length) setSelectedSymbols(selected);
+      if (pinned.length) setPinnedSymbols(pinned);
+    } catch {
+      /* Keep defaults if local preference data is malformed. */
+    }
+  }, [operatorStorageKey]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(operatorStorageKey, JSON.stringify({ selectedSymbols, pinnedSymbols }));
+  }, [operatorStorageKey, selectedSymbols, pinnedSymbols]);
+
+  const selectedAssets = useMemo(() => {
+    const selected = selectedSymbols
+      .map((symbol) => AVAILABLE_OPERATOR_ASSETS.find((asset) => asset.symbol === symbol))
+      .filter((asset): asset is AssetSpec => !!asset);
+    const pinned = new Set(pinnedSymbols);
+    return selected.sort((a, b) => {
+      const ai = pinned.has(a.symbol) ? 0 : 1;
+      const bi = pinned.has(b.symbol) ? 0 : 1;
+      if (ai !== bi) return ai - bi;
+      return selectedSymbols.indexOf(a.symbol) - selectedSymbols.indexOf(b.symbol);
+    });
+  }, [pinnedSymbols, selectedSymbols]);
+
+  const assetSuggestions = useMemo(() => {
+    const q = assetSearch.trim().toUpperCase();
+    if (!q) return AVAILABLE_OPERATOR_ASSETS.slice(0, 8);
+    const normalized = normalizeAssetSymbol(q);
+    return AVAILABLE_OPERATOR_ASSETS
+      .filter((asset) => {
+        const aliases = assetAliases(asset);
+        return aliases.some((alias) => alias.toUpperCase().includes(q) || alias.toUpperCase().replace(/[^A-Z0-9]/g, "") === normalized);
+      })
+      .slice(0, 8);
+  }, [assetSearch]);
+
+  const addAsset = (asset: AssetSpec) => {
+    setSelectedSymbols((prev) => prev.includes(asset.symbol) ? prev : [...prev, asset.symbol]);
+    setAssetSearch("");
+    toast({ title: `${asset.label} added`, description: "Asset card and Market Radar are now tracking it." });
+  };
+
+  const togglePin = (symbol: string) => {
+    setPinnedSymbols((prev) => prev.includes(symbol) ? prev.filter((s) => s !== symbol) : [symbol, ...prev]);
+    setSelectedSymbols((prev) => prev.includes(symbol) ? prev : [symbol, ...prev]);
+  };
 
   const detailQuery = useQuery<UserDetailResponse>({
     queryKey: ["operator-workstation-detail", userId],
@@ -1132,6 +1471,55 @@ export default function OperatorWorkstation() {
       invalidate();
     },
     onError: (err: Error) => toast({ title: "Planned trade failed", description: err.message, variant: "destructive" }),
+  });
+
+  const buyNow = useMutation({
+    mutationFn: async (input: { symbol: string; sellTargetPrice: number | null; positionSizeUSD: number; confidence: number | null }) => {
+      if (!userId) throw new Error("Operator user id unavailable");
+      const buyRes = await api(`/api/admin/users/${encodeURIComponent(userId)}/operator-buy`, {
+        method: "POST",
+        body: JSON.stringify({
+          symbol: input.symbol,
+          sizeUSD: input.positionSizeUSD,
+          confidence: input.confidence ?? undefined,
+          note: "Operator workstation BUY NOW",
+        }),
+      });
+      const body = await readJson<{
+        ok?: boolean;
+        positionId?: string | null;
+        exchangeOrderId?: string | null;
+        exchange?: string | null;
+        fillPrice?: number | null;
+        sizeUSD?: number | null;
+        effectiveSizeUSD?: number | null;
+        dryRun?: boolean;
+      }>(buyRes);
+      if (input.sellTargetPrice != null && body.positionId) {
+        const targetRes = await api(`/api/admin/users/${encodeURIComponent(userId)}/sell-targets`, {
+          method: "POST",
+          body: JSON.stringify({
+            positionId: body.positionId,
+            targetPrice: input.sellTargetPrice,
+            note: "Operator workstation BUY NOW sell target",
+          }),
+        });
+        await readJson<{ plannedTrade: PlannedTradeRow }>(targetRes);
+      }
+      return body;
+    },
+    onSuccess: (body, input) => {
+      const asset = AVAILABLE_OPERATOR_ASSETS.find((a) => a.symbol === input.symbol);
+      const exchange = body.exchange ? body.exchange.toUpperCase() : "EXCHANGE";
+      toast({
+        title: `BUY NOW submitted${asset ? ` — ${asset.label}` : ""}`,
+        description: [`${moneyFull(body.sizeUSD ?? body.effectiveSizeUSD ?? input.positionSizeUSD, 0)}`, exchange, body.fillPrice ? `@ ${price(body.fillPrice)}` : "market", input.sellTargetPrice != null ? "sell target armed" : null].filter(Boolean).join(" · "),
+      });
+      setBuyNowConfirm(null);
+      invalidate();
+      void qc.invalidateQueries({ queryKey: ["runtime-state"] });
+    },
+    onError: (err: Error) => toast({ title: "BUY NOW failed", description: err.message, variant: "destructive" }),
   });
 
   const cancelPlan = useMutation({
@@ -1199,7 +1587,7 @@ export default function OperatorWorkstation() {
     activePlan(p)
   );
   const positionBySymbol = (symbol: string) => positions.find((p) => rowSymbol(p) === symbol);
-  const busy = armPlannedBuy.isPending || cancelPlan.isPending || armSellTarget.isPending || manualSell.isPending;
+  const busy = armPlannedBuy.isPending || buyNow.isPending || cancelPlan.isPending || armSellTarget.isPending || manualSell.isPending;
   const engine = engineQuery.data;
   const runtime = runtimeQuery.data;
   const activeConn = runtime?.connectedExchanges.find((c) => c.exchange === runtime.activeExchange) ?? runtime?.connectedExchanges[0];
@@ -1224,7 +1612,7 @@ export default function OperatorWorkstation() {
   const hasRailActivity = positions.length > 0 || activePlannedTrades.length > 0 || closedTrades.length > 0;
 
   return (
-    <div style={{ minHeight: "100dvh", background: T.bg, color: T.muted, fontFamily: T.font, display: "grid", gridTemplateRows: "auto auto auto 1fr" }}>
+    <div style={{ minHeight: "100dvh", background: T.bg, color: T.muted, fontFamily: T.font, display: "grid", gridTemplateRows: "auto auto auto auto 1fr" }}>
       <header style={{
         borderBottom: `1px solid ${T.border}`,
         background: "linear-gradient(180deg, #030d16 0%, #000508 100%)",
@@ -1264,20 +1652,33 @@ export default function OperatorWorkstation() {
         engine={engine}
         onSignOut={() => void signOut({ redirectUrl: "/" })}
       />
-      <MarketRadar engine={engine} />
+      <AssetControlBar
+        assets={AVAILABLE_OPERATOR_ASSETS}
+        selectedSymbols={selectedSymbols}
+        pinnedSymbols={pinnedSymbols}
+        search={assetSearch}
+        suggestions={assetSuggestions}
+        onSearch={setAssetSearch}
+        onAdd={addAsset}
+        onTogglePin={togglePin}
+      />
+      <MarketRadar assets={selectedAssets} engine={engine} />
 
       <main style={{ padding: 14, display: "grid", gridTemplateColumns: hasRailActivity ? "minmax(680px, 1fr) minmax(390px, 0.36fr)" : "minmax(680px, 1fr)", gap: 14, minHeight: 0 }}>
         <section style={{ minHeight: 0, overflowY: "auto", paddingRight: 2 }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(320px, 1fr))", gap: 12 }}>
-            {OPERATOR_ASSETS.map((asset) => (
+            {selectedAssets.map((asset) => (
               <OperatorWorkstationCard
                 key={asset.symbol}
                 asset={asset}
+                pinned={pinnedSymbols.includes(asset.symbol)}
                 position={positionBySymbol(asset.symbol)}
                 plan={plannedBySymbol(asset.symbol)}
                 breakdown={engine?.symbolBreakdowns?.[asset.symbol]}
                 onArm={(input) => armPlannedBuy.mutate(input)}
+                onBuyNow={(input) => setBuyNowConfirm(input)}
                 onCancel={(id) => cancelPlan.mutate(id)}
+                onTogglePin={togglePin}
                 busy={busy}
               />
             ))}
@@ -1296,6 +1697,60 @@ export default function OperatorWorkstation() {
           />
         )}
       </main>
+      {buyNowConfirm && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Confirm BUY NOW"
+          onClick={() => {
+            if (!buyNow.isPending) setBuyNowConfirm(null);
+          }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 40,
+            display: "grid",
+            placeItems: "center",
+            padding: 18,
+            background: "rgba(0,0,0,0.74)",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "min(480px, 100%)",
+              border: `1px solid ${T.green}77`,
+              background: "#020b08",
+              boxShadow: `0 0 34px ${T.green}22`,
+              padding: 16,
+              display: "grid",
+              gap: 12,
+            }}
+          >
+            <div style={{ color: T.green, fontSize: 10, fontWeight: 950, letterSpacing: "0.18em" }}>CONFIRM BUY NOW</div>
+            <div style={{ color: T.text, fontSize: 16, fontWeight: 950, lineHeight: 1.35 }}>
+              Market buy {buyNowConfirm.symbol} for {moneyFull(buyNowConfirm.positionSizeUSD, 0)}?
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <RailValue label="SELL TARGET" value={price(buyNowConfirm.sellTargetPrice)} color={T.amber} />
+              <RailValue label="CONFIDENCE" value={unsignedPct(buyNowConfirm.confidence)} color={confidenceColor(buyNowConfirm.confidence)} />
+              <RailValue label="LABEL" value="OPERATOR_ENTERED" color={T.cyan} />
+              <RailValue label="MODE" value="LIVE MARKET BUY" color={T.green} />
+            </div>
+            <div style={{ color: T.faint, fontSize: 10, lineHeight: 1.5 }}>
+              This uses the existing operator-buy path. Existing exit protections attach after fill; workstation sell target is armed when a position id is returned.
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button type="button" disabled={buyNow.isPending} onClick={() => setBuyNowConfirm(null)} style={buttonStyle(T.faint, buyNow.isPending)}>
+                CANCEL
+              </button>
+              <button type="button" disabled={buyNow.isPending} onClick={() => buyNow.mutate(buyNowConfirm)} style={buttonStyle(T.green, buyNow.isPending)}>
+                {buyNow.isPending ? "BUYING..." : "BUY NOW"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

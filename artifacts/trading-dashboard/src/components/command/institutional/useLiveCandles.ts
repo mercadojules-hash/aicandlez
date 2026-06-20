@@ -82,6 +82,7 @@ export function useLiveCandles({
   const [points, setPoints] = useState<LivePoint[]>([]);
   const [state,  setState]  = useState<LiveState>("loading");
   const [livePrice, setLivePrice] = useState<number | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<number | null>(null);
 
   const baseRef   = useRef<LivePoint[]>([]);
   const driftRef  = useRef(0);
@@ -109,6 +110,7 @@ export function useLiveCandles({
           baseRef.current = mapped;
           setPoints(mapped);
           setLivePrice(mapped[mapped.length - 1].close);
+          setLastUpdated(Date.now());
           setState("live");
         })
         .catch(() => {
@@ -118,6 +120,7 @@ export function useLiveCandles({
           baseRef.current = synth;
           setPoints(synth);
           setLivePrice(synth[synth.length - 1].close);
+          setLastUpdated(Date.now());
           setState("synthetic");
         });
     };
@@ -152,6 +155,7 @@ export function useLiveCandles({
       });
       setPoints(next);
       setLivePrice(anchor + driftRef.current);
+      setLastUpdated(Date.now());
     }, driftMs);
     return () => clearInterval(id);
   }, [driftMs]);
@@ -165,5 +169,5 @@ export function useLiveCandles({
     return { first, last, pct, up: pct >= 0 };
   }, [points]);
 
-  return { points, state, livePrice, summary };
+  return { points, state, livePrice, lastUpdated, summary };
 }
