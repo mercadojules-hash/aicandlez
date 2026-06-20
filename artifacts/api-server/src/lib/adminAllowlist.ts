@@ -36,11 +36,12 @@ export function isSuperAdminEmail(email: string | null | undefined): boolean {
 // Operator access is granted without duplicating accounts: the same customer
 // row, portfolio, exchange connections, and billing state remain intact while
 // /auth/me promotes the email to `admin` on login.
-// info@mixtapepsd.com was previously here but is now a customer account.
+// Phase 2 personal operator workstation accounts.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const OPERATOR_ADMIN_EMAILS: readonly string[] = [
   "teedelgado@gmail.com",
+  "info@mixtapepsd.com",
 ];
 
 export function isOperatorAdminEmail(email: string | null | undefined): boolean {

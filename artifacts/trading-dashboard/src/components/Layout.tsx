@@ -460,6 +460,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
   // — even when an admin previews the customer route on the admin host.
   // Admin terminal at /command is untouched (locked invariant).
   const isCustomerPortalRoute = location.startsWith("/portal");
+  const isOperatorWorkstationRoute = location.startsWith("/workstation");
+  const ownsChrome = isCustomerPortalRoute || isOperatorWorkstationRoute;
 
   useEffect(() => {
     const h = () => { if (window.innerWidth >= 768) setMobileOpen(false); };
@@ -575,7 +577,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           USER · CONNECT EXCHANGE · ACCOUNT · SIGN OUT). Customers must never
           see operator system status (API/WS/ENGINE/KILL pills, MOD XX
           designation, sidebar toggles). */}
-      {!isCustomerPortalRoute && (
+      {!ownsChrome && (
       <header
         className="h-10 shrink-0 border-b flex items-center px-3 justify-between sticky top-0 z-50"
         style={{
@@ -626,8 +628,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
           operator host. The customer terminal at trade.aicandlez.com must
           never show platform-wide operator vitals, even if an admin signs
           in there. Telemetry lives exclusively on admintrade. */}
-      {!isCustomerPortalRoute && <ApiBaseUrlBanner />}
-      {IS_ADMIN_HOST && isAdmin && !isCustomerPortalRoute && <AdminTopTelemetryBar />}
+      {!ownsChrome && <ApiBaseUrlBanner />}
+      {IS_ADMIN_HOST && isAdmin && !ownsChrome && <AdminTopTelemetryBar />}
 
       {/* Body */}
       <div className="flex flex-1 min-h-0 overflow-hidden relative">
@@ -640,7 +642,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             Trade Journal / Validation / Sentiment AI / Multi-Asset Chart
             / Exchange / Command Center / Desktop Terminal / Institutional
             Terminal / Signal Debug / System Verification navigation. */}
-        {IS_ADMIN_HOST && !isCustomerPortalRoute && (
+        {IS_ADMIN_HOST && !ownsChrome && (
           <>
             {mobileOpen && (
               <div className="md:hidden fixed inset-0 z-30 bg-black/80 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />

@@ -57,6 +57,7 @@ import InstitutionalTerminal from "@/pages/InstitutionalTerminal";
 import Portal from "@/pages/Portal";
 import Terminal from "@/pages/Terminal";
 import Operator from "@/pages/Operator";
+import OperatorWorkstation from "@/pages/OperatorWorkstation";
 import { useUserRole } from "@/hooks/useUserRole";
 
 // ── Env ───────────────────────────────────────────────────────────────────────
@@ -263,16 +264,21 @@ const CUSTOMER_PORTAL_URL = (() => {
 })();
 
 const IS_ADMIN_HOST = DEFAULT_LANDING === "/command";
+const PERSONAL_OPERATOR_EMAILS = new Set(["teedelgado@gmail.com", "info@mixtapepsd.com"]);
 
 function SignedInHomeRouter() {
-  const { isAdmin, loading } = useUserRole();
+  const { isAdmin, loading, email } = useUserRole();
   if (loading) return <FullPageLoader />;
   // On the customer host (trade.*) admins also land on the default —
   // they can navigate to /command from chrome. On the admin host
   // (admintrade.*) non-admins must NOT remain — bounce cross-host to
   // the canonical customer portal.
   if (!isAdmin && IS_ADMIN_HOST) return <CrossAppRedirect to={CUSTOMER_PORTAL_URL} />;
-  if (isAdmin && IS_ADMIN_HOST) return <Redirect to="/command" />;
+  if (isAdmin && IS_ADMIN_HOST) {
+    const normalizedEmail = (email ?? "").trim().toLowerCase();
+    if (PERSONAL_OPERATOR_EMAILS.has(normalizedEmail)) return <Redirect to="/workstation" />;
+    return <Redirect to="/command" />;
+  }
   // Customer host: dispatch by role.
   if (!isAdmin) return <Redirect to={DEFAULT_LANDING} />;
   return <Redirect to="/command" />;
@@ -448,6 +454,11 @@ function Router() {
         {/* Approved operator war-room (graduated mockup). Admin-only, same
             gating as /command. /command preserved for rollback safety. */}
         <ProtectedAdmin><Operator /></ProtectedAdmin>
+      </Route>
+      <Route path="/workstation">
+        {/* Phase 2 personal operator trading workstation. Trading-first surface
+            for primary operator accounts; Mercado keeps /command + /admin. */}
+        <ProtectedAdmin><OperatorWorkstation /></ProtectedAdmin>
       </Route>
       <Route path="/dashboard">
         <Protected><Dashboard /></Protected>
