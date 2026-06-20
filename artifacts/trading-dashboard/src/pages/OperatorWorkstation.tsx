@@ -697,14 +697,21 @@ function LiveTradeRow({
   const pnl = maybeNum(field(row, "unrealized_pnl", "unrealizedPnl"));
   const pnlPct = maybeNum(field(row, "unrealized_pnl_pct", "unrealizedPnlPct"));
   return (
-    <div style={{ borderTop: `1px solid ${T.border}`, padding: "8px 0", display: "grid", gap: 7 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "0.7fr 0.9fr 0.9fr 0.85fr 0.7fr 0.7fr 70px 62px", gap: 7, alignItems: "center" }}>
-        <div style={{ color: T.text, fontWeight: 950 }}>{symbol}</div>
-        <div>{price(field(row, "entry_price", "entryPrice"))}</div>
-        <div>{price(field(row, "current_price", "currentPrice"))}</div>
-        <div style={{ color: (pnl ?? 0) >= 0 ? T.green : T.red }}>{signedMoney(pnl)}</div>
-        <div style={{ color: (pnlPct ?? 0) >= 0 ? T.green : T.red }}>{pct(pnlPct)}</div>
-        <div>{openAge(row)}</div>
+    <div style={{ borderTop: `1px solid ${T.border}`, padding: "9px 0", display: "grid", gap: 8 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "0.8fr 1fr 1fr 1fr 0.8fr", gap: 8, alignItems: "end" }}>
+        <RailValue label="SYMBOL" value={symbol} color={T.text} strong />
+        <RailValue label="ENTRY" value={price(field(row, "entry_price", "entryPrice"))} />
+        <RailValue label="CURRENT" value={price(field(row, "current_price", "currentPrice"))} />
+        <RailValue label="P/L" value={`${signedMoney(pnl)} ${pct(pnlPct)}`} color={(pnl ?? 0) >= 0 ? T.green : T.red} />
+        <RailValue label="TIME" value={openAge(row)} />
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 72px 62px", gap: 7, alignItems: "center" }}>
+        <input
+          value={target}
+          onChange={(e) => setTarget(e.target.value)}
+          placeholder={sellTarget ? `Target ${price(sellTarget.sellTargetPrice)}` : "Sell target price"}
+          style={{ ...inputStyle(), height: 30, fontSize: 10 }}
+        />
         {sellTarget && !["Completed", "Cancelled", "Expired", "Failed"].includes(sellTarget.status) ? (
           <button type="button" disabled={busy} onClick={() => onCancelTarget(sellTarget.id)} style={buttonStyle(T.red, busy)}>CANCEL</button>
         ) : (
@@ -722,17 +729,20 @@ function LiveTradeRow({
         )}
         <button type="button" disabled={busy} onClick={() => onManualSell(row)} style={buttonStyle(T.red, busy)}>SELL</button>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) repeat(3, minmax(0, 0.8fr))", gap: 6, color: T.faint, fontSize: 9 }}>
-        <input
-          value={target}
-          onChange={(e) => setTarget(e.target.value)}
-          placeholder={sellTarget ? `Target ${price(sellTarget.sellTargetPrice)}` : "Sell target price"}
-          style={{ ...inputStyle(), height: 28, fontSize: 10 }}
-        />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 6, color: T.faint, fontSize: 9 }}>
         <span>Retention {retention(row)}</span>
         <span>Max Hold {maxHold(row)}</span>
         <span>{sellTarget ? planState(sellTarget.status) : String(field(row, "exit_mode_status") ?? "MONITORING")}</span>
       </div>
+    </div>
+  );
+}
+
+function RailValue({ label, value, color = T.muted, strong = false }: { label: string; value: string; color?: string; strong?: boolean }) {
+  return (
+    <div style={{ minWidth: 0 }}>
+      <div style={{ color: T.faint, fontSize: 8, fontWeight: 900, letterSpacing: "0.08em", whiteSpace: "nowrap" }}>{label}</div>
+      <div style={{ color, fontSize: strong ? 14 : 12, fontWeight: strong ? 950 : 850, marginTop: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontVariantNumeric: "tabular-nums" }}>{value}</div>
     </div>
   );
 }
@@ -831,10 +841,7 @@ function SidePanel({
     <aside style={{ display: "grid", gridTemplateRows: "minmax(300px, 40fr) minmax(150px, 20fr) minmax(300px, 40fr)", gap: 12, minHeight: 0 }}>
       <section style={panelStyle()}>
         <PanelTitle icon={Activity} title="LIVE TRADES" sub={`${positions.length} open`} />
-        <div style={{ color: T.faint, fontSize: 8, display: "grid", gridTemplateColumns: "0.7fr 0.9fr 0.9fr 0.85fr 0.7fr 0.7fr 70px 62px", gap: 7, paddingBottom: 6 }}>
-          <span>SYMBOL</span><span>ENTRY</span><span>CURRENT</span><span>P/L $</span><span>P/L %</span><span>TIME</span><span>TARGET</span><span>SELL</span>
-        </div>
-        <div style={{ overflowY: "auto", minHeight: 0, maxHeight: 438 }}>
+        <div style={{ overflowY: "auto", minHeight: 0, maxHeight: 540 }}>
           {positions.length === 0 ? <Empty label="NO LIVE POSITIONS" /> : positions.slice(0, 12).map((row, i) => (
             <LiveTradeRow
               key={rowId(row, String(i))}
