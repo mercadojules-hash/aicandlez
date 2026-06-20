@@ -92,6 +92,10 @@ const OPERATOR_ASSETS: AssetSpec[] = [
   { symbol: "XRPUSD", label: "XRP", accent: "#ff6680", anchor: 1.15 },
   { symbol: "AAVEUSD", label: "AAVE", accent: "#b5f56a", anchor: 120 },
   { symbol: "COMPUSD", label: "COMP", accent: "#ffcf5a", anchor: 38 },
+  { symbol: "DOGEUSD", label: "DOGE", accent: "#d6c15d", anchor: 0.14 },
+  { symbol: "ADAUSD", label: "ADA", accent: "#7aa7ff", anchor: 0.4 },
+  { symbol: "AVAXUSD", label: "AVAX", accent: "#ff5f5f", anchor: 18 },
+  { symbol: "ATOMUSD", label: "ATOM", accent: "#a78bfa", anchor: 3.5 },
 ];
 
 const WORKSTATION_EMAILS = new Set(["teedelgado@gmail.com", "info@mixtapepsd.com"]);
@@ -837,46 +841,54 @@ function SidePanel({
     const id = rowId(row, "");
     return sellTargets.find((p) => p.targetPositionId === id || p.enteredPositionId === id);
   };
+  if (positions.length === 0 && activePlans.length === 0 && closedTrades.length === 0) return null;
+
   return (
-    <aside style={{ display: "grid", gridTemplateRows: "minmax(300px, 40fr) minmax(150px, 20fr) minmax(300px, 40fr)", gap: 12, minHeight: 0 }}>
-      <section style={panelStyle()}>
-        <PanelTitle icon={Activity} title="LIVE TRADES" sub={`${positions.length} open`} />
-        <div style={{ overflowY: "auto", minHeight: 0, maxHeight: 540 }}>
-          {positions.length === 0 ? <Empty label="NO LIVE POSITIONS" /> : positions.slice(0, 12).map((row, i) => (
-            <LiveTradeRow
-              key={rowId(row, String(i))}
-              row={row}
-              sellTarget={findTarget(row)}
-              onManualSell={onManualSell}
-              onArmSellTarget={onArmSellTarget}
-              onCancelTarget={onCancelTarget}
-              busy={busy}
-            />
-          ))}
-        </div>
-      </section>
-      <section style={panelStyle()}>
-        <PanelTitle icon={Target} title="PLANNED TRADES" sub={`${activePlans.length} armed`} />
-        <div style={{ color: T.faint, fontSize: 9, display: "grid", gridTemplateColumns: "0.7fr 1fr 1fr 0.9fr", gap: 8, paddingBottom: 6 }}>
-          <span>SYMBOL</span><span>BUY TARGET</span><span>SELL TARGET</span><span>SIZE</span>
-        </div>
-        <div style={{ overflowY: "auto", minHeight: 0 }}>
-          {activePlans.length === 0 ? <Empty label="NO ARMED PLANS" /> : activePlans.map((row) => (
-            <PlannedTradeRowView key={row.id} row={row} onCancelTarget={onCancelTarget} busy={busy} />
-          ))}
-        </div>
-      </section>
-      <section style={panelStyle()}>
-        <PanelTitle icon={History} title="TRADE HISTORY" sub={`${closedTrades.length} recent`} />
-        <div style={{ color: T.faint, fontSize: 9, display: "grid", gridTemplateColumns: "0.75fr 0.8fr 0.8fr 0.8fr 1fr", gap: 8, paddingBottom: 6 }}>
-          <span>SYMBOL</span><span>ENTRY</span><span>EXIT</span><span>PROFIT</span><span>REASON</span>
-        </div>
-        <div style={{ overflowY: "auto", minHeight: 0 }}>
-          {closedTrades.length === 0 ? <Empty label="NO CLOSED TRADES" /> : closedTrades.slice(0, 30).map((row, i) => (
-            <HistoryRow key={rowId(row, String(i))} row={row} />
-          ))}
-        </div>
-      </section>
+    <aside style={{ display: "grid", gap: 12, alignSelf: "start", minHeight: 0 }}>
+      {positions.length > 0 && (
+        <section style={panelStyle()}>
+          <PanelTitle icon={Activity} title="LIVE TRADES" sub={`${positions.length} open`} />
+          <div style={{ overflowY: "auto", minHeight: 0, maxHeight: 690 }}>
+            {positions.map((row, i) => (
+              <LiveTradeRow
+                key={rowId(row, String(i))}
+                row={row}
+                sellTarget={findTarget(row)}
+                onManualSell={onManualSell}
+                onArmSellTarget={onArmSellTarget}
+                onCancelTarget={onCancelTarget}
+                busy={busy}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+      {activePlans.length > 0 && (
+        <section style={panelStyle()}>
+          <PanelTitle icon={Target} title="PLANNED TRADES" sub={`${activePlans.length} armed`} />
+          <div style={{ color: T.faint, fontSize: 9, display: "grid", gridTemplateColumns: "0.7fr 1fr 1fr 0.9fr", gap: 8, paddingBottom: 6 }}>
+            <span>SYMBOL</span><span>BUY TARGET</span><span>SELL TARGET</span><span>SIZE</span>
+          </div>
+          <div style={{ overflowY: "auto", minHeight: 0, maxHeight: 230 }}>
+            {activePlans.map((row) => (
+              <PlannedTradeRowView key={row.id} row={row} onCancelTarget={onCancelTarget} busy={busy} />
+            ))}
+          </div>
+        </section>
+      )}
+      {closedTrades.length > 0 && (
+        <section style={panelStyle()}>
+          <PanelTitle icon={History} title="TRADE HISTORY" sub={`${closedTrades.length} recent`} />
+          <div style={{ color: T.faint, fontSize: 9, display: "grid", gridTemplateColumns: "0.75fr 0.8fr 0.8fr 0.8fr 1fr", gap: 8, paddingBottom: 6 }}>
+            <span>SYMBOL</span><span>ENTRY</span><span>EXIT</span><span>PROFIT</span><span>REASON</span>
+          </div>
+          <div style={{ overflowY: "auto", minHeight: 0, height: 390 }}>
+            {closedTrades.slice(0, 30).map((row, i) => (
+              <HistoryRow key={rowId(row, String(i))} row={row} />
+            ))}
+          </div>
+        </section>
+      )}
     </aside>
   );
 }
@@ -901,24 +913,6 @@ function panelStyle(): React.CSSProperties {
     minHeight: 0,
     overflow: "hidden",
   };
-}
-
-function Empty({ label }: { label: string }) {
-  return (
-    <div style={{
-      minHeight: 84,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      color: T.faint,
-      border: `1px dashed ${T.border}`,
-      fontSize: 10,
-      fontWeight: 900,
-      letterSpacing: "0.12em",
-    }}>
-      {label}
-    </div>
-  );
 }
 
 export default function OperatorWorkstation() {
@@ -1041,9 +1035,12 @@ export default function OperatorWorkstation() {
   });
 
   const positions = detailQuery.data?.positions ?? [];
-  const closedTrades = detailQuery.data?.closedTrades ?? [];
+  const closedTrades = useMemo(() => {
+    return [...(detailQuery.data?.closedTrades ?? [])].sort((a, b) => (rowTimeMs(b) ?? 0) - (rowTimeMs(a) ?? 0));
+  }, [detailQuery.data?.closedTrades]);
   const simAccount = detailQuery.data?.simAccount ?? null;
   const plannedTrades = (plannedQuery.data?.plannedTrades ?? []).filter((p) => !userId || p.userId === userId);
+  const activePlannedTrades = plannedTrades.filter(activePlan);
   const plannedBySymbol = (symbol: string) => plannedTrades.find((p) =>
     p.symbol === symbol &&
     (p.planType ?? "PLANNED_BUY") === "PLANNED_BUY" &&
@@ -1061,17 +1058,18 @@ export default function OperatorWorkstation() {
   const availableCash = liveCash ?? simCash;
   const investedCapital = positions.reduce((sum, row) => sum + positionSize(row), 0);
   const openPnl = positions.reduce((sum, row) => sum + n(field(row, "unrealized_pnl", "unrealizedPnl")), 0);
-  const reservedPlannedCapital = plannedTrades.filter(activePlan).reduce((sum, row) => sum + n(row.positionSizeUSD), 0);
+  const reservedPlannedCapital = activePlannedTrades.reduce((sum, row) => sum + n(row.positionSizeUSD), 0);
   const availableCapital = availableCash == null ? null : Math.max(0, availableCash - reservedPlannedCapital);
   const accountValue = maybeNum(activeConn?.usdBreakdown?.accountValue)
     ?? maybeNum(activeConn?.usdBreakdown?.total)
     ?? maybeNum(activeConn?.totalEquityUSD)
     ?? (availableCash == null ? null : availableCash + investedCapital + openPnl);
   const todayPnl = todayRealizedPnl(closedTrades);
-  const tradeSize = plannedTrades.find(activePlan)?.positionSizeUSD ?? 100;
+  const tradeSize = activePlannedTrades[0]?.positionSizeUSD ?? 100;
   const maxHoldLabel = positions.map(maxHold).find((v) => v !== "—") ?? "3H";
   const displayName = user?.fullName ?? user?.firstName ?? (normalizedEmail || "Operator");
   const accountName = normalizedEmail || "AICandlez operator account";
+  const hasRailActivity = positions.length > 0 || activePlannedTrades.length > 0 || closedTrades.length > 0;
 
   return (
     <div style={{ minHeight: "100dvh", background: T.bg, color: T.muted, fontFamily: T.font, display: "grid", gridTemplateRows: "auto auto auto 1fr" }}>
@@ -1106,7 +1104,7 @@ export default function OperatorWorkstation() {
         availableCapital={availableCapital}
         accountValue={accountValue}
         openPositions={positions.length}
-        plannedTradesCount={plannedTrades.filter(activePlan).length}
+        plannedTradesCount={activePlannedTrades.length}
         todayPnl={todayPnl}
         openPnl={openPnl}
         tradeSize={tradeSize}
@@ -1116,7 +1114,7 @@ export default function OperatorWorkstation() {
       />
       <MarketRadar engine={engine} />
 
-      <main style={{ padding: 14, display: "grid", gridTemplateColumns: "minmax(680px, 1fr) minmax(360px, 0.34fr)", gap: 14, minHeight: 0 }}>
+      <main style={{ padding: 14, display: "grid", gridTemplateColumns: hasRailActivity ? "minmax(680px, 1fr) minmax(390px, 0.36fr)" : "minmax(680px, 1fr)", gap: 14, minHeight: 0 }}>
         <section style={{ minHeight: 0, overflowY: "auto", paddingRight: 2 }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(320px, 1fr))", gap: 12 }}>
             {OPERATOR_ASSETS.map((asset) => (
@@ -1134,15 +1132,17 @@ export default function OperatorWorkstation() {
           </div>
         </section>
 
-        <SidePanel
-          positions={positions}
-          closedTrades={closedTrades}
-          plannedTrades={plannedTrades}
-          onManualSell={(row) => manualSell.mutate(row)}
-          onArmSellTarget={(row, targetPrice) => armSellTarget.mutate({ position: row, targetPrice })}
-          onCancelTarget={(id) => cancelPlan.mutate(id)}
-          busy={busy}
-        />
+        {hasRailActivity && (
+          <SidePanel
+            positions={positions}
+            closedTrades={closedTrades}
+            plannedTrades={plannedTrades}
+            onManualSell={(row) => manualSell.mutate(row)}
+            onArmSellTarget={(row, targetPrice) => armSellTarget.mutate({ position: row, targetPrice })}
+            onCancelTarget={(id) => cancelPlan.mutate(id)}
+            busy={busy}
+          />
+        )}
       </main>
     </div>
   );
