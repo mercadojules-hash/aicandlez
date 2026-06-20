@@ -43,15 +43,19 @@ const USE_LEGACY_ADMIN: boolean =
  *    shell. It can never grant a non-admin the operator surface (a non-admin
  *    already gets the customer shell, and the server gates every /api/admin
  *    + operator route independently). No privilege escalation is possible.
- *  • Default (no override) preserves the locked admin → AdminPortalShell
- *    dispatch, so nothing changes for operators who don't opt in.
+ *  • Default (no override) restores the Phase 2 operational operator view
+ *    inside PortalCustomerShell. AdminPortalShell remains reachable via the
+ *    explicit `?previewCustomer=0` rollback path.
  *  • Persisted in localStorage so the choice survives navigation + reload;
- *    `?previewCustomer=1` sets it and `?previewCustomer=0` clears it.
+ *    `?previewCustomer=1` selects it and `?previewCustomer=0` returns to the
+ *    legacy admin scanner shell. Admin sessions default to the operational
+ *    customer-preview command center so a fresh browser does not fall back to
+ *    the older scanner dashboard.
  */
 const OPERATOR_CUSTOMER_VIEW_KEY = "aicandlez:operator-customer-view";
 
 function readOperatorCustomerView(): boolean {
-  if (typeof window === "undefined") return false;
+  if (typeof window === "undefined") return true;
   try {
     const sp = new URLSearchParams(window.location.search);
     const q = sp.get("previewCustomer");
@@ -60,12 +64,15 @@ function readOperatorCustomerView(): boolean {
       return true;
     }
     if (q === "0") {
-      window.localStorage.removeItem(OPERATOR_CUSTOMER_VIEW_KEY);
+      window.localStorage.setItem(OPERATOR_CUSTOMER_VIEW_KEY, "0");
       return false;
     }
-    return window.localStorage.getItem(OPERATOR_CUSTOMER_VIEW_KEY) === "1";
+    const stored = window.localStorage.getItem(OPERATOR_CUSTOMER_VIEW_KEY);
+    if (stored === "0") return false;
+    if (stored === "1") return true;
+    return true;
   } catch {
-    return false;
+    return true;
   }
 }
 
@@ -90,8 +97,7 @@ export default function Portal() {
     setOperatorCustomerView(prev => {
       const next = !prev;
       try {
-        if (next) window.localStorage.setItem(OPERATOR_CUSTOMER_VIEW_KEY, "1");
-        else window.localStorage.removeItem(OPERATOR_CUSTOMER_VIEW_KEY);
+        window.localStorage.setItem(OPERATOR_CUSTOMER_VIEW_KEY, next ? "1" : "0");
       } catch { /* localStorage unavailable — keep in-memory state only */ }
       return next;
     });
@@ -126,9 +132,9 @@ export default function Portal() {
     return gateTimedOut ? <SkeletonChrome /> : <ResolvingSession />;
   }
 
-  // An operator may opt into the customer Candidate B surface without losing
-  // operator access (Clerk role + /command untouched). Default (no override)
-  // keeps the locked admin → AdminPortalShell dispatch.
+  // Admin /portal defaults to the Phase 2 operational operator view mounted
+  // inside PortalCustomerShell. The older AdminPortalShell remains an explicit
+  // rollback path through the toggle / `?previewCustomer=0`.
   const operatorInCustomerView = isAdmin && operatorCustomerView;
 
   if (isAdmin && !operatorInCustomerView) {
