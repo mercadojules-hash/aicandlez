@@ -15,6 +15,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/requireAuth.js";
+import { getTicker } from "../lib/marketData.js";
 
 const router = Router();
 const requireOperator = [requireAuth, requireRole(["admin", "super-admin"])];
@@ -35,10 +36,12 @@ router.get("/admin/positions", ...requireOperator, async (req, res): Promise<voi
           NULL::text                                      AS user_email,
           t.symbol                                        AS symbol,
           t.side                                          AS side,
+          CASE WHEN t.price > 0 THEN t.amount / t.price ELSE NULL END AS quantity,
           t.amount                                        AS size_usd,
           t.price                                         AS entry_price,
           t.stop_loss                                     AS stop_loss,
           t.take_profit                                   AS take_profit,
+          NULL::real                                      AS manual_exit_target_price,
           t.mode                                          AS mode,
           EXTRACT(EPOCH FROM t.timestamp)::bigint * 1000  AS entry_time,
           NULL::text                                      AS exchange,
@@ -57,10 +60,12 @@ router.get("/admin/positions", ...requireOperator, async (req, res): Promise<voi
           u.email                                         AS user_email,
           p.symbol                                        AS symbol,
           p.side                                          AS side,
+          p.quantity                                      AS quantity,
           p.size_usd                                      AS size_usd,
           p.entry_price                                   AS entry_price,
           p.stop_loss                                     AS stop_loss,
           p.take_profit                                   AS take_profit,
+          p.manual_exit_target_price                      AS manual_exit_target_price,
           'simulation'::text                              AS mode,
           p.entry_time                                    AS entry_time,
           p.exchange                                      AS exchange,
@@ -77,8 +82,51 @@ router.get("/admin/positions", ...requireOperator, async (req, res): Promise<voi
       LIMIT ${sql.raw(String(limit))}
     `).then(r => r.rows);
 
+    const symbols = [...new Set(rows.map((r) => String((r as Record<string, unknown>)["symbol"] ?? "")).filter(Boolean))];
+    const priceBySymbol = new Map<string, number>();
+    await Promise.all(symbols.map(async (symbol) => {
+      try {
+        const ticker = await getTicker(symbol);
+        if (ticker.price > 0) priceBySymbol.set(symbol, ticker.price);
+      } catch {
+        /* Leave price-derived telemetry null for this symbol on this poll. */
+      }
+    }));
+
+    const enriched = rows.map((row) => {
+      const r = row as Record<string, unknown>;
+      const symbol = String(r["symbol"] ?? "");
+      const side = String(r["side"] ?? "BUY").toUpperCase();
+      const entryPrice = Number(r["entry_price"] ?? 0);
+      const sizeUSD = Number(r["size_usd"] ?? 0);
+      const quantity = Number(r["quantity"] ?? (entryPrice > 0 ? sizeUSD / entryPrice : 0));
+      const currentPrice = priceBySymbol.get(symbol) ?? null;
+      const unrealizedPnL = currentPrice !== null
+        ? (side === "SELL" ? (entryPrice - currentPrice) : (currentPrice - entryPrice)) * quantity
+        : null;
+      const currentMarketValue = currentPrice !== null
+        ? (side === "SELL" ? sizeUSD - (unrealizedPnL ?? 0) : quantity * currentPrice)
+        : null;
+      const unrealizedPnLPct = unrealizedPnL !== null && sizeUSD > 0 ? (unrealizedPnL / sizeUSD) * 100 : null;
+      const manualTarget = r["manual_exit_target_price"] == null ? null : Number(r["manual_exit_target_price"]);
+      const distanceToTarget = manualTarget !== null && currentPrice !== null
+        ? manualTarget - currentPrice
+        : null;
+      return {
+        ...r,
+        capital_invested: sizeUSD,
+        quantity_purchased: quantity > 0 ? quantity : null,
+        current_price: currentPrice,
+        current_market_value: currentMarketValue,
+        unrealized_pnl: unrealizedPnL,
+        unrealized_pnl_pct: unrealizedPnLPct,
+        manual_target_status: manualTarget !== null ? "Armed" : null,
+        distance_to_target: distanceToTarget,
+      };
+    });
+
     res.json({
-      positions: rows,
+      positions: enriched,
       count:     rows.length,
       timestamp: Date.now(),
     });

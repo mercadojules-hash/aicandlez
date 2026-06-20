@@ -5275,6 +5275,31 @@ function AdminOpenPositionsCommandCenter({
   const [expandedTradeId, setExpandedTradeId] = useState<string | null>(null);
   const [sellTarget, setSellTarget] = useState<PortalOpenPositionRow | null>(null);
   const [manualTargetInputs, setManualTargetInputs] = useState<Record<string, string>>({});
+  const [plannedSymbol, setPlannedSymbol] = useState("ETHUSD");
+  const [plannedBuyTrigger, setPlannedBuyTrigger] = useState("");
+  const [plannedExitTarget, setPlannedExitTarget] = useState("");
+  const [plannedSize, setPlannedSize] = useState("10");
+
+  const { data: plannedTradesResp } = useQuery<{ plannedTrades: Array<{
+    id: string; planType?: string; symbol: string; buyTargetPrice: number | null; sellTargetPrice: number | null;
+    targetProfitUSD?: number | null; targetPositionId?: string | null;
+    positionSizeUSD: number; status: string; lastError?: string | null;
+  }> }>({
+    queryKey: ["admin-planned-trades-visible", clerkUserId],
+    queryFn: async () => {
+      const res = await authFetch("/api/admin/planned-trades?limit=20");
+      if (!res.ok) throw new Error(`/api/admin/planned-trades ${res.status}`);
+      return (await res.json()) as { plannedTrades: Array<{
+        id: string; planType?: string; symbol: string; buyTargetPrice: number | null; sellTargetPrice: number | null;
+        targetProfitUSD?: number | null; targetPositionId?: string | null;
+        positionSizeUSD: number; status: string; lastError?: string | null;
+      }> };
+    },
+    enabled: !!clerkUserId,
+    refetchInterval: 8_000,
+    staleTime: 4_000,
+    retry: false,
+  });
 
   const manualSell = useMutation({
     mutationFn: async (position: PortalOpenPositionRow) => {
@@ -5311,38 +5336,88 @@ function AdminOpenPositionsCommandCenter({
   const manualTarget = useMutation({
     mutationFn: async (input: { position: PortalOpenPositionRow; targetPrice: number | null }) => {
       if (!clerkUserId) throw new Error("Admin user id unavailable");
-      const res = await authFetch(
-        `/api/admin/users/${encodeURIComponent(clerkUserId)}/positions/${encodeURIComponent(input.position.id)}/manual-target`,
-        {
-          method: "PUT",
-          body: JSON.stringify({
-            targetPrice: input.targetPrice,
-            note: input.targetPrice === null
-              ? "Manual target cancelled from Command Center"
-              : "Manual target armed from Command Center",
-          }),
-        },
-      );
+      const res = input.targetPrice != null && input.targetPrice > 0
+        ? await authFetch(`/api/admin/users/${encodeURIComponent(clerkUserId)}/sell-targets`, {
+            method: "POST",
+            body: JSON.stringify({
+              positionId: input.position.id,
+              targetPrice: input.targetPrice,
+              note: "Operator sell target from visible command center",
+            }),
+          })
+        : await authFetch(
+            `/api/admin/users/${encodeURIComponent(clerkUserId)}/positions/${encodeURIComponent(input.position.id)}/manual-target`,
+            {
+              method: "PUT",
+              body: JSON.stringify({
+                targetPrice: null,
+                note: "Manual exit target cleared from visible command center",
+              }),
+            },
+          );
       const json = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(String((json as { error?: unknown }).error ?? `HTTP ${res.status}`));
-      }
-      return json as { manualExitTargetPrice?: number | null };
+      if (!res.ok) throw new Error(String((json as { error?: unknown }).error ?? `HTTP ${res.status}`));
+      return json;
     },
-    onSuccess: (_data, vars) => {
-      toast({
-        title: vars.targetPrice === null ? "Manual target cancelled" : "Manual target armed",
-        description: vars.targetPrice === null ? "Position returned to normal AI exit monitoring." : "Position will close when the target is reached.",
-      });
-      if (vars.targetPrice === null) {
-        setManualTargetInputs(prev => ({ ...prev, [vars.position.id]: "" }));
-      }
-      void qc.invalidateQueries({ queryKey: ["customer-simulation-account"] });
+    onSuccess: () => {
+      toast({ title: "Sell target updated", description: "Operator target is armed and visible in planned trades." });
       void qc.invalidateQueries({ queryKey: ["admin-user-detail", clerkUserId] });
-      void qc.invalidateQueries({ queryKey: RUNTIME_STATE_QUERY_KEY });
+      void qc.invalidateQueries({ queryKey: ["customer-simulation-account"] });
+      void qc.invalidateQueries({ queryKey: ["admin-planned-trades-visible", clerkUserId] });
     },
     onError: (err: Error) => {
       toast({ title: "Manual target failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const plannedTrade = useMutation({
+    mutationFn: async () => {
+      if (!clerkUserId) throw new Error("Admin user id unavailable");
+      const symbol = plannedSymbol.trim().toUpperCase();
+      const buyTargetPrice = Number(plannedBuyTrigger);
+      const sellTargetPrice = plannedExitTarget.trim() ? Number(plannedExitTarget) : null;
+      const positionSizeUSD = Number(plannedSize);
+      if (!symbol || !(buyTargetPrice > 0) || !(positionSizeUSD > 0)) {
+        throw new Error("Symbol, Buy Trigger, and Position Size are required.");
+      }
+      const res = await authFetch(`/api/admin/users/${encodeURIComponent(clerkUserId)}/planned-buys`, {
+        method: "POST",
+        body: JSON.stringify({
+          symbol,
+          buyTargetPrice,
+          sellTargetPrice: sellTargetPrice && sellTargetPrice > 0 ? sellTargetPrice : null,
+          positionSizeUSD,
+          note: "Planned trade armed from visible command center",
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(String((json as { error?: unknown }).error ?? `HTTP ${res.status}`));
+      return json;
+    },
+    onSuccess: () => {
+      toast({ title: "Planned trade armed", description: "Buy trigger and exit target are now monitored." });
+      setPlannedBuyTrigger("");
+      setPlannedExitTarget("");
+      void qc.invalidateQueries({ queryKey: ["admin-planned-trades-visible", clerkUserId] });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Planned trade failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const cancelPlannedTrade = useMutation({
+    mutationFn: async (planId: string) => {
+      const res = await authFetch(`/api/admin/planned-trades/${encodeURIComponent(planId)}/cancel`, { method: "POST" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(String((json as { error?: unknown }).error ?? `HTTP ${res.status}`));
+      return json;
+    },
+    onSuccess: () => {
+      toast({ title: "Plan cancelled", description: "Operator plan will no longer execute." });
+      void qc.invalidateQueries({ queryKey: ["admin-planned-trades-visible", clerkUserId] });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Cancel failed", description: err.message, variant: "destructive" });
     },
   });
 
@@ -5387,6 +5462,110 @@ function AdminOpenPositionsCommandCenter({
         </button>
       </div>
 
+      <div style={{
+        margin: "8px 8px 0 8px", padding: 9,
+        border: "1px solid rgba(255,170,0,0.26)",
+        background: "rgba(255,170,0,0.055)",
+        display: "flex", flexDirection: "column", gap: 8,
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ color: T.AMBER, fontSize: 10, fontWeight: 900, letterSpacing: "0.14em" }}>
+            PLANNED TRADES
+          </div>
+          <div style={{ color: T.TEXT_3, fontSize: 8, fontWeight: 800, letterSpacing: T.TRACK_LABEL }}>
+            PLANNED BUYS · ACTIVE SELL TARGETS · FILLED/CANCELLED PLANS
+          </div>
+        </div>
+        <div className="cd-admin-planned-grid" style={{
+          display: "grid",
+          gridTemplateColumns: "minmax(110px, 1fr) minmax(110px, 1fr) minmax(110px, 1fr) minmax(110px, 1fr) minmax(110px, 0.7fr)",
+          gap: 6,
+        }}>
+          {[
+            ["Symbol", plannedSymbol, setPlannedSymbol],
+            ["Buy Trigger", plannedBuyTrigger, setPlannedBuyTrigger],
+            ["Exit Target (optional)", plannedExitTarget, setPlannedExitTarget],
+            ["Position Size", plannedSize, setPlannedSize],
+          ].map(([label, value, setter]) => (
+            <label key={String(label)} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <span style={{ color: T.TEXT_3, fontSize: 8, fontWeight: 900, letterSpacing: T.TRACK_LABEL }}>{String(label).toUpperCase()}</span>
+              <input
+                value={String(value)}
+                onChange={(e) => (setter as (v: string) => void)(e.target.value)}
+                style={{
+                  minHeight: 30, padding: "6px 8px",
+                  border: "1px solid rgba(255,170,0,0.30)",
+                  background: "rgba(0,0,0,0.30)",
+                  color: T.TEXT_0,
+                  fontFamily: T.FONT_MONO,
+                  fontSize: 10,
+                  fontWeight: 800,
+                  outline: "none",
+                }}
+              />
+            </label>
+          ))}
+          <button
+            type="button"
+            disabled={!clerkUserId || plannedTrade.isPending}
+            onClick={() => plannedTrade.mutate()}
+            style={{
+              minHeight: 30, alignSelf: "end",
+              border: "1px solid rgba(255,170,0,0.52)",
+              background: plannedTrade.isPending ? "rgba(255,170,0,0.10)" : "rgba(255,170,0,0.22)",
+              color: T.AMBER,
+              fontFamily: T.FONT_MONO,
+              fontSize: 10,
+              fontWeight: 900,
+              letterSpacing: "0.10em",
+              cursor: !clerkUserId || plannedTrade.isPending ? "wait" : "pointer",
+            }}
+          >
+            {plannedTrade.isPending ? "ARMING" : "ARM"}
+          </button>
+        </div>
+        {(plannedTradesResp?.plannedTrades ?? []).length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {(plannedTradesResp?.plannedTrades ?? []).slice(0, 4).map(plan => (
+              <span key={plan.id} style={{
+                border: "1px solid rgba(255,170,0,0.20)",
+                background: "rgba(0,0,0,0.22)",
+                color: plan.lastError ? T.RED : T.TEXT_2,
+                padding: "4px 6px",
+                fontSize: 8,
+                fontWeight: 800,
+                letterSpacing: "0.06em",
+              }}>
+                {plan.planType === "SELL_TARGET" ? "SELL TARGET" : "BUY"} {plan.symbol}
+                {" · "}
+                {plan.buyTargetPrice != null ? `BUY ${fmtPrice(plan.buyTargetPrice)} · ` : ""}
+                {plan.sellTargetPrice != null ? `EXIT ${fmtPrice(plan.sellTargetPrice)} · ` : ""}
+                {plan.status}
+                {["Waiting", "Sell Armed", "Triggering Buy", "Selling"].includes(plan.status) && (
+                  <button
+                    type="button"
+                    disabled={cancelPlannedTrade.isPending}
+                    onClick={() => cancelPlannedTrade.mutate(plan.id)}
+                    style={{
+                      marginLeft: 6,
+                      border: "1px solid rgba(255,51,85,0.35)",
+                      background: "rgba(255,51,85,0.10)",
+                      color: "#ff6680",
+                      fontFamily: T.FONT_MONO,
+                      fontSize: 8,
+                      fontWeight: 900,
+                      cursor: cancelPlannedTrade.isPending ? "wait" : "pointer",
+                    }}
+                  >
+                    CANCEL
+                  </button>
+                )}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
       {rows.length === 0 ? (
         <div style={{
           padding: 24, textAlign: "center", color: T.TEXT_3,
@@ -5411,13 +5590,20 @@ function AdminOpenPositionsCommandCenter({
             const currentPrice = portalMetricNum(raw["current_price"], row.last);
             const pnl = portalMetricNum(raw["unrealized_pnl"], row.pnl);
             const pnlPct = portalMetricNum(raw["unrealized_pnl_pct"], row.pnlPct);
-            const existingManualTarget = portalMetricNum(
-              raw["manual_exit_target_price"] ?? raw["manualExitTargetPrice"],
+            const investedCapital = portalMetricNum(raw["capital_invested"] ?? raw["size_usd"]);
+            const quantity = portalMetricNum(raw["quantity_purchased"] ?? raw["quantity"]);
+            const currentValue = portalMetricNum(
+              raw["current_market_value"],
+              Number.isFinite(quantity) && Number.isFinite(currentPrice) ? quantity * currentPrice : NaN,
             );
+            const existingManualTarget = portalMetricNum(raw["manual_exit_target_price"]);
             const manualInputValue =
               manualTargetInputs[row.id] ??
               (Number.isFinite(existingManualTarget) && existingManualTarget > 0 ? String(existingManualTarget) : "");
             const manualTargetValue = Number(manualInputValue);
+            const distanceToTarget = Number.isFinite(manualTargetValue) && manualTargetValue > 0 && Number.isFinite(currentPrice)
+              ? manualTargetValue - currentPrice
+              : portalMetricNum(raw["distance_to_target"]);
             const peakUsd = portalMetricNum(raw["peak_profit_usd"] ?? diag["peak_profit_usd"]);
             const peakPct = portalMetricNum(raw["peak_profit_pct"] ?? diag["peak_profit_pct"]);
             const drawdownUsd = portalMetricNum(raw["drawdown_from_peak_usd"]);
@@ -5437,7 +5623,6 @@ function AdminOpenPositionsCommandCenter({
             const trailingActive = Boolean(diag["trailing_active"]);
             const status = String(raw["exit_mode_status"] ?? (trailingActive ? "TRAIL TRACKING" : "MONITORING"));
             const pnlColor = pnl > 0 ? T.NEON : pnl < 0 ? T.RED : T.TEXT_2;
-            const targetBusy = manualTarget.isPending;
 
             return (
               <div key={row.id} style={{
@@ -5447,7 +5632,7 @@ function AdminOpenPositionsCommandCenter({
               }}>
                 <div className="cd-admin-command-row" style={{
                   display: "grid",
-                  gridTemplateColumns: "minmax(150px, 1.2fr) repeat(9, minmax(92px, 1fr)) minmax(174px, 0.95fr)",
+                  gridTemplateColumns: "minmax(150px, 1.2fr) repeat(9, minmax(92px, 1fr)) minmax(156px, 0.9fr)",
                   gap: 6, alignItems: "stretch",
                 }}>
                   <div style={{
@@ -5467,21 +5652,17 @@ function AdminOpenPositionsCommandCenter({
                       </span>
                     )}
                   </div>
+                  <PortalCommandMetric label="INVESTED" value={portalFmtSignedDollar(investedCapital).replace("+", "")} />
                   <PortalCommandMetric label="ENTRY" value={fmtPrice(entryPrice)} />
                   <PortalCommandMetric label="CURRENT" value={fmtPrice(currentPrice)} />
+                  <PortalCommandMetric label="CURRENT VALUE" value={portalFmtSignedDollar(currentValue).replace("+", "")} />
                   <PortalCommandMetric label="P/L $" value={portalFmtSignedDollar(pnl)} color={pnlColor} />
                   <PortalCommandMetric label="P/L %" value={portalFmtSignedPct(pnlPct)} color={pnlColor} />
-                  <PortalCommandMetric
-                    label="MANUAL TARGET"
-                    value={Number.isFinite(existingManualTarget) && existingManualTarget > 0 ? fmtPrice(existingManualTarget) : "—"}
-                    color={Number.isFinite(existingManualTarget) && existingManualTarget > 0 ? T.AMBER : T.TEXT_3}
-                  />
+                  <PortalCommandMetric label="TARGET DIST" value={Number.isFinite(distanceToTarget) ? portalFmtSignedDollar(distanceToTarget) : "—"} color={Number.isFinite(distanceToTarget) && distanceToTarget <= 0 ? T.NEON : T.AMBER} />
                   <PortalCommandMetric label="PEAK $" value={portalFmtSignedDollar(peakUsd)} color={Number.isFinite(peakUsd) ? portalPnlColor(peakUsd) : T.TEXT_3} />
                   <PortalCommandMetric label="PEAK %" value={portalFmtSignedPct(peakPct)} color={Number.isFinite(peakPct) ? portalPnlColor(peakPct) : T.TEXT_3} />
-                  <PortalCommandMetric label="RETENTION" value={Number.isFinite(retentionPct) ? `${retentionPct.toFixed(1)}%` : "—"} color={retentionColor} />
-                  <PortalCommandMetric label="DRAWDOWN" value={`${portalFmtSignedDollar(drawdownUsd)} · ${portalFmtPct(drawdownPct)}`} color={drawdownPct > 0 ? T.AMBER : T.TEXT_3} />
                   <div style={{ display: "grid", gap: 6, gridTemplateRows: "1fr 1fr 1fr" }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 54px 58px", gap: 5 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 56px", gap: 5 }}>
                       <input
                         value={manualInputValue}
                         placeholder="Target"
@@ -5499,9 +5680,11 @@ function AdminOpenPositionsCommandCenter({
                       />
                       <button
                         type="button"
-                        disabled={!isLive || !clerkUserId || targetBusy || !(manualTargetValue > 0)}
-                        onClick={() => manualTarget.mutate({ position: row, targetPrice: manualTargetValue })}
-                        title={isLive ? "Arm manual target exit" : "Manual target exits are for live exchange positions"}
+                        disabled={!clerkUserId || manualTarget.isPending}
+                        onClick={() => {
+                          const targetPrice = manualInputValue.trim() ? Number(manualInputValue) : null;
+                          manualTarget.mutate({ position: row, targetPrice: targetPrice && targetPrice > 0 ? targetPrice : null });
+                        }}
                         style={{
                           minHeight: 27,
                           border: "1px solid rgba(255,170,0,0.48)",
@@ -5511,29 +5694,10 @@ function AdminOpenPositionsCommandCenter({
                           fontSize: 8,
                           fontWeight: 900,
                           letterSpacing: "0.06em",
-                          cursor: !isLive || !clerkUserId || targetBusy || !(manualTargetValue > 0) ? "not-allowed" : "pointer",
+                          cursor: !clerkUserId || manualTarget.isPending ? "wait" : "pointer",
                         }}
                       >
                         ARM
-                      </button>
-                      <button
-                        type="button"
-                        disabled={!isLive || !clerkUserId || targetBusy || !(Number.isFinite(existingManualTarget) && existingManualTarget > 0)}
-                        onClick={() => manualTarget.mutate({ position: row, targetPrice: null })}
-                        title="Cancel manual target exit"
-                        style={{
-                          minHeight: 27,
-                          border: "1px solid rgba(255,255,255,0.16)",
-                          background: "rgba(255,255,255,0.04)",
-                          color: T.TEXT_2,
-                          fontFamily: T.FONT_MONO,
-                          fontSize: 8,
-                          fontWeight: 900,
-                          letterSpacing: "0.06em",
-                          cursor: !isLive || !clerkUserId || targetBusy || !(Number.isFinite(existingManualTarget) && existingManualTarget > 0) ? "not-allowed" : "pointer",
-                        }}
-                      >
-                        CANCEL
                       </button>
                     </div>
                     <button

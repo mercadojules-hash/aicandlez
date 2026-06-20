@@ -22,6 +22,7 @@ import { authFetch } from "@/lib/authFetch";
  * All data is real (no fabricated values) and auto-refreshes.
  */
 
+import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Gauge, GitBranch, Radio, DollarSign, Users,
@@ -146,8 +147,13 @@ interface AdaptersHealth {
 interface AdminPositionsResponse {
   positions: Array<{
     id: string; user_id: string | null; user_email: string | null;
-    symbol: string; side: string; size_usd: number;
+    symbol: string; side: string; size_usd: number; capital_invested?: number;
+    quantity?: number | null; quantity_purchased?: number | null;
     entry_price: number; entry_time: number | null; mode: string; source: string;
+    current_price?: number | null; current_market_value?: number | null;
+    unrealized_pnl?: number | null; unrealized_pnl_pct?: number | null;
+    manual_exit_target_price?: number | null; distance_to_target?: number | null;
+    manual_target_status?: string | null;
   }>;
   count: number;
 }
@@ -162,6 +168,19 @@ interface AdminClosedTradesResponse {
   }>;
   count: number;
   summary: { total: number; wins: number; losses: number; total_pnl: number };
+}
+
+interface PlannedTradesResponse {
+  plannedTrades: Array<{
+    id: string; userId: string; planType?: string; symbol: string;
+    buyTargetPrice: number | null; buyTriggerDirection?: string | null;
+    sellTargetPrice: number | null; targetProfitUSD?: number | null;
+    targetPositionId?: string | null; positionSizeUSD: number;
+    expirationTime: number | null; status: string;
+    enteredPositionId: string | null; completedTradeId?: string | null;
+    lastError: string | null;
+  }>;
+  count: number;
 }
 
 // ── Fetcher ──────────────────────────────────────────────────────────────────
@@ -247,6 +266,11 @@ export function OperatorTelemetryGrid() {
     queryFn:         () => j<AdminClosedTradesResponse>("/api/admin/closed-trades?limit=30"),
     refetchInterval: 5_000, refetchOnWindowFocus: false, staleTime: 0, retry: false,
   });
+  const { data: planned } = useQuery<PlannedTradesResponse>({
+    queryKey:        ["operator-planned-trades"],
+    queryFn:         () => j<PlannedTradesResponse>("/api/admin/planned-trades?limit=50"),
+    refetchInterval: 5_000, refetchOnWindowFocus: false, staleTime: 0, retry: false,
+  });
 
   const qc = useQueryClient();
   const onKillSwitch = async () => {
@@ -323,6 +347,10 @@ export function OperatorTelemetryGrid() {
         style={{ gridTemplateColumns: "1fr 1fr", alignItems: "stretch" }}>
         <PositionsPanel data={positions} />
         <ClosedTradesPanel data={closed} />
+      </div>
+
+      <div className="grid gap-2 mt-2" style={{ gridTemplateColumns: "1fr", alignItems: "stretch" }}>
+        <PlannedTradesPanel data={planned} />
       </div>
     </section>
   );
@@ -913,47 +941,287 @@ function PositionsPanel({ data }: { data: AdminPositionsResponse | undefined }) 
       ) : (
         <div className="flex flex-col gap-0.5">
           <div className="grid gap-1 text-[7.5px] tracking-[0.14em] font-bold"
-            style={{ gridTemplateColumns: "1fr 50px 40px 60px 60px",
+            style={{ gridTemplateColumns: "1fr 44px 50px 50px 56px 64px 68px",
                      color: N.TEXT_3, fontFamily: N.FONT_MONO }}>
             <span>USER · SYMBOL</span>
             <span className="text-right">SIDE</span>
-            <span className="text-right">SRC</span>
             <span className="text-right">ENTRY</span>
-            <span className="text-right">SIZE</span>
+            <span className="text-right">MARK</span>
+            <span className="text-right">QTY</span>
+            <span className="text-right">VALUE</span>
+            <span className="text-right">P/L</span>
           </div>
-          {rows.map(r => (
-            <div key={r.id} className="grid gap-1 text-[9.5px] tabular-nums py-0.5"
-              style={{ gridTemplateColumns: "1fr 50px 40px 60px 60px",
-                       fontFamily: N.FONT_MONO, borderTop: `1px solid ${N.BORDER}` }}>
-              {/* P2-AD-05 — cross-nav to BillingAdmin drawer when a real
-                  user_id exists. Global/non-attributable rows render plain. */}
-              {r.user_id ? (
-                <a href={`/admin/billing?user=${encodeURIComponent(r.user_id)}`}
-                  className="truncate hover:underline"
-                  style={{ color: N.TEXT_1 }}
-                  title={`Open billing drawer for ${r.user_email ?? r.user_id}`}>
-                  {(r.user_email ?? r.user_id).split("@")[0]} · {r.symbol}
-                </a>
-              ) : (
-                <span style={{ color: N.TEXT_1 }} className="truncate">
-                  global · {r.symbol}
-                </span>
-              )}
-              <span className="text-right font-bold"
-                style={{ color: r.side.toLowerCase() === "buy" ? N.LONG : N.SHORT }}>
-                {r.side.toUpperCase()}
+          {rows.map(r => {
+            const pnl = r.unrealized_pnl ?? null;
+            const pnlPct = r.unrealized_pnl_pct ?? null;
+            const target = r.manual_exit_target_price ?? null;
+            return (
+              <div key={r.id} className="py-1" style={{ borderTop: `1px solid ${N.BORDER}` }}>
+                <div className="grid gap-1 text-[9.5px] tabular-nums"
+                  style={{ gridTemplateColumns: "1fr 44px 50px 50px 56px 64px 68px", fontFamily: N.FONT_MONO }}>
+                  {r.user_id ? (
+                    <a href={`/admin/billing?user=${encodeURIComponent(r.user_id)}`}
+                      className="truncate hover:underline"
+                      style={{ color: N.TEXT_1 }}
+                      title={`Open billing drawer for ${r.user_email ?? r.user_id}`}>
+                      {(r.user_email ?? r.user_id).split("@")[0]} · {r.symbol}
+                    </a>
+                  ) : (
+                    <span style={{ color: N.TEXT_1 }} className="truncate">global · {r.symbol}</span>
+                  )}
+                  <span className="text-right font-bold" style={{ color: r.side.toLowerCase() === "buy" ? N.LONG : N.SHORT }}>
+                    {r.side.toUpperCase()}
+                  </span>
+                  <span className="text-right" style={{ color: N.TEXT_2 }}>${num(r.entry_price).toFixed(2)}</span>
+                  <span className="text-right" style={{ color: N.TEXT_2 }}>{r.current_price == null ? "—" : `$${num(r.current_price).toFixed(2)}`}</span>
+                  <span className="text-right" style={{ color: N.TEXT_2 }}>{num(r.quantity_purchased ?? r.quantity).toFixed(4)}</span>
+                  <span className="text-right" style={{ color: N.TEXT_0 }}>{fmtMoney(num(r.current_market_value ?? r.size_usd))}</span>
+                  <span className="text-right font-bold" style={{ color: (pnl ?? 0) >= 0 ? N.LONG : N.SHORT }}>
+                    {pnl == null ? "—" : `${fmtPnL(pnl)} ${pnlPct == null ? "" : `(${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(2)}%)`}`}
+                  </span>
+                </div>
+                <div className="grid gap-1 text-[8px] tabular-nums mt-0.5"
+                  style={{ gridTemplateColumns: "1fr 90px 90px 90px", fontFamily: N.FONT_MONO, color: N.TEXT_3 }}>
+                  <span>Invested {fmtMoney(num(r.capital_invested ?? r.size_usd))} · SRC {r.source === "sim" ? "SIM" : "GLB"}</span>
+                  <span className="text-right">Target {target == null ? "—" : `$${target.toFixed(2)}`}</span>
+                  <span className="text-right">Distance {r.distance_to_target == null ? "—" : `$${num(r.distance_to_target).toFixed(2)}`}</span>
+                  <span className="text-right" style={{ color: target == null ? N.TEXT_3 : N.WARN }}>{target == null ? "Normal" : "Armed"}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+function PlannedTradesPanel({ data }: { data: PlannedTradesResponse | undefined }) {
+  const rows = (data?.plannedTrades ?? []).slice(0, 12);
+  const plannedBuys = rows.filter(r => (r.planType ?? "PLANNED_BUY") === "PLANNED_BUY" && !["Completed", "Cancelled", "Expired", "Failed"].includes(r.status));
+  const activeTargets = rows.filter(r => (r.planType ?? "") === "SELL_TARGET" && !["Completed", "Cancelled", "Expired", "Failed"].includes(r.status));
+  const terminal = rows.filter(r => ["Completed", "Cancelled", "Expired", "Failed"].includes(r.status));
+  const qc = useQueryClient();
+  const [userId, setUserId] = useState("");
+  const [symbol, setSymbol] = useState("ETHUSD");
+  const [buy, setBuy] = useState("");
+  const [sell, setSell] = useState("");
+  const [size, setSize] = useState("10");
+  const [hours, setHours] = useState("24");
+  const [sellUserId, setSellUserId] = useState("");
+  const [positionId, setPositionId] = useState("");
+  const [targetPrice, setTargetPrice] = useState("");
+  const [targetProfit, setTargetProfit] = useState("");
+  const [busy, setBusy] = useState(false);
+  const createPlan = async () => {
+    const targetUser = userId.trim();
+    const body = {
+      symbol: symbol.trim().toUpperCase(),
+      buyTargetPrice: Number(buy),
+      sellTargetPrice: sell.trim() ? Number(sell) : null,
+      positionSizeUSD: Number(size),
+      expirationHours: hours.trim() ? Number(hours) : undefined,
+      note: "Operator planned trade created from telemetry grid",
+    };
+    if (!targetUser || !(body.buyTargetPrice > 0) || !(body.positionSizeUSD > 0)) {
+      window.alert("User, symbol, buy target, and size are required.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const r = await authFetch(`/api/admin/users/${encodeURIComponent(targetUser)}/planned-buys`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        throw new Error(String(err.error ?? `HTTP ${r.status}`));
+      }
+      setBuy("");
+      setSell("");
+      await qc.invalidateQueries({ queryKey: ["operator-planned-trades"] });
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const createSellTarget = async () => {
+    const targetUser = sellUserId.trim();
+    const body = {
+      positionId: positionId.trim(),
+      targetPrice: targetPrice.trim() ? Number(targetPrice) : null,
+      targetProfitUSD: targetProfit.trim() ? Number(targetProfit) : null,
+      note: "Operator sell target created from telemetry grid",
+    };
+    if (!targetUser || !body.positionId || (body.targetPrice == null && body.targetProfitUSD == null)) {
+      window.alert("User, position id, and target price or target profit are required.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const r = await authFetch(`/api/admin/users/${encodeURIComponent(targetUser)}/sell-targets`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        throw new Error(String(err.error ?? `HTTP ${r.status}`));
+      }
+      setPositionId("");
+      setTargetPrice("");
+      setTargetProfit("");
+      await qc.invalidateQueries({ queryKey: ["operator-planned-trades"] });
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const cancelPlan = async (id: string) => {
+    setBusy(true);
+    try {
+      const r = await authFetch(`/api/admin/planned-trades/${encodeURIComponent(id)}/cancel`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        throw new Error(String(err.error ?? `HTTP ${r.status}`));
+      }
+      await qc.invalidateQueries({ queryKey: ["operator-planned-trades"] });
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const renderRows = (sectionRows: typeof rows) => (
+    <div className="flex flex-col gap-0.5">
+      <div className="grid gap-1 text-[7.5px] tracking-[0.14em] font-bold"
+        style={{ gridTemplateColumns: "1fr 72px 72px 72px 92px 72px", color: N.TEXT_3, fontFamily: N.FONT_MONO }}>
+        <span>USER · SYMBOL</span>
+        <span className="text-right">BUY</span>
+        <span className="text-right">SELL</span>
+        <span className="text-right">SIZE</span>
+        <span className="text-right">STATUS</span>
+        <span className="text-right">ACTION</span>
+      </div>
+      {sectionRows.map(r => (
+        <div key={r.id} className="grid gap-1 text-[9.5px] tabular-nums py-0.5"
+          style={{ gridTemplateColumns: "1fr 72px 72px 72px 92px 72px", fontFamily: N.FONT_MONO, borderTop: `1px solid ${N.BORDER}` }}>
+          <span className="truncate" style={{ color: N.TEXT_1 }} title={r.targetPositionId ?? r.enteredPositionId ?? r.id}>
+            {r.userId.slice(0, 10)} · {r.symbol}
+          </span>
+          <span className="text-right" style={{ color: N.TEXT_2 }}>
+            {r.buyTargetPrice == null ? "—" : `$${num(r.buyTargetPrice).toFixed(2)}`}
+          </span>
+          <span className="text-right" style={{ color: N.TEXT_2 }}>
+            {r.sellTargetPrice == null ? "—" : `$${num(r.sellTargetPrice).toFixed(2)}`}
+          </span>
+          <span className="text-right" style={{ color: N.TEXT_0 }}>{fmtMoney(num(r.positionSizeUSD))}</span>
+          <span className="text-right font-bold" style={{ color: r.status === "Completed" ? N.LONG : r.status === "Expired" || r.status === "Cancelled" || r.status === "Failed" ? N.TEXT_3 : N.WARN }}>
+            {r.status}
+          </span>
+          <span className="text-right">
+            {["Waiting", "Triggering Buy", "Sell Armed", "Selling"].includes(r.status) ? (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => { void cancelPlan(r.id); }}
+                className="h-5 px-1.5 text-[7px] font-bold tracking-[0.12em]"
+                style={{ background: "rgba(255,51,85,0.16)", color: N.SHORT, border: `1px solid ${N.SHORT}`, borderRadius: 3, fontFamily: N.FONT_MONO }}
+              >
+                CANCEL
+              </button>
+            ) : (
+              <span style={{ color: r.lastError ? N.SHORT : N.TEXT_3 }} title={r.lastError ?? undefined}>
+                {r.lastError ? "ERR" : "—"}
               </span>
-              <span className="text-right" style={{ color: r.source === "sim" ? N.TEXT_3 : N.BRAND }}>
-                {r.source === "sim" ? "SIM" : "GLB"}
-              </span>
-              <span className="text-right" style={{ color: N.TEXT_2 }}>
-                ${r.entry_price.toFixed(2)}
-              </span>
-              <span className="text-right" style={{ color: N.TEXT_0 }}>
-                {fmtMoney(r.size_usd)}
-              </span>
+            )}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+  return (
+    <Panel title={`PLANNED TRADES · ${data?.count ?? 0}`} icon={GitBranch} accent={N.WARN}>
+      <div className="text-[7.5px] font-bold tracking-[0.18em] mb-1" style={{ color: N.TEXT_3, fontFamily: N.FONT_MONO }}>
+        PLANNED BUYS
+      </div>
+      <div className="grid gap-1 mb-2" style={{ gridTemplateColumns: "1.2fr 82px 82px 82px 74px 64px 70px" }}>
+        {[
+          ["User ID", userId, setUserId],
+          ["Symbol", symbol, setSymbol],
+          ["Buy", buy, setBuy],
+          ["Sell opt", sell, setSell],
+          ["Size", size, setSize],
+          ["Hours", hours, setHours],
+        ].map(([placeholder, value, setter]) => (
+          <input
+            key={String(placeholder)}
+            value={String(value)}
+            placeholder={String(placeholder)}
+            onChange={(e) => (setter as (v: string) => void)(e.target.value)}
+            className="h-7 px-2 text-[9px] outline-none"
+            style={{ background: "#000", border: `1px solid ${N.BORDER}`, color: N.TEXT_1, fontFamily: N.FONT_MONO, borderRadius: 3 }}
+          />
+        ))}
+        <button
+          type="button"
+          onClick={() => { void createPlan(); }}
+          disabled={busy}
+          className="h-7 text-[8px] font-bold tracking-[0.12em]"
+          style={{ background: busy ? N.BORDER : N.WARN, color: "#000", borderRadius: 3, fontFamily: N.FONT_MONO }}
+        >
+          {busy ? "..." : "ARM"}
+        </button>
+      </div>
+      <div className="text-[7.5px] font-bold tracking-[0.18em] mb-1" style={{ color: N.TEXT_3, fontFamily: N.FONT_MONO }}>
+        ACTIVE SELL TARGETS
+      </div>
+      <div className="grid gap-1 mb-2" style={{ gridTemplateColumns: "1.2fr 1.2fr 82px 82px 70px" }}>
+        {[
+          ["User ID", sellUserId, setSellUserId],
+          ["Position ID", positionId, setPositionId],
+          ["Price", targetPrice, setTargetPrice],
+          ["Profit $", targetProfit, setTargetProfit],
+        ].map(([placeholder, value, setter]) => (
+          <input
+            key={String(placeholder)}
+            value={String(value)}
+            placeholder={String(placeholder)}
+            onChange={(e) => (setter as (v: string) => void)(e.target.value)}
+            className="h-7 px-2 text-[9px] outline-none"
+            style={{ background: "#000", border: `1px solid ${N.BORDER}`, color: N.TEXT_1, fontFamily: N.FONT_MONO, borderRadius: 3 }}
+          />
+        ))}
+        <button
+          type="button"
+          onClick={() => { void createSellTarget(); }}
+          disabled={busy}
+          className="h-7 text-[8px] font-bold tracking-[0.12em]"
+          style={{ background: busy ? N.BORDER : N.WARN, color: "#000", borderRadius: 3, fontFamily: N.FONT_MONO }}
+        >
+          {busy ? "..." : "ARM"}
+        </button>
+      </div>
+      {rows.length === 0 ? <Empty label="NO PLANNED TRADES" /> : (
+        <div className="flex flex-col gap-2">
+          {plannedBuys.length > 0 && renderRows(plannedBuys)}
+          {activeTargets.length > 0 && renderRows(activeTargets)}
+          {terminal.length > 0 && (
+            <div>
+              <div className="text-[7.5px] font-bold tracking-[0.18em] mb-1" style={{ color: N.TEXT_3, fontFamily: N.FONT_MONO }}>
+                FILLED / CANCELLED / FAILED
+              </div>
+              {renderRows(terminal)}
             </div>
-          ))}
+          )}
         </div>
       )}
     </Panel>

@@ -34,10 +34,23 @@ const dbMock = {
 vi.mock("@workspace/db", () => ({
   db: dbMock,
   userExchangeConnectionsTable: { userId: "userId", isDefault: "isDefault", status: "status", tradingMode: "tradingMode" },
+  userExchangeSettingsTable:    {
+    userId: "userId", exchange: "exchange",
+    takeProfitPercent: "takeProfitPercent",
+    stopLossPercent: "stopLossPercent",
+    trailingStopPercent: "trailingStopPercent",
+    maxHoldHours: "maxHoldHours",
+    tradeSizeUsd: "tradeSizeUsd",
+    maxPositions: "maxPositions",
+  },
   userNotificationsTable:       {},
   userSettingsTable:            {},
   usersTable:                   usersTableRef,
   logsTable:                    {},
+  simPositionsTable:            {},
+  simTradesTable:                {},
+  simAccountsTable:              {},
+  riskThrottleEventsTable:       {},
 }));
 
 vi.mock("../executionStreamBus.js",     () => ({ executionStreamBus: execStreamMock }));
@@ -61,6 +74,26 @@ vi.mock("../marketData.js",        () => ({
 vi.mock("../tradeLimitEngine.js",  () => ({
   getTradeLimitVerdict:        vi.fn(async () => ({ blocked: false })),
   invalidateTradeLimitCache:   vi.fn(),
+}));
+const riskGovernorMock = {
+  enabled: false,
+  decision: {
+    blockNewEntries: false,
+    status: "OK",
+    pauseReason: null,
+    message: "ok",
+    metrics: {},
+  } as {
+    blockNewEntries: boolean;
+    status: string;
+    pauseReason: string | null;
+    message: string;
+    metrics: Record<string, unknown>;
+  },
+};
+vi.mock("../riskGovernor.js", () => ({
+  isRiskGovernorEnabled:       vi.fn(() => riskGovernorMock.enabled),
+  evaluateRiskGovernorForUser: vi.fn(async () => riskGovernorMock.decision),
 }));
 vi.mock("../userStatusGuard.js",   () => ({
   getUserStatusVerdict: vi.fn(async () => ({ allowLive: true, status: "active" })),
@@ -98,6 +131,14 @@ describe("isCustomerLiveExecutionEnabled", () => {
 describe("placeLiveAutoOrderForUser — customer kill switch", () => {
   beforeEach(() => {
     delete process.env["CUSTOMER_LIVE_EXECUTION_ENABLED"];
+    riskGovernorMock.enabled = false;
+    riskGovernorMock.decision = {
+      blockNewEntries: false,
+      status: "OK",
+      pauseReason: null,
+      message: "ok",
+      metrics: {},
+    };
     execStreamMock.emitEvent.mockClear();
     dbMock.insert.mockClear();
     nextRoleRow = { role: "user" };
@@ -166,12 +207,56 @@ describe("placeLiveAutoOrderForUser — customer kill switch", () => {
   });
 });
 
+describe("placeLiveAutoOrderForUser — Risk Governor gate (0GOV)", () => {
+  beforeEach(() => {
+    process.env["CUSTOMER_LIVE_EXECUTION_ENABLED"] = "true";
+    execStreamMock.emitEvent.mockClear();
+    dbMock.insert.mockClear();
+    nextRoleRow = { role: "user" };
+    riskGovernorMock.enabled = true;
+  });
+  afterEach(() => {
+    delete process.env["CUSTOMER_LIVE_EXECUTION_ENABLED"];
+    riskGovernorMock.enabled = false;
+    riskGovernorMock.decision = {
+      blockNewEntries: false,
+      status: "OK",
+      pauseReason: null,
+      message: "ok",
+      metrics: {},
+    };
+  });
+
+  it("blocks new live entries with risk_governor_paused when governor is paused", async () => {
+    riskGovernorMock.decision = {
+      blockNewEntries: true,
+      status: "PAUSED_CONSECUTIVE_LOSSES",
+      pauseReason: "consecutive_losses_8",
+      message: "Risk Governor paused new entries.",
+      metrics: { consecutiveLosses: 8 },
+    };
+    const result = await placeLiveAutoOrderForUser({
+      userId: "user_abc", symbol: "BTCUSD", side: "BUY", sizeUSD: 100,
+    });
+    expect(result.success).toBe(false);
+    expect(result.errorCode).toBe("risk_governor_paused");
+    expect(execStreamMock.emitEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "order_rejected",
+        gate: "risk_governor_paused",
+        reason: "risk_governor_paused",
+      }),
+    );
+  });
+});
+
 describe("placeLiveAutoOrderForUser — symbol-universe gate (0UNI)", () => {
   // Kill switch must be ON so we reach 0UNI (it sits after the 0PRE kill
   // switch). Mock SUPPORTED_SYMBOLS = [BTCUSD, ETHUSD, SOLUSD]; anything else
   // is "not in universe" for a non-operator.
   beforeEach(() => {
     process.env["CUSTOMER_LIVE_EXECUTION_ENABLED"] = "true";
+    riskGovernorMock.enabled = false;
     execStreamMock.emitEvent.mockClear();
     dbMock.insert.mockClear();
     nextRoleRow = { role: "user" };
@@ -252,5 +337,22 @@ describe("placeLiveCloseOrderForUser — customer kill switch (symmetric)", () =
       openSide: "BUY", quantity: 0.01, exchange: "Binance", useSandbox: true,
     });
     expect(result.errorCode).toBe("customer_live_execution_disabled");
+  });
+
+  it("does not apply Risk Governor to close orders", async () => {
+    process.env["CUSTOMER_LIVE_EXECUTION_ENABLED"] = "true";
+    riskGovernorMock.enabled = true;
+    riskGovernorMock.decision = {
+      blockNewEntries: true,
+      status: "PAUSED_CONSECUTIVE_LOSSES",
+      pauseReason: "consecutive_losses_8",
+      message: "Risk Governor paused new entries.",
+      metrics: { consecutiveLosses: 8 },
+    };
+    const result = await placeLiveCloseOrderForUser({
+      userId: "user_abc", symbol: "BTCUSD",
+      openSide: "BUY", quantity: 0.01, exchange: "Kraken",
+    });
+    expect(result.errorCode).not.toBe("risk_governor_paused");
   });
 });

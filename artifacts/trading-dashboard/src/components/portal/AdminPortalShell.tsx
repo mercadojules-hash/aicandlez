@@ -348,8 +348,17 @@ interface AdminPosition {
   user_email:   string | null;
   symbol:       string;
   side:         string;
+  quantity:     number | null;
+  quantity_purchased: number | null;
   size_usd:     number;
+  capital_invested?: number;
   entry_price:  number;
+  current_price?: number | null;
+  current_market_value?: number | null;
+  unrealized_pnl?: number | null;
+  unrealized_pnl_pct?: number | null;
+  manual_exit_target_price?: number | null;
+  distance_to_target?: number | null;
   stop_loss:    number | null;
   take_profit:  number | null;
   mode:         string;
@@ -472,6 +481,8 @@ function AdminTelemetryProvider({ children }: { children: ReactNode }) {
     const open: PaperTrade[] = t.positions.map((p, i) => {
       const entry = Number(p.entry_price) || 0;
       const size  = Number(p.size_usd) || 0;
+      const mark  = Number(p.current_price ?? entry) || entry;
+      const pnl   = Number(p.unrealized_pnl ?? 0) || 0;
       return {
         id:       String(p.id ?? `pos-${i}`),
         symbol:   p.symbol,
@@ -479,13 +490,13 @@ function AdminTelemetryProvider({ children }: { children: ReactNode }) {
         side:     (String(p.side).toUpperCase() === "SELL" || String(p.side).toUpperCase() === "SHORT") ? "SHORT" : "LONG",
         entry,
         stop:     Number(p.stop_loss   ?? 0),
-        target:   Number(p.take_profit ?? 0),
+        target:   Number(p.manual_exit_target_price ?? p.take_profit ?? 0),
         size,
-        qty:      size / Math.max(entry, 1),
+        qty:      Number(p.quantity_purchased ?? p.quantity ?? (size / Math.max(entry, 1))),
         openedAt: Number(p.entry_time) || Date.now(),
-        last:     entry,
-        pnl:      0,
-        pnlPct:   0,
+        last:     mark,
+        pnl,
+        pnlPct:   Number(p.unrealized_pnl_pct ?? 0) || 0,
       };
     });
     const mapReason = (r: string | null): "TP" | "SL" | "MANUAL" => {
@@ -520,7 +531,7 @@ function AdminTelemetryProvider({ children }: { children: ReactNode }) {
     const losses = t.summary.losses;
     const closedCount = wins + losses;
     const realizedPnl = t.summary.total_pnl;
-    const unrealizedPnl = 0;
+    const unrealizedPnl = open.reduce((sum, p) => sum + (Number(p.pnl) || 0), 0);
     const startOfDay = new Date(); startOfDay.setHours(0,0,0,0);
     let todayPnl = 0;
     for (const h of history) {

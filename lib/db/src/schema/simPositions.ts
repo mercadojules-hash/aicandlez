@@ -15,6 +15,9 @@ export const simPositionsTable = pgTable("sim_positions", {
   signalId:   text("signal_id"),
   stopLoss:   real("stop_loss"),
   takeProfit: real("take_profit"),
+  // Optional operator-controlled absolute exit price. When populated, the
+  // operator controls monitor closes this position with MANUAL_TARGET_EXIT
+  // once the market reaches the target. NULL means normal engine behavior.
   manualExitTargetPrice: real("manual_exit_target_price"),
   // Engine avgConfidence (%) at the moment this position was opened. Carried so
   // closed trades can be bucketed by confidence band for performance analysis

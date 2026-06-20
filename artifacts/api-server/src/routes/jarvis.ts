@@ -92,6 +92,7 @@ import {
   deleteReport,
   generateReport,
 } from "../lib/jarvis/historicalIntelligence.js";
+import { buildRiskGovernorReport24h, isRiskGovernorEnabled } from "../lib/riskGovernor.js";
 import {
   fetchRepoAwareness,
   parseRepoFullName,
@@ -339,6 +340,7 @@ interface AicandlezLiveFeed {
   scope: "platform";
   degraded: boolean;
   metrics: AicandlezLiveMetrics;
+  riskGovernor: Record<string, unknown>;
   recentCloses: AicandlezRecentClose[];
   generatedAt: number;
 }
@@ -367,7 +369,7 @@ async function computeAicandlezLive(req: Request): Promise<AicandlezLiveFeed> {
       isNull(simTradesTable.reconciliationTag),
     );
 
-    const [closedAgg, openAgg, recentRows] = await Promise.all([
+    const [closedAgg, openAgg, recentRows, riskGovernor] = await Promise.all([
       db
         .select({
           closed: sql<number>`(count(*))::int`,
@@ -402,6 +404,14 @@ async function computeAicandlezLive(req: Request): Promise<AicandlezLiveFeed> {
         .where(liveClosedWhere)
         .orderBy(desc(simTradesTable.exitTime))
         .limit(10),
+      buildRiskGovernorReport24h().catch((err) => {
+        req.log.warn({ err }, "computeAicandlezLive risk governor report failed");
+        return {
+          enabled: isRiskGovernorEnabled(),
+          degraded: true,
+          error: "risk_governor_report_failed",
+        };
+      }),
     ]);
 
     const c = closedAgg[0];
@@ -433,6 +443,7 @@ async function computeAicandlezLive(req: Request): Promise<AicandlezLiveFeed> {
         grossProfitUSD: grossProfit,
         grossLossUSD: grossLoss,
       },
+      riskGovernor,
       recentCloses: recentRows.map((r) => ({
         id: r.id,
         symbol: r.symbol,
@@ -453,6 +464,11 @@ async function computeAicandlezLive(req: Request): Promise<AicandlezLiveFeed> {
       scope: "platform",
       degraded: true,
       metrics: { ...EMPTY_AICANDLEZ_METRICS },
+      riskGovernor: {
+        enabled: isRiskGovernorEnabled(),
+        degraded: true,
+        error: "aicandlez_live_feed_degraded",
+      },
       recentCloses: [],
       generatedAt: Date.now(),
     };

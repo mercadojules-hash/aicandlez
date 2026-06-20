@@ -45,6 +45,7 @@ import { updateExcursion, pruneExcursions } from "./excursionTracker.js";
 import { logger } from "./logger.js";
 import { roundOptionalPrice, roundPrice } from "./pricePrecision.js";
 import { runManualTargetExitMonitor } from "./manualTargetExit.js";
+import { runOperatorTradeControlsMonitor } from "./operatorTradeControls.js";
 
 function genId() { return crypto.randomUUID(); }
 
@@ -4272,6 +4273,7 @@ async function runHardStopMonitorGuarded() {
     await Promise.all([
       runHardStopMonitor(),
       runManualTargetExitMonitor(),
+      runOperatorTradeControlsMonitor(),
     ]);
   } finally {
     stopMonitorRunning = false;

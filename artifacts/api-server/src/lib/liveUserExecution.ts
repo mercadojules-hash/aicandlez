@@ -26,6 +26,8 @@ import { isAiDisclaimerAccepted } from "./aiDisclaimer.js";
 import { engineStats, VOLUME_GATE_FRACTION } from "./tradingLoop.js";
 import { recordCustomerBrokerSubmitted, recordBrokerReject } from "./customerExecMetrics.js";
 import { resolveAiTradingGate } from "./aiTradingGate.js";
+import { evaluateRiskGovernorForUser, isRiskGovernorEnabled } from "./riskGovernor.js";
+import { settingsStore } from "./settingsStore.js";
 import { getTradeSizeOverrideUsd } from "./tradeSizeOverride.js";
 import {
   ALLOWED_TRADE_SIZES,
@@ -116,7 +118,7 @@ export interface LiveUserOrderResult {
   dryRun?:         boolean;
   /** True when the order was routed through the exchange's public sandbox. */
   sandbox?:        boolean;
-  errorCode?:      "no_connection" | "not_trade_authorized" | "decrypt_failed" | "unsupported" | "unsupported_symbol" | "symbol_not_in_universe" | "symbol_disabled" | "sell_blocked_bullish_1h" | "no_sandbox" | "price_unavailable" | "exchange_reject" | "trade_limit_exhausted" | "user_status_blocked" | "customer_live_execution_disabled" | "user_ai_disabled" | "concurrent_live_cap_reached" | "risk_max_per_trade" | "risk_max_simultaneous" | "risk_max_allocation" | "risk_reserve_cash_breach" | "risk_no_equity" | "ai_disclaimer_not_accepted" | "low_confidence_signal" | "volume_safety_gate" | "liquidity_protected" | "plan_max_positions_reached" | "allocation_limit" | "spot_short_blocked" | "cash_unavailable";
+  errorCode?:      "no_connection" | "not_trade_authorized" | "decrypt_failed" | "unsupported" | "unsupported_symbol" | "symbol_not_in_universe" | "symbol_disabled" | "sell_blocked_bullish_1h" | "no_sandbox" | "price_unavailable" | "exchange_reject" | "trade_limit_exhausted" | "user_status_blocked" | "customer_live_execution_disabled" | "risk_governor_paused" | "user_ai_disabled" | "concurrent_live_cap_reached" | "risk_max_per_trade" | "risk_max_simultaneous" | "risk_max_allocation" | "risk_reserve_cash_breach" | "risk_no_equity" | "ai_disclaimer_not_accepted" | "low_confidence_signal" | "volume_safety_gate" | "liquidity_protected" | "plan_max_positions_reached" | "allocation_limit" | "spot_short_blocked" | "cash_unavailable";
   error?:          string;
 }
 
@@ -690,6 +692,56 @@ export async function placeLiveAutoOrderForUser(
         logger.warn({ err, userId }, "liveUserExecution: customer-disabled log insert failed");
       }
       return { success: false, userId, errorCode: "customer_live_execution_disabled", error: msg };
+    }
+  }
+
+  // 0GOV. Risk Governor — NEW live entries only.
+  //
+  // This gate deliberately sits after customer live enablement and before the
+  // expensive broker/risk/equity checks below. It never runs on
+  // `placeLiveCloseOrderForUser`, so exits, SL/TP/trailing/max-hold/manual
+  // closes and reconciliation are untouched.
+  if (isRiskGovernorEnabled()) {
+    const governor = await evaluateRiskGovernorForUser({
+      userId,
+      exchangeHealthOk: null,
+      globalKillSwitchActive: settingsStore.get().killSwitch === true,
+    });
+    if (governor.blockNewEntries) {
+      const msg = governor.message || "Risk Governor paused new live entries for this account.";
+      await emitFailureNotification(userId, symbol, side, msg);
+      executionStreamBus.emitEvent({
+        type:     "order_rejected",
+        severity: "warn",
+        symbol, side, mode: "live",
+        gate:     "risk_governor_paused",
+        reason:   "risk_governor_paused",
+        message:  msg,
+        details:  {
+          userId,
+          status:      governor.status,
+          pauseReason: governor.pauseReason,
+          metrics:     governor.metrics,
+        },
+      });
+      try {
+        await db.insert(logsTable).values({
+          id:      crypto.randomUUID(),
+          type:    "trade",
+          level:   "warn",
+          message: `[risk_governor_paused] ${msg}`,
+          details: {
+            userId, symbol, side,
+            errorCode:   "risk_governor_paused",
+            status:      governor.status,
+            pauseReason: governor.pauseReason,
+            metrics:     governor.metrics,
+          },
+        });
+      } catch (err) {
+        logger.warn({ err, userId }, "liveUserExecution: risk-governor log insert failed");
+      }
+      return { success: false, userId, errorCode: "risk_governor_paused", error: msg };
     }
   }
 

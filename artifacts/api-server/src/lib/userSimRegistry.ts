@@ -58,6 +58,7 @@ export interface UserSimPosition {
   signalId?: string;
   stopLoss?: number;
   takeProfit?: number;
+  manualExitTargetPrice?: number;
   /** Engine avgConfidence (%) at open — carried for confidence-band analysis. */
   confidence?: number;
   currentPrice?: number;
@@ -269,6 +270,7 @@ async function loadFromDB(userId: string): Promise<UserSimState> {
       signalId:        p.signalId ?? undefined,
       stopLoss:        p.stopLoss ?? undefined,
       takeProfit:      p.takeProfit ?? undefined,
+      manualExitTargetPrice: p.manualExitTargetPrice ?? undefined,
       exchange:        p.exchange ?? undefined,
       exchangeOrderId: p.exchangeOrderId ?? undefined,
       entryFeeBroker:         p.entryFeeBroker ?? undefined,
@@ -1010,6 +1012,7 @@ export async function placeUserOrder(userId: string, req: UserOrderRequest): Pro
     confidence: req.confidence,
     stopLoss:   req.stopLoss,
     takeProfit: req.takeProfit,
+    manualExitTargetPrice: undefined,
   };
 
   state.account.cashBalance -= sizeUSD;
@@ -1029,6 +1032,7 @@ export async function placeUserOrder(userId: string, req: UserOrderRequest): Pro
       confidence: position.confidence ?? null,
       stopLoss:   position.stopLoss ?? null,
       takeProfit: position.takeProfit ?? null,
+      manualExitTargetPrice: position.manualExitTargetPrice ?? null,
     }),
     persistAccount(state),
   ]);
@@ -1056,6 +1060,7 @@ export async function registerLiveUserFill(params: {
   confidence?:     number;
   stopLoss?:       number;
   takeProfit?:     number;
+  manualExitTargetPrice?: number;
   exchange:        string;
   exchangeOrderId: string;
   // Broker-reported entry-leg commission (when the adapter parsed it from
@@ -1080,6 +1085,7 @@ export async function registerLiveUserFill(params: {
     confidence:      params.confidence,
     stopLoss:        params.stopLoss,
     takeProfit:      params.takeProfit,
+    manualExitTargetPrice: params.manualExitTargetPrice,
     exchange:        params.exchange,
     exchangeOrderId: params.exchangeOrderId,
     entryFeeBroker:         params.entryFeeBroker,
@@ -1102,6 +1108,7 @@ export async function registerLiveUserFill(params: {
     confidence:      position.confidence ?? null,
     stopLoss:        position.stopLoss ?? null,
     takeProfit:      position.takeProfit ?? null,
+    manualExitTargetPrice: position.manualExitTargetPrice ?? null,
     exchange:        position.exchange ?? null,
     exchangeOrderId: position.exchangeOrderId ?? null,
     entryFeeBroker:         position.entryFeeBroker ?? null,
