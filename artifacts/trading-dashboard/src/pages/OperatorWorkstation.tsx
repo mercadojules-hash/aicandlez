@@ -476,18 +476,18 @@ function RadarTile({ asset, breakdown }: { asset: AssetSpec; breakdown?: EngineS
   const trend = trendOf(breakdown, summary.pct);
   return (
     <div style={{
-      minWidth: 138,
+      minWidth: 106,
       border: `1px solid ${T.border}`,
       background: `${asset.accent}0e`,
-      padding: "8px 10px",
+      padding: "8px 8px",
       display: "grid",
       gap: 5,
     }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
-        <span style={{ color: asset.accent, fontSize: 13, fontWeight: 950, letterSpacing: "0.08em" }}>{asset.label}</span>
+        <span style={{ color: asset.accent, fontSize: 12, fontWeight: 950, letterSpacing: "0.06em" }}>{asset.label}</span>
         <span style={{ color: T.faint, fontSize: 8, fontWeight: 900, letterSpacing: "0.10em" }}>{state.toUpperCase()}</span>
       </div>
-      <div style={{ color: T.text, fontSize: 14, fontWeight: 950, fontVariantNumeric: "tabular-nums" }}>{price(livePrice)}</div>
+      <div style={{ color: T.text, fontSize: 13, fontWeight: 950, fontVariantNumeric: "tabular-nums" }}>{price(livePrice)}</div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, fontSize: 9, fontWeight: 900 }}>
         <span style={{ color: summary.up ? T.green : T.red }}>{pct(summary.pct)}</span>
         <span style={{ color: confidence == null ? T.faint : asset.accent }}>{confidence == null ? "AI —" : `${confidence.toFixed(0)}%`}</span>
@@ -504,15 +504,15 @@ function MarketRadar({ engine }: { engine: EngineStatusResponse | undefined }) {
       background: "#00070d",
       padding: "10px 14px",
       display: "grid",
-      gridTemplateColumns: "112px minmax(0, 1fr)",
-      gap: 10,
+      gridTemplateColumns: "104px minmax(0, 1fr)",
+      gap: 8,
       alignItems: "stretch",
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, color: T.text, fontSize: 11, fontWeight: 950, letterSpacing: "0.12em" }}>
         <LineChart size={14} color={T.cyan} />
         MARKET RADAR
       </div>
-      <div style={{ display: "flex", gap: 8, overflowX: "auto", minWidth: 0 }}>
+      <div style={{ display: "flex", gap: 6, overflowX: "auto", minWidth: 0 }}>
         {OPERATOR_ASSETS.map((asset) => (
           <RadarTile key={asset.symbol} asset={asset} breakdown={engine?.symbolBreakdowns?.[asset.symbol]} />
         ))}
