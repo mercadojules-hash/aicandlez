@@ -37,6 +37,7 @@ import { notifyFillHydrated } from "../lib/positionStore.js";
 import { getTradeSizeOverrideUsd } from "../lib/tradeSizeOverride.js";
 import { roundOptionalPrice } from "../lib/pricePrecision.js";
 import { setManualExitTarget } from "../lib/manualTargetExit.js";
+import { createMarketQuote, getLockedQuote, QuoteValidationError } from "../lib/marketData.js";
 import type Stripe from "stripe";
 
 const router = Router();
@@ -519,10 +520,52 @@ const OperatorBuyBody = z.object({
   symbol:     z.string().trim().min(2, "symbol is required").max(30),
   sizeUSD:    z.number().min(1).max(100_000).optional(),
   confidence: z.number().min(0).max(100).optional(),
+  quoteId:    z.string().trim().min(1).optional(),
   note:       z.string().trim().max(2_000).optional(),
 });
 
 const OPERATOR_BUY_LABEL = "OPERATOR_ENTERED";
+
+router.post("/admin/users/:id/operator-buy/preview", ...requireOperator, async (req, res): Promise<void> => {
+  const ctx = resolveActor(req, res, { allowSelf: true });
+  if (!ctx) return;
+  const parsed = OperatorBuyBody.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json(serialize4xx(req, parsed.error, "operator-buy-preview"));
+    return;
+  }
+
+  const symbol = parsed.data.symbol.trim().toUpperCase();
+  const requestedSizeUSD = parsed.data.sizeUSD ?? null;
+  const runtimeTradeSizeOverrideUsd = getTradeSizeOverrideUsd();
+  const sizeUSD = requestedSizeUSD ?? runtimeTradeSizeOverrideUsd;
+
+  try {
+    const quote = await createMarketQuote(symbol);
+    const estimatedQuantity = quote.price > 0 ? sizeUSD / quote.price : null;
+    res.json({
+      ok: true,
+      symbol,
+      quoteId: quote.quoteId,
+      price: quote.price,
+      bid: quote.bid,
+      ask: quote.ask,
+      createdAt: quote.createdAt,
+      expiresAt: quote.expiresAt,
+      requestedSizeUSD,
+      runtimeTradeSizeOverrideUsd,
+      effectiveSizeUSD: sizeUSD,
+      sizeUSD,
+      estimatedQuantity,
+    });
+  } catch (err) {
+    res.status(503).json(serialize5xx(req, err, "operator-buy-preview", {
+      targetId: ctx.targetId,
+      symbol,
+      sizeUSD,
+    }));
+  }
+});
 
 router.put("/admin/users/:id/positions/:positionId/manual-target", ...requireOperator, async (req, res): Promise<void> => {
   const ctx = resolveActor(req, res, { allowSelf: true });
@@ -618,11 +661,31 @@ router.post("/admin/users/:id/operator-buy", ...requireOperator, async (req, res
   const acceptedAt = Date.now();
 
   try {
+    let lockedQuote;
+    try {
+      lockedQuote = getLockedQuote(parsed.data.quoteId, symbol);
+    } catch (quoteErr) {
+      if (quoteErr instanceof QuoteValidationError) {
+        res.status(409).json({
+          ok: false,
+          errorCode: quoteErr.code,
+          error: quoteErr.message,
+          symbol,
+          quoteId: parsed.data.quoteId ?? null,
+        });
+        return;
+      }
+      throw quoteErr;
+    }
+
     req.log.warn({
       tag:          "OPERATOR_BUY_REQUESTED",
       operatorId:   ctx.actorId,
       targetUserId: ctx.targetId,
       symbol,
+      quoteId:      lockedQuote.quoteId,
+      quotePrice:   lockedQuote.price,
+      quoteExpiresAt: lockedQuote.expiresAt,
       requestedSizeUSD,
       runtimeTradeSizeOverrideUsd,
       effectiveSizeUSD: sizeUSD,
@@ -638,6 +701,8 @@ router.post("/admin/users/:id/operator-buy", ...requireOperator, async (req, res
       sizeUSD,
       useSandbox:    false,
       correlationId,
+      lockedReferencePrice: lockedQuote.price,
+      lockedQuoteId:        lockedQuote.quoteId,
     });
 
     if (!result.success) {
@@ -787,6 +852,9 @@ router.post("/admin/users/:id/operator-buy", ...requireOperator, async (req, res
         exchangeOrderId: result.exchangeOrderId ?? null,
         positionId,
         fillPrice:    result.fillPrice ?? null,
+        quoteId:      lockedQuote.quoteId,
+        quotePrice:   lockedQuote.price,
+        quoteExpiresAt: lockedQuote.expiresAt,
         quantity:     result.quantity ?? null,
         stopLoss,
         takeProfit,
@@ -805,6 +873,9 @@ router.post("/admin/users/:id/operator-buy", ...requireOperator, async (req, res
       exchange:        result.exchange,
       exchangeOrderId: result.exchangeOrderId,
       fillPrice:       result.fillPrice,
+      quoteId:         lockedQuote.quoteId,
+      quotePrice:      lockedQuote.price,
+      quoteExpiresAt:  lockedQuote.expiresAt,
       quantity:        result.quantity,
       requestedSizeUSD,
       runtimeTradeSizeOverrideUsd,

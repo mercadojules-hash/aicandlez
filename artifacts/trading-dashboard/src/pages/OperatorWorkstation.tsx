@@ -80,6 +80,44 @@ interface EngineStatusResponse {
   symbolBreakdowns?: Record<string, EngineSymbolBreakdown>;
 }
 
+interface MarketTicker {
+  symbol: string;
+  price: number;
+  bid: number;
+  ask: number;
+  lastUpdated: number;
+}
+
+interface MarketTickerResponse {
+  symbol: string;
+  ticker: MarketTicker;
+  source: string;
+  timestamp?: number;
+}
+
+interface MarketFeedHealthResponse {
+  symbol: string;
+  source: string;
+  tickerLastUpdated: number | null;
+  tickerAgeSeconds: number | null;
+  timestamp: number;
+  error?: string;
+}
+
+interface OperatorBuyPreview {
+  ok: boolean;
+  symbol: string;
+  quoteId: string;
+  price: number;
+  bid: number;
+  ask: number;
+  createdAt: number;
+  expiresAt: number;
+  effectiveSizeUSD: number;
+  sizeUSD: number;
+  estimatedQuantity: number | null;
+}
+
 interface AssetSpec {
   symbol: string;
   label: string;
@@ -92,6 +130,12 @@ interface BuyNowConfirmInput {
   sellTargetPrice: number | null;
   positionSizeUSD: number;
   confidence: number | null;
+}
+
+interface BuyNowSubmitInput extends BuyNowConfirmInput {
+  quoteId: string;
+  previewPrice: number;
+  quoteExpiresAt: number;
 }
 
 const AVAILABLE_OPERATOR_ASSETS: AssetSpec[] = [
@@ -160,6 +204,26 @@ function useOperatorApi() {
     const url = API_BASE_URL ? `${API_BASE_URL}${path}` : path;
     return fetch(url, { ...init, credentials: "include", headers });
   }, [getToken]);
+}
+
+function apiUrl(path: string): string {
+  return API_BASE_URL ? `${API_BASE_URL}${path}` : path;
+}
+
+function useMarketTicker(symbol: string, pollMs = 5_000) {
+  return useQuery<MarketTickerResponse>({
+    queryKey: ["operator-market-ticker", symbol],
+    enabled: !!symbol,
+    queryFn: async () => {
+      const res = await fetch(apiUrl(`/api/market-data/${encodeURIComponent(symbol)}?timeframe=5m&limit=2`), {
+        cache: "no-store",
+        credentials: "include",
+        headers: { Accept: "application/json" },
+      });
+      return readJson<MarketTickerResponse>(res);
+    },
+    refetchInterval: pollMs,
+  });
 }
 
 async function readJson<TBody>(res: Response): Promise<TBody> {
@@ -657,6 +721,10 @@ function RadarTile({ asset, breakdown }: { asset: AssetSpec; breakdown?: EngineS
     timeframe: "5m",
     pollMs: 20_000,
   });
+  const marketQuery = useMarketTicker(asset.symbol);
+  const marketPrice = maybeNum(marketQuery.data?.ticker?.price);
+  const current = marketPrice ?? livePrice;
+  const priceState = marketPrice != null ? "live" : state;
   const confidence = confidenceOf(breakdown);
   const trend = trendOf(breakdown, summary.pct);
   return (
@@ -670,9 +738,9 @@ function RadarTile({ asset, breakdown }: { asset: AssetSpec; breakdown?: EngineS
     }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
         <span style={{ color: asset.accent, fontSize: 12, fontWeight: 950, letterSpacing: "0.06em" }}>{asset.label}</span>
-        <span style={{ color: T.faint, fontSize: 8, fontWeight: 900, letterSpacing: "0.10em" }}>{state.toUpperCase()}</span>
+        <span style={{ color: T.faint, fontSize: 8, fontWeight: 900, letterSpacing: "0.10em" }}>{priceState.toUpperCase()}</span>
       </div>
-      <div style={{ color: T.text, fontSize: 13, fontWeight: 950, fontVariantNumeric: "tabular-nums" }}>{price(livePrice)}</div>
+      <div style={{ color: T.text, fontSize: 13, fontWeight: 950, fontVariantNumeric: "tabular-nums" }}>{price(current)}</div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, fontSize: 9, fontWeight: 900 }}>
         <span style={{ color: summary.up ? T.green : T.red }}>{pct(summary.pct)}</span>
         <span style={{ color: confidence == null ? T.faint : asset.accent }}>{confidence == null ? "AI —" : `${confidence.toFixed(0)}%`}</span>
@@ -869,7 +937,9 @@ function OperatorWorkstationCard({
     timeframe: "5m",
     pollMs: 15_000,
   });
-  const current = livePrice ?? maybeNum(field(position ?? {}, "current_price", "currentPrice"));
+  const marketQuery = useMarketTicker(asset.symbol);
+  const marketPrice = maybeNum(marketQuery.data?.ticker?.price);
+  const current = marketPrice ?? livePrice ?? maybeNum(field(position ?? {}, "current_price", "currentPrice"));
   const entry = maybeNum(field(position ?? {}, "entry_price", "entryPrice"));
   const side = String(field(position ?? {}, "side") ?? "BUY");
   const liveQuantity = maybeNum(field(position ?? {}, "quantity")) ?? (entry && positionSize(position ?? {}) > 0 ? positionSize(position ?? {}) / entry : null);
@@ -925,7 +995,7 @@ function OperatorWorkstationCard({
             </button>
             <div style={{ color: asset.accent, fontSize: 24, fontWeight: 950, letterSpacing: "0.08em" }}>{asset.label}</div>
           </div>
-          <div style={{ color: liveMode ? T.green : T.faint, fontSize: 10, fontWeight: 800, letterSpacing: "0.14em" }}>{asset.symbol} · {liveMode ? "LIVE POSITION" : state.toUpperCase()}</div>
+          <div style={{ color: liveMode ? T.green : T.faint, fontSize: 10, fontWeight: 800, letterSpacing: "0.14em" }}>{asset.symbol} · {liveMode ? "LIVE POSITION" : marketPrice != null ? "LIVE" : state.toUpperCase()}</div>
         </div>
         <div style={{ display: "grid", justifyItems: "end", gap: 6 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end" }}>
@@ -1090,24 +1160,46 @@ function buttonStyle(color: string, disabled = false): React.CSSProperties {
 
 function BuyNowConfirmModal({
   input,
+  userId,
+  api,
   pending,
   onCancel,
   onConfirm,
 }: {
   input: BuyNowConfirmInput;
+  userId: string;
+  api: ReturnType<typeof useOperatorApi>;
   pending: boolean;
   onCancel: () => void;
-  onConfirm: () => void;
+  onConfirm: (preview: OperatorBuyPreview) => void;
 }) {
   const asset = AVAILABLE_OPERATOR_ASSETS.find((a) => a.symbol === input.symbol);
-  const { livePrice, state, lastUpdated } = useLiveCandles({
-    symbol: input.symbol,
-    syntheticAnchor: asset?.anchor ?? 100,
-    limit: 48,
-    timeframe: "5m",
-    pollMs: 15_000,
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1_000);
+    return () => clearInterval(id);
+  }, []);
+  const previewQuery = useQuery<OperatorBuyPreview>({
+    queryKey: ["operator-buy-preview", userId, input.symbol, input.positionSizeUSD],
+    enabled: !!userId,
+    queryFn: async () => {
+      const res = await api(`/api/admin/users/${encodeURIComponent(userId)}/operator-buy/preview`, {
+        method: "POST",
+        body: JSON.stringify({
+          symbol: input.symbol,
+          sizeUSD: input.positionSizeUSD,
+          confidence: input.confidence ?? undefined,
+          note: "Operator workstation BUY NOW preview",
+        }),
+      });
+      return readJson<OperatorBuyPreview>(res);
+    },
+    refetchOnWindowFocus: false,
   });
-  const estimatedQuantity = projectedQuantity(livePrice, input.positionSizeUSD);
+  const preview = previewQuery.data;
+  const quoteAge = preview ? Math.max(0, Math.floor((now - preview.createdAt) / 1000)) : null;
+  const quoteExpired = preview ? preview.expiresAt <= now : false;
+  const estimatedQuantity = preview?.estimatedQuantity ?? projectedQuantity(preview?.price, input.positionSizeUSD);
   const estimatedFee = estimatedFeesUSD(input.positionSizeUSD);
   const estimatedTotalCost = estimatedFee == null ? input.positionSizeUSD : input.positionSizeUSD + estimatedFee;
 
@@ -1153,12 +1245,14 @@ function BuyNowConfirmModal({
           gap: 9,
         }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            <RailValue label="CURRENT PRICE" value={price(livePrice)} color={state === "live" ? T.green : T.amber} strong />
+            <RailValue label="MARKET PRICE" value={price(preview?.price)} color={quoteExpired ? T.red : T.green} strong />
             <RailValue label="INVESTMENT" value={moneyFull(input.positionSizeUSD, 2)} color={T.text} strong />
             <RailValue label="ESTIMATED QUANTITY" value={quantityText(estimatedQuantity, asset?.label ?? input.symbol.replace(/USD$/, ""))} color={T.cyan} />
             <RailValue label="ESTIMATED FEE" value={moneyFull(estimatedFee, 2)} color={T.faint} />
             <RailValue label="ESTIMATED TOTAL COST" value={moneyFull(estimatedTotalCost, 2)} color={T.green} />
-            <RailValue label="LIVE SOURCE" value={`${state.toUpperCase()} · ${clockTime(lastUpdated)}`} color={state === "live" ? T.green : T.amber} />
+            <RailValue label="QUOTE ID" value={preview?.quoteId ? preview.quoteId.slice(0, 8) : previewQuery.isError ? "ERROR" : "LOADING"} color={previewQuery.isError || quoteExpired ? T.red : T.green} />
+            <RailValue label="BID / ASK" value={`${price(preview?.bid)} / ${price(preview?.ask)}`} color={T.faint} />
+            <RailValue label="QUOTE AGE" value={quoteAge == null ? "—" : `${quoteAge}s`} color={quoteExpired ? T.red : T.green} />
           </div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -1168,16 +1262,21 @@ function BuyNowConfirmModal({
           <RailValue label="MODE" value="LIVE MARKET BUY" color={T.green} />
         </div>
         <div style={{ color: T.faint, fontSize: 10, lineHeight: 1.5 }}>
-          This uses the existing operator-buy path. Existing exit protections attach after fill; workstation sell target is armed when a position id is returned.
+          This BUY requires the displayed quoteId. If the quote expires, execution is rejected before broker submission and the quote must be refreshed.
         </div>
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
           <button type="button" disabled={pending} onClick={onCancel} style={buttonStyle(T.faint, pending)}>
             CANCEL
           </button>
-          <button type="button" disabled={pending} onClick={onConfirm} style={buttonStyle(T.green, pending)}>
-            {pending ? "BUYING..." : "BUY NOW"}
+          <button type="button" disabled={pending || !preview} onClick={() => preview && onConfirm(preview)} style={buttonStyle(quoteExpired ? T.red : T.green, pending || !preview)}>
+            {pending ? "BUYING..." : quoteExpired ? "SUBMIT EXPIRED QUOTE TEST" : "BUY NOW"}
           </button>
         </div>
+        {previewQuery.isError && (
+          <div style={{ color: T.red, fontSize: 10, fontWeight: 800 }}>
+            {(previewQuery.error as Error).message}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1209,8 +1308,10 @@ function LiveTradeRow({
     timeframe: "5m",
     pollMs: 15_000,
   });
+  const marketQuery = useMarketTicker(symbol);
+  const marketPrice = maybeNum(marketQuery.data?.ticker?.price);
   const entry = maybeNum(field(row, "entry_price", "entryPrice"));
-  const current = livePrice ?? maybeNum(field(row, "current_price", "currentPrice"));
+  const current = marketPrice ?? livePrice ?? maybeNum(field(row, "current_price", "currentPrice"));
   const side = String(field(row, "side") ?? "BUY");
   const sizeUsd = positionSize(row);
   const quantity = maybeNum(field(row, "quantity")) ?? (entry && sizeUsd > 0 ? sizeUsd / entry : null);
@@ -1229,7 +1330,7 @@ function LiveTradeRow({
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 7 }}>
         <RailValue label="SELL TARGET" value={price(resolvedTarget)} color={T.amber} />
         <RailValue label="DISTANCE TO TARGET" value={distanceText(current, resolvedTarget)} color={T.cyan} />
-        <RailValue label="LAST UPDATE" value={`${clockTime(lastUpdated)} · ${state.toUpperCase()}`} color={state === "live" ? T.green : T.amber} />
+        <RailValue label="LAST UPDATE" value={`${clockTime(marketQuery.data?.ticker?.lastUpdated ?? lastUpdated)} · ${marketPrice != null ? "LIVE" : state.toUpperCase()}`} color={marketPrice != null || state === "live" ? T.green : T.amber} />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 72px 62px", gap: 7, alignItems: "center" }}>
         <input
@@ -1543,6 +1644,19 @@ export default function OperatorWorkstation() {
     refetchInterval: 10_000,
   });
 
+  const feedHealthQuery = useQuery<MarketFeedHealthResponse>({
+    queryKey: ["operator-workstation-market-feed-health", "INJUSD"],
+    queryFn: async () => {
+      const res = await fetch(apiUrl("/api/market-data/INJUSD/health"), {
+        cache: "no-store",
+        credentials: "include",
+        headers: { Accept: "application/json" },
+      });
+      return readJson<MarketFeedHealthResponse>(res);
+    },
+    refetchInterval: 5_000,
+  });
+
   const invalidate = () => {
     void qc.invalidateQueries({ queryKey: ["operator-workstation-detail", userId] });
     void qc.invalidateQueries({ queryKey: ["operator-workstation-planned", userId] });
@@ -1571,7 +1685,7 @@ export default function OperatorWorkstation() {
   });
 
   const buyNow = useMutation({
-    mutationFn: async (input: BuyNowConfirmInput) => {
+    mutationFn: async (input: BuyNowSubmitInput) => {
       if (!userId) throw new Error("Operator user id unavailable");
       const buyRes = await api(`/api/admin/users/${encodeURIComponent(userId)}/operator-buy`, {
         method: "POST",
@@ -1579,6 +1693,7 @@ export default function OperatorWorkstation() {
           symbol: input.symbol,
           sizeUSD: input.positionSizeUSD,
           confidence: input.confidence ?? undefined,
+          quoteId: input.quoteId,
           note: "Operator workstation BUY NOW",
         }),
       });
@@ -1588,6 +1703,9 @@ export default function OperatorWorkstation() {
         exchangeOrderId?: string | null;
         exchange?: string | null;
         fillPrice?: number | null;
+        quoteId?: string | null;
+        quotePrice?: number | null;
+        quoteExpiresAt?: number | null;
         sizeUSD?: number | null;
         effectiveSizeUSD?: number | null;
         dryRun?: boolean;
@@ -1610,7 +1728,7 @@ export default function OperatorWorkstation() {
       const exchange = body.exchange ? body.exchange.toUpperCase() : "EXCHANGE";
       toast({
         title: `BUY NOW submitted${asset ? ` — ${asset.label}` : ""}`,
-        description: [`${moneyFull(body.sizeUSD ?? body.effectiveSizeUSD ?? input.positionSizeUSD, 0)}`, exchange, body.fillPrice ? `@ ${price(body.fillPrice)}` : "market", input.sellTargetPrice != null ? "sell target armed" : null].filter(Boolean).join(" · "),
+        description: [`${moneyFull(body.sizeUSD ?? body.effectiveSizeUSD ?? input.positionSizeUSD, 0)}`, exchange, body.fillPrice ? `@ ${price(body.fillPrice)}` : `quote ${price(input.previewPrice)}`, body.quoteId ? `quote ${body.quoteId.slice(0, 8)}` : null, input.sellTargetPrice != null ? "sell target armed" : null].filter(Boolean).join(" · "),
       });
       setBuyNowConfirm(null);
       invalidate();
@@ -1686,6 +1804,10 @@ export default function OperatorWorkstation() {
   const positionBySymbol = (symbol: string) => positions.find((p) => rowSymbol(p) === symbol);
   const busy = armPlannedBuy.isPending || buyNow.isPending || cancelPlan.isPending || armSellTarget.isPending || manualSell.isPending;
   const engine = engineQuery.data;
+  const feedAge = maybeNum(feedHealthQuery.data?.tickerAgeSeconds);
+  const feedUnavailable = feedHealthQuery.isError || !!feedHealthQuery.data?.error || feedAge == null;
+  const feedColor = feedUnavailable || feedAge > 60 ? T.red : feedAge >= 15 ? T.amber : T.green;
+  const feedStatus = feedUnavailable ? "UNAVAILABLE" : feedAge > 60 ? "STALE" : "LIVE";
   const runtime = runtimeQuery.data;
   const activeConn = runtime?.connectedExchanges.find((c) => c.exchange === runtime.activeExchange) ?? runtime?.connectedExchanges[0];
   const liveCash = activeConn?.usdBreakdown
@@ -1728,6 +1850,8 @@ export default function OperatorWorkstation() {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
           {!isPersonalOperator && isSuperAdmin && <TopPill icon={AlertTriangle} label="SUPER-ADMIN PREVIEW" color={T.amber} />}
+          <TopPill icon={Radio} label={`MARKET FEED: ${feedStatus}`} color={feedColor} />
+          <TopPill icon={Activity} label={`TICKER AGE: ${feedAge == null ? "—" : `${feedAge}s`}`} color={feedColor} />
           <TopPill icon={engine?.running ? CheckCircle2 : PauseCircle} label={engine?.running ? "ENGINE LIVE" : "ENGINE —"} color={engine?.running ? T.green : T.faint} />
           <TopPill icon={engine?.killSwitch ? AlertTriangle : Radio} label={engine?.killSwitch ? "KILL ACTIVE" : "KILL CLEAR"} color={engine?.killSwitch ? T.red : T.cyan} />
           <TopPill icon={engine?.testMode ? Loader2 : Zap} label={engine?.testMode ? "TEST MODE" : "LIVE MODE"} color={engine?.testMode ? T.amber : T.green} />
@@ -1797,9 +1921,16 @@ export default function OperatorWorkstation() {
       {buyNowConfirm && (
         <BuyNowConfirmModal
           input={buyNowConfirm}
+          userId={userId!}
+          api={api}
           pending={buyNow.isPending}
           onCancel={() => setBuyNowConfirm(null)}
-          onConfirm={() => buyNow.mutate(buyNowConfirm)}
+          onConfirm={(preview) => buyNow.mutate({
+            ...buyNowConfirm,
+            quoteId: preview.quoteId,
+            previewPrice: preview.price,
+            quoteExpiresAt: preview.expiresAt,
+          })}
         />
       )}
     </div>

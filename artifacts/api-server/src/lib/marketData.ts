@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import https from "node:https";
 
 /**
@@ -54,6 +55,16 @@ export interface TickerData {
   change24h: number;
   changePercent24h: number;
   lastUpdated: number;
+}
+
+export interface MarketQuote {
+  quoteId: string;
+  symbol: string;
+  price: number;
+  bid: number;
+  ask: number;
+  createdAt: number;
+  expiresAt: number;
 }
 
 interface CacheEntry<T> {
@@ -385,6 +396,8 @@ const STALE_ON_ARRIVAL_MULTIPLIER = 3;
 
 const candleCache = new Map<string, CacheEntry<Candle[]>>();
 const tickerCache = new Map<string, CacheEntry<TickerData>>();
+const quoteCache = new Map<string, MarketQuote>();
+const QUOTE_TTL_MS = 15_000;
 
 // ── Data feed health telemetry ───────────────────────────────────────────────
 
@@ -738,6 +751,60 @@ export async function getTicker(symbol: string): Promise<TickerData> {
 
   tickerCache.set(symbol, { data: ticker, fetchedAt: Date.now() });
   return ticker;
+}
+
+export class QuoteValidationError extends Error {
+  constructor(
+    public readonly code: "quote_required" | "quote_not_found" | "quote_expired" | "quote_symbol_mismatch",
+    message: string,
+  ) {
+    super(message);
+    this.name = "QuoteValidationError";
+  }
+}
+
+function pruneExpiredQuotes(now = Date.now()): void {
+  for (const [quoteId, quote] of quoteCache.entries()) {
+    if (quote.expiresAt <= now) quoteCache.delete(quoteId);
+  }
+}
+
+export async function createMarketQuote(symbol: string, ttlMs = QUOTE_TTL_MS): Promise<MarketQuote> {
+  const ticker = await getTicker(symbol);
+  const now = Date.now();
+  pruneExpiredQuotes(now);
+  const quote: MarketQuote = {
+    quoteId: randomUUID(),
+    symbol,
+    price: ticker.price,
+    bid: ticker.bid,
+    ask: ticker.ask,
+    createdAt: now,
+    expiresAt: now + ttlMs,
+  };
+  quoteCache.set(quote.quoteId, quote);
+  return quote;
+}
+
+export function getLockedQuote(quoteId: string | undefined, symbol?: string): MarketQuote {
+  const id = quoteId?.trim();
+  if (!id) {
+    throw new QuoteValidationError("quote_required", "Refresh quote before submitting BUY NOW");
+  }
+  const now = Date.now();
+  const quote = quoteCache.get(id);
+  if (!quote) {
+    pruneExpiredQuotes(now);
+    throw new QuoteValidationError("quote_not_found", "Quote not found or already expired. Refresh quote and try again.");
+  }
+  if (quote.expiresAt <= now) {
+    quoteCache.delete(id);
+    throw new QuoteValidationError("quote_expired", "Quote expired. Refresh quote before submitting BUY NOW.");
+  }
+  if (symbol && quote.symbol !== symbol.trim().toUpperCase()) {
+    throw new QuoteValidationError("quote_symbol_mismatch", `Quote is for ${quote.symbol}, not ${symbol}`);
+  }
+  return quote;
 }
 
 // ── Compat: callers that still import SYMBOL_MAP (legacy) ────────────────────

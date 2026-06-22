@@ -96,6 +96,13 @@ export interface LiveUserOrderRequest {
    * users whose `multiExchangeParallelEnabled` flag is on; ignored otherwise.
    */
   targetExchange?: string;
+  /**
+   * Operator quote-lock path. When present, the base quantity is calculated
+   * from the preview quote that the operator explicitly accepted. Broker
+   * execution still records the exchange-reported average fill when available.
+   */
+  lockedReferencePrice?: number;
+  lockedQuoteId?: string;
 }
 
 export interface LiveUserOrderResult {
@@ -1927,13 +1934,17 @@ export async function placeLiveAutoOrderForUser(
 
   // 3. Reference price → base quantity
   let referencePrice: number;
-  try {
-    const ticker = await getTicker(symbol);
-    referencePrice = ticker.price;
-  } catch (err) {
-    const msg = `Failed to fetch reference price for ${symbol}: ${err instanceof Error ? err.message : String(err)}`;
-    await emitFailureNotification(userId, symbol, side, msg, row.exchange);
-    return { success: false, userId, exchange: row.exchange, errorCode: "price_unavailable", error: msg };
+  if (req.lockedReferencePrice !== undefined) {
+    referencePrice = req.lockedReferencePrice;
+  } else {
+    try {
+      const ticker = await getTicker(symbol);
+      referencePrice = ticker.price;
+    } catch (err) {
+      const msg = `Failed to fetch reference price for ${symbol}: ${err instanceof Error ? err.message : String(err)}`;
+      await emitFailureNotification(userId, symbol, side, msg, row.exchange);
+      return { success: false, userId, exchange: row.exchange, errorCode: "price_unavailable", error: msg };
+    }
   }
   if (!(referencePrice > 0)) {
     const msg = `Invalid reference price (${referencePrice}) for ${symbol}`;
@@ -1951,7 +1962,7 @@ export async function placeLiveAutoOrderForUser(
   // 4. Dry-run short-circuit (pilot rollout safety net)
   if (isDryRunEnabled()) {
     logger.info(
-      { userId, exchange: row.exchange, symbol, side, sizeUSD, qtyBase, referencePrice },
+      { userId, exchange: row.exchange, symbol, side, sizeUSD, qtyBase, referencePrice, quoteId: req.lockedQuoteId },
       "liveUserExecution: DRY-RUN — adapter call skipped",
     );
     const dryResult: LiveUserOrderResult = {
@@ -2094,7 +2105,7 @@ export async function placeLiveAutoOrderForUser(
   let filled = false;
   try {
     await recordExecTrace(`execution_submitted_${row.exchange.toLowerCase()}`, "info", {
-      userId, symbol, side, sizeUSD, exchange: row.exchange, qtyBase, referencePrice,
+      userId, symbol, side, sizeUSD, exchange: row.exchange, qtyBase, referencePrice, quoteId: req.lockedQuoteId,
     });
     // Issue #2 metric: a customer live order has been DISPATCHED to the broker.
     // This is "submitted", not "filled" — the filled counter only advances after
