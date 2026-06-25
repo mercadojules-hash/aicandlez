@@ -53,6 +53,10 @@ export function isExecutionGatewayUnified(): boolean {
   return process.env["EXECUTION_GATEWAY_UNIFIED"] === "true";
 }
 
+export function isAiAutoTradingEnabled(): boolean {
+  return process.env["AI_AUTO_TRADING_ENABLED"] === "true";
+}
+
 function runtimeOf(req: LiveUserOrderRequest): RuntimeMode {
   return req.useSandbox ? "sandbox" : "live";
 }
@@ -72,6 +76,45 @@ export async function executeCustomerOrder(
   // Re-stamp the request so downstream `placeLiveAutoOrderForUser` sees
   // the resolved id (matters when the upstream caller didn't pass one).
   legacyReq.correlationId = correlationId;
+
+  if (trigger === "ai" && !isAiAutoTradingEnabled()) {
+    emitTelemetry({
+      tag:               "EXECUTION_REJECTED",
+      correlationId,
+      userId:            legacyReq.userId,
+      symbol:            legacyReq.symbol,
+      normalizedSymbol:  legacyReq.symbol,
+      exchange:          null,
+      runtimeMode,
+      persistenceResult: "skipped",
+      positionId:        null,
+      latencyMs:         Date.now() - acceptedAt,
+      rejectionReason:   "ai_auto_trading_disabled",
+      trigger:           trigT,
+      side:              legacyReq.side,
+      sizeUSD:           legacyReq.sizeUSD,
+    });
+    logger.warn(
+      { tag: "AI_AUTO_TRADING_DISABLED", correlationId, userId: legacyReq.userId, symbol: legacyReq.symbol },
+      "[AI_AUTO_TRADING_DISABLED] blocked AI-triggered customer order before broker execution",
+    );
+    recordCustomerAttempt({
+      userId:    legacyReq.userId,
+      symbol:    legacyReq.symbol,
+      side:      legacyReq.side,
+      exchange:  legacyReq.targetExchange ?? null,
+      success:   false,
+      errorCode: "ai_auto_trading_disabled",
+    });
+    return {
+      success: false,
+      userId: legacyReq.userId,
+      errorCode: "ai_auto_trading_disabled",
+      error: "AI auto trading is disabled. Manual trading remains available.",
+      trigger,
+      correlationId,
+    };
+  }
 
   emitTelemetry({
     tag:               "EXECUTION_GATEWAY_ACCEPTED",

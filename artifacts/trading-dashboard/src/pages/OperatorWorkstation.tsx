@@ -76,6 +76,9 @@ interface EngineStatusResponse {
   running: boolean;
   killSwitch: boolean;
   executionActive: boolean;
+  aiAutoTradingEnabled?: boolean;
+  manualMode?: boolean;
+  tradingModeLabel?: string;
   testMode: boolean;
   symbolBreakdowns?: Record<string, EngineSymbolBreakdown>;
 }
@@ -662,7 +665,8 @@ function SummaryBar({
   engine: EngineStatusResponse | undefined;
   onSignOut: () => void;
 }) {
-  const aiLive = !!engine?.running && !engine.killSwitch;
+  const manualMode = engine?.manualMode === true || engine?.aiAutoTradingEnabled === false;
+  const aiLive = !!engine?.running && !engine.killSwitch && !manualMode;
   return (
     <section style={{
       borderBottom: `1px solid ${T.border}`,
@@ -706,7 +710,7 @@ function SummaryBar({
         <SummaryMetric label="OPEN P/L" value={signedMoney(openPnl)} color={(openPnl ?? 0) >= 0 ? T.green : T.red} />
         <SummaryMetric label="TRADE SIZE" value={moneyFull(tradeSize, 0)} />
         <SummaryMetric label="MAX HOLD" value={maxHoldLabel} color={T.amber} />
-        <SummaryMetric label="AI STATUS" value={aiLive ? "LIVE" : "IDLE"} color={aiLive ? T.green : T.faint} />
+        <SummaryMetric label="AI STATUS" value={manualMode ? "MANUAL MODE" : aiLive ? "LIVE" : "IDLE"} color={manualMode ? T.amber : aiLive ? T.green : T.faint} />
         <SummaryMetric label="KILL SWITCH" value={engine?.killSwitch ? "ACTIVE" : "CLEAR"} color={engine?.killSwitch ? T.red : T.cyan} />
       </div>
     </section>
@@ -1853,6 +1857,7 @@ export default function OperatorWorkstation() {
           <TopPill icon={Radio} label={`MARKET FEED: ${feedStatus}`} color={feedColor} />
           <TopPill icon={Activity} label={`TICKER AGE: ${feedAge == null ? "—" : `${feedAge}s`}`} color={feedColor} />
           <TopPill icon={engine?.running ? CheckCircle2 : PauseCircle} label={engine?.running ? "ENGINE LIVE" : "ENGINE —"} color={engine?.running ? T.green : T.faint} />
+          <TopPill icon={PauseCircle} label={engine?.manualMode || engine?.aiAutoTradingEnabled === false ? "AI TRADING DISABLED" : "AUTO ENTRIES ON"} color={engine?.manualMode || engine?.aiAutoTradingEnabled === false ? T.amber : T.green} />
           <TopPill icon={engine?.killSwitch ? AlertTriangle : Radio} label={engine?.killSwitch ? "KILL ACTIVE" : "KILL CLEAR"} color={engine?.killSwitch ? T.red : T.cyan} />
           <TopPill icon={engine?.testMode ? Loader2 : Zap} label={engine?.testMode ? "TEST MODE" : "LIVE MODE"} color={engine?.testMode ? T.amber : T.green} />
         </div>

@@ -32,6 +32,7 @@ import {
 import { requireAuth, requireRole } from "../middlewares/requireAuth.js";
 import { getExecutionFunnelSnapshot } from "../lib/executionFunnel.js";
 import { getSignalFunnelSnapshot, resetSignalFunnel } from "../lib/signalFunnel.js";
+import { isAiAutoTradingEnabled } from "../lib/executionGateway.js";
 
 const router = Router();
 // All engine-control routes are operator-only (super-admin / admin).
@@ -46,10 +47,14 @@ router.get("/engine/status", (_req, res) => {
   // at tick start (line ~1023). When true, NO new orders flow anywhere.
   const killSwitch = settingsStore.get().killSwitch === true;
   const executionActive = engineStats.running && !killSwitch;
+  const aiAutoTradingEnabled = isAiAutoTradingEnabled();
   res.json({
     running:            engineStats.running,
     killSwitch,                              // platform global stop
     executionActive,                         // running AND !killSwitch
+    aiAutoTradingEnabled,
+    manualMode:         !aiAutoTradingEnabled,
+    tradingModeLabel:   aiAutoTradingEnabled ? "AI Auto Trading Enabled" : "AI Trading Disabled / Manual Mode",
     startedAt:          engineStats.startedAt,
     lastTickAt:         engineStats.lastTickAt,
     lastSignalAt:       engineStats.lastSignalAt,

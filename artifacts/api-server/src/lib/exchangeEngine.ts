@@ -1209,6 +1209,10 @@ export async function placeLiveAutoOrder(req: {
     return { success: false, error, rejectionGate: gate };
   };
 
+  if (process.env["AI_AUTO_TRADING_ENABLED"] !== "true") {
+    return reject("ai_auto_trading_disabled", "AI auto trading is disabled. Manual trading remains available.");
+  }
+
   // Operator env-key live order — owner-process only (see operatorEngineOwner).
   // A non-owner (e.g. the Replit dev workspace) must never drive the shared
   // Kraken key or its nonce stream collides with the prod owner.

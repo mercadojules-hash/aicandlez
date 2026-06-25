@@ -14,7 +14,7 @@ import {
   getUserBrokerBaseBalance,
   type LiveUserOrderResult,
 } from "./liveUserExecution.js";
-import { executeCustomerOrder } from "./executionGateway.js";
+import { executeCustomerOrder, isAiAutoTradingEnabled } from "./executionGateway.js";
 import { getTradeLimitVerdict, invalidateTradeLimitCache } from "./tradeLimitEngine.js";
 import {
   registerLiveUserFill,
@@ -1485,6 +1485,37 @@ async function autoExecute(
     const isLiveMode = exMode !== "simulation";
     exModeForStream = isTest ? "test" : (isLiveMode ? "live" : "simulation");
   } catch { /* fail-open to existing gates only on import error */ }
+
+  // ── Emergency manual-mode gate ─────────────────────────────────────────────
+  // AI/scheduled entries must be explicitly enabled. When disabled, the engine
+  // still scans markets, emits signals, computes recommendations, and runs exit
+  // monitors, but no autonomous entry can reach customer, paper, or operator
+  // order placement. Manual BUY/SELL and manual target exits do not call this
+  // autoExecute path and remain available.
+  if (!isAiAutoTradingEnabled()) {
+    engineStats.tradesBlocked++;
+    const msg = `AI auto trading disabled — blocked scheduled ${symbol} ${side} entry. Manual trading remains enabled.`;
+    logger.warn({ tag: "AI_AUTO_TRADING_DISABLED", symbol, side, signalId, confidence }, msg);
+    await db.insert(logsTable).values({
+      id: genId(),
+      type: "trade",
+      level: "warn",
+      message: msg,
+      details: { symbol, side, signalId, confidence, manualMode: true },
+    });
+    executionStreamBus.emitEvent({
+      type: "order_rejected",
+      severity: "warn",
+      symbol,
+      side,
+      gate: "ai_auto_trading_disabled",
+      mode: exModeForStream,
+      reason: "manual_mode",
+      message: msg,
+      details: { signalId, confidence, manualMode: true },
+    });
+    return { executed: false, blockReason: "AI auto trading disabled" };
+  }
 
   // ── Gate 1: max concurrent open positions (OPERATOR/GLOBAL book ONLY) ───────
   // CUSTOMER-EXECUTION INVARIANT: this cap bounds the OPERATOR's OWN global

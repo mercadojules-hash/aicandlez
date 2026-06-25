@@ -125,7 +125,7 @@ export interface LiveUserOrderResult {
   dryRun?:         boolean;
   /** True when the order was routed through the exchange's public sandbox. */
   sandbox?:        boolean;
-  errorCode?:      "no_connection" | "not_trade_authorized" | "decrypt_failed" | "unsupported" | "unsupported_symbol" | "symbol_not_in_universe" | "symbol_disabled" | "sell_blocked_bullish_1h" | "no_sandbox" | "price_unavailable" | "exchange_reject" | "trade_limit_exhausted" | "user_status_blocked" | "customer_live_execution_disabled" | "risk_governor_paused" | "user_ai_disabled" | "concurrent_live_cap_reached" | "risk_max_per_trade" | "risk_max_simultaneous" | "risk_max_allocation" | "risk_reserve_cash_breach" | "risk_no_equity" | "ai_disclaimer_not_accepted" | "low_confidence_signal" | "volume_safety_gate" | "liquidity_protected" | "plan_max_positions_reached" | "allocation_limit" | "spot_short_blocked" | "cash_unavailable";
+  errorCode?:      "no_connection" | "not_trade_authorized" | "decrypt_failed" | "unsupported" | "unsupported_symbol" | "symbol_not_in_universe" | "symbol_disabled" | "sell_blocked_bullish_1h" | "no_sandbox" | "price_unavailable" | "exchange_reject" | "trade_limit_exhausted" | "user_status_blocked" | "customer_live_execution_disabled" | "ai_auto_trading_disabled" | "risk_governor_paused" | "user_ai_disabled" | "concurrent_live_cap_reached" | "risk_max_per_trade" | "risk_max_simultaneous" | "risk_max_allocation" | "risk_reserve_cash_breach" | "risk_no_equity" | "ai_disclaimer_not_accepted" | "low_confidence_signal" | "volume_safety_gate" | "liquidity_protected" | "plan_max_positions_reached" | "allocation_limit" | "spot_short_blocked" | "cash_unavailable";
   error?:          string;
 }
 
